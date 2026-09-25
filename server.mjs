@@ -10,6 +10,8 @@ import {metrics} from './lib/data.mjs';
 import {checkProvider,download} from './lib/providers.mjs';
 import {demo,artwork} from './lib/demo.mjs';
 import {moneyReport} from './lib/money-report.mjs';
+import {saveVideos,deleteVideos,videoInfo,videoPath,parseRange} from './lib/videos.mjs';
+import {createReadStream} from 'node:fs';
 const ROOT=dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||5190),HOST='127.0.0.1';
 const CSRF=randomBytes(32).toString('hex');
@@ -19,6 +21,12 @@ const sessionKeys={};const verified={};
 const keys=()=>({fireworks:sessionKeys.fireworks||localEnv.FIREWORKS_API_KEY||process.env.FIREWORKS_API_KEY,apify:sessionKeys.apify||localEnv.APIFY_TOKEN||process.env.APIFY_TOKEN||process.env.APIFY_API_TOKEN,groq:sessionKeys.groq||localEnv.GROQ_API_KEY||process.env.GROQ_API_KEY,jev:sessionKeys.jev||localEnv.TYPESAFE_API_KEY||process.env.TYPESAFE_API_KEY||process.env.JEV_API_KEY});
 const pipeline=await new Pipeline(process.env.LAB_DATA_DIR||join(ROOT,'data'),keys,{transcriptionProvider,fireworksRpm:Number(localEnv.FIREWORKS_REQUESTS_PER_MINUTE||process.env.FIREWORKS_REQUESTS_PER_MINUTE||60),groqRpm:Number(localEnv.GROQ_REQUESTS_PER_MINUTE||process.env.GROQ_REQUESTS_PER_MINUTE||20)}).init();
 let mediaActive=0;const mediaWaiters=[],mediaPending=new Map();async function mediaTask(fn){if(mediaActive>=8)await new Promise(resolve=>mediaWaiters.push(resolve));else mediaActive++;try{return await fn();}finally{if(mediaWaiters.length)mediaWaiters.shift()();else mediaActive--;}}
+// Videos are saved locally when a run finishes (and at startup for finished runs), before Instagram links expire.
+const videoJobs=new Map();
+function startVideoSave(job){const existing=videoJobs.get(job.id);if(existing?.running)return existing;const state={running:true,progress:null,result:null,error:null};state.done=saveVideos(pipeline.root,job,{onProgress:p=>{state.progress=p;}}).then(r=>{state.result=r;}).catch(e=>{state.error=e.message;console.error(`Creator Lab: saving videos for ${job.id} failed: ${e.message}`);}).finally(()=>{state.running=false;});videoJobs.set(job.id,state);return state;}
+const finished=j=>['complete','partial'].includes(j.status);
+for(const j of pipeline.jobs.values())if(finished(j))startVideoSave(j);
+pipeline.listeners.add(id=>{const j=pipeline.jobs.get(id);if(j&&finished(j)&&!videoJobs.get(id)?.running&&!videoJobs.get(id)?.result)startVideoSave(j);});
 const clients=new Set();pipeline.listeners.add(id=>{for(const res of clients)res.write(`data: ${JSON.stringify({id})}\n\n`);});
 const publicJob=j=>{const copy=structuredClone(j);for(const p of copy.posts){if(p.transcript)delete p.transcript.raw;if(p.analysis)delete p.analysis.raw;}return copy;};
 const summary=j=>({id:j.id,creator:j.creator,status:j.status,createdAt:j.createdAt,count:j.posts.length,completed:j.posts.filter(p=>p.analysis).length});
@@ -37,6 +45,12 @@ const server=http.createServer(async(req,res)=>{
   if(path==='/api/events'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache',Connection:'keep-alive'});res.write(': connected\n\n');clients.add(res);req.on('close',()=>clients.delete(res));return;}
   if(path==='/api/demo'){json(res,200,demo());return;}
   if(path==='/api/runs'&&req.method==='POST'){const data=await body(req);const job=await pipeline.create(data,data.rows);json(res,201,publicJob(job));return;}
+  const vids=path.match(/^\/api\/runs\/([\w-]+)\/videos(?:\/(save|delete))?$/);
+  if(vids){const job=pipeline.jobs.get(vids[1]);if(!job){json(res,404,{error:'Run not found'});return;}const state=videoJobs.get(job.id);
+   if(vids[2]==='save'&&req.method==='POST')startVideoSave(job);
+   else if(vids[2]==='delete'&&req.method==='POST'){if(state?.running){json(res,409,{error:'Videos are still being saved. Try again when saving finishes.'});return;}videoJobs.delete(job.id);json(res,200,await deleteVideos(pipeline.root,job));return;}
+   else if(vids[2]){json(res,405,{error:'Method not allowed'});return;}
+   const now=videoJobs.get(job.id);json(res,200,{...await videoInfo(pipeline.root,job),saving:Boolean(now?.running),progress:now?.progress||null,lastResult:now?.result||null,error:now?.error||null});return;}
   const match=path.match(/^\/api\/runs\/([\w-]+)(?:\/(run|pause|export|metrics|attach|money))?$/);
   if(match){const [,id,action]=match;const job=pipeline.jobs.get(id);if(!job){json(res,404,{error:'Run not found'});return;}
    if(action==='run'&&req.method==='POST'){if(pipeline.active.size&&!pipeline.active.has(id))throw new Error('Pause the current run first');const settings=await body(req);if(settings.concurrency!==undefined){const n=Number(settings.concurrency);if(!Number.isInteger(n)||n<1||n>12)throw new Error('Concurrency must be 1 to 12');job.concurrency=n;}await pipeline.run(id);json(res,200,publicJob(job));return;}
@@ -47,6 +61,10 @@ const server=http.createServer(async(req,res)=>{
    if(action==='export'){res.setHeader('Content-Disposition',`attachment; filename="${job.creator}-${id}.json"`);json(res,200,publicJob(job));return;}
    json(res,200,publicJob(job));return;
   }
+  const video=path.match(/^\/videos\/([\w-]+)\/([\w-]+)$/);
+  if(video){let file,info;try{file=videoPath(pipeline.root,video[1],video[2]);info=await stat(file);}catch{res.writeHead(404);res.end();return;}
+   const range=req.headers.range;if(range){const r=parseRange(range,info.size);if(!r){res.writeHead(416,{'Content-Range':`bytes */${info.size}`});res.end();return;}res.writeHead(206,{'Content-Type':'video/mp4','Accept-Ranges':'bytes','Content-Range':`bytes ${r.start}-${r.end}/${info.size}`,'Content-Length':r.end-r.start+1,'Cache-Control':'no-cache'});createReadStream(file,{start:r.start,end:r.end}).pipe(res);return;}
+   res.writeHead(200,{'Content-Type':'video/mp4','Accept-Ranges':'bytes','Content-Length':info.size,'Cache-Control':'no-cache'});createReadStream(file).pipe(res);return;}
   const art=path.match(/^\/demo-art\/(\d+)\.svg$/);if(art){res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'});res.end(artwork(Number(art[1])));return;}
   const thumb=path.match(/^\/media\/([\w-]+)\/([\w-]+)$/);if(thumb){const job=pipeline.jobs.get(thumb[1]),post=job?.posts.find(p=>p.id===thumb[2]);if(!post?.thumbnailUrl){res.writeHead(404);res.end();return;}const file=join(pipeline.root,'media',post.id+'.img');let bytes;try{bytes=await readFile(file);}catch{if(!mediaPending.has(file))mediaPending.set(file,mediaTask(async()=>{const result=await download(post.thumbnailUrl,8*1024*1024);if(!/^image\/(jpeg|png|webp)/.test(result.type))throw new Error('Unsupported thumbnail format');await writeFile(file,result.bytes);return result.bytes;}).finally(()=>mediaPending.delete(file)));bytes=await mediaPending.get(file);}const type=bytes[0]===0x89?'image/png':bytes.toString('ascii',8,12)==='WEBP'?'image/webp':'image/jpeg';res.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=86400'});res.end(bytes);return;}
   const files={'/record':'record.html','/record.js':'record.js','/record.css':'record.css','/':'index.html','/app.js':'app.js','/research.mjs':'research.mjs','/money-view.mjs':'money-view.mjs','/styles.css':'styles.css','/money/index.mjs':'money/index.mjs','/money/1.0.mjs':'money/1.0.mjs'};
