@@ -1,4 +1,5 @@
 import {filterPosts,groupPosts,summarize,sortExamples,rate} from './research.mjs';
+import {renderMoneyView,renderMoneyInspector} from './money-view.mjs';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const openingLine=p=>{const text=p.analysis?.opening||p.transcript?.text||'';const sentence=text.match(/^.*?[.!?](?:\s|$)/s)?.[0]?.trim();return sentence||((text.length>180?text.slice(0,177)+'…':text));};
@@ -9,6 +10,8 @@ const colors=['#899967','#c58e65','#8babc0','#bf8585','#a39dc0','#81aaa0','#c2b2
 const roleColors={hook:'#b3c966',setup:'#a8b9b0',problem:'#cd937d',example:'#87a9bd',advice:'#889f70',payoff:'#b1a4c5',cta:'#d2b266',other:'#bcc2b4',unclear:'#bcc2b4'};
 let boot,job,selected,dimension='mechanism',category='all',plot=[],groups=[],visible=[],replaying=false,replayToken=0,replayRevealed=new Set(),refreshTimer,metricsInitialized=false;
 let compareKeys=new Set(),comparisonOpen=false,examplePage=0;
+let currentView='explorer',moneyState;
+const moneyFetchedAt=new Map();
 const api=async(path,data)=>{const r=await fetch(path,data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-Lab-Token':boot.token},body:JSON.stringify(data)});const v=await r.json();if(!r.ok)throw new Error(v.error||'Request failed');return v;};
 function toast(text){$('#toast').textContent=text;$('#toast').hidden=false;setTimeout(()=>$('#toast').hidden=true,5500);}
 const median=a=>{a=a.filter(Number.isFinite).sort((a,b)=>a-b);return a.length?(a[Math.floor((a.length-1)/2)]+a[Math.ceil((a.length-1)/2)])/2:null;};
@@ -55,7 +58,7 @@ function buildTiles(){
  }
 }
 function layout(){
- if(!job)return;const stage=$('#stage');if(document.body.classList.contains('focused')&&!document.body.classList.contains('portrait')&&innerWidth>760){const height=Math.max(330,Math.floor(innerHeight-(stage.getBoundingClientRect().top+scrollY)-48));if(stage.style.height!==`${height}px`)stage.style.height=`${height}px`;$('.inspector').style.maxHeight=`${height+70}px`;}else{stage.style.height='';$('.inspector').style.maxHeight='';}const w=stage.clientWidth,h=stage.clientHeight,stacked=w<680;stage.classList.add('map','simultaneous');
+ if(!job)return;if(currentView==='money'){$('.inspector').style.maxHeight='';return;}const stage=$('#stage');if(document.body.classList.contains('focused')&&!document.body.classList.contains('portrait')&&innerWidth>760){const height=Math.max(330,Math.floor(innerHeight-(stage.getBoundingClientRect().top+scrollY)-48));if(stage.style.height!==`${height}px`)stage.style.height=`${height}px`;$('.inspector').style.maxHeight=`${height+70}px`;}else{stage.style.height='';$('.inspector').style.maxHeight='';}const w=stage.clientWidth,h=stage.clientHeight,stacked=w<680;stage.classList.add('map','simultaneous');
  const wallW=stacked?w:Math.floor(w*.43)-15,wallH=stacked?Math.floor(h*.36):h;
  const mapX=stacked?0:wallW+30,mapY=stacked?wallH+25:0,mapW=w-mapX,mapH=h-mapY;
  $('#wall-label').style.cssText='left:0;top:0';$('#map-label').style.cssText=`left:${mapX}px;top:${mapY}px`;
@@ -97,6 +100,7 @@ function selectPost(id){selected=id;const p=job.posts.find(p=>p.id===id);if(!p)r
  $('#all-labels').innerHTML=Object.entries(p.analysis?.labels||{}).map(([key,a])=>`<div class="label-line"><span>${escape(boot.dimensions[key]?.title||key)}</span><span>${title(a.value)}</span><span>${Math.round(a.confidence*100)}%</span></div>`).join('');
  $('#post-error').textContent=p.excludedReason||((p.error||p.analysis?.review)?'Review: '+(p.error||'Some labels are uncertain. Check the spoken source.'):'');
  for(const tile of $$('.tile'))tile.classList.toggle('selected',tile.dataset.id===selected);
+ renderMoneySelection();
 }
 const formatRate=(n,digits=1)=>n===null?'Unknown':n.toFixed(digits);
 function researchPosts(){return visible.filter(p=>p.analysis&&!p.excludedReason&&(category==='all'||value(p)===category));}
@@ -126,8 +130,53 @@ function renderExamples(){
  $('#example-grid').innerHTML=shown.length?shown.map(p=>`<article class="example-card" data-post="${escape(p.id)}"><button class="example-thumbnail" data-inspect="${escape(p.id)}" aria-label="Inspect Reel ${escape(p.id)}"><img src="${escape(imageURL(p))}" loading="lazy" alt="Reel thumbnail"><span>Inspect script ↗</span></button><div class="example-copy"><small>${title(p.analysis.labels.topic?.value)} · ${title(p.analysis.labels.mechanism?.value)}</small><h4>${escape(openingLine(p))}</h4><div class="example-metrics"><span><b>${compact(p[metric])}</b> ${metric}</span><span><b>${compact(p.likes)}</b> likes</span><span><b>${formatRate(rate(p,'likes',metric))}</b> likes / 1k</span><span><b>${formatRate(rate(p,'comments',metric),2)}</b> comments / 1k</span></div><div class="example-links"><button class="quiet" data-inspect="${escape(p.id)}">Read script ↗</button>${!job.synthetic&&safeLink(p.url)?`<a href="${escape(safeLink(p.url))}" target="_blank" rel="noopener noreferrer">Original Reel ↗</a>`:'<span>Synthetic example</span>'}</div></div></article>`).join(''):'<p class="examples-empty">No examples for this combination. Clear a filter to explore more Reels.</p>';
  $('#example-grid').querySelectorAll('[data-inspect]').forEach(b=>b.onclick=()=>{selectPost(b.dataset.inspect);$('.inspector').scrollIntoView({behavior:'smooth',block:'center'});});
 }
-function render(){if(!metricsInitialized&&job.posts.length){if(!job.posts.some(p=>p.views>0)&&job.posts.some(p=>p.plays>0))$('#metric').value='plays';else $('#metric').value='views';if(job.posts.length<100||!job.posts.some(p=>p.publishedAt&&(Date.now()-Date.parse(p.publishedAt))/864e5>=7))$('#age').value='0';else $('#age').value='7';metricsInitialized=true;}readStats();calculate();$('.inspector').classList.toggle('no-matches',!visible.length);$('#inspector-empty').hidden=visible.length>0;renderLegend();buildTiles();layout();renderGroups();if(!selected&&job.posts.length)selectPost((job.posts.find(p=>p.analysis&&!p.excludedReason)||job.posts[0]).id);}
-async function loadJob(id){stopReplay();job=await api(id==='demo'?'/api/demo':`/api/runs/${id}`);selected=(job.posts.find(p=>p.analysis&&!p.excludedReason)||job.posts[0])?.id;metricsInitialized=false;category='all';compareKeys.clear();comparisonOpen=false;examplePage=0;$('#topic-filter').value='all';$('#hook-filter').value='all';$('#tiles').innerHTML='';$('#map-tiles').innerHTML='';$('#comparison').hidden=true;render();if(selected)selectPost(selected);else{$('#opening').textContent='Collecting the archive. The first spoken opening will appear here.';$('#post-creator').textContent=`@${job.creator}`;$('#preview-image').hidden=true;$('#preview-play').hidden=true;$('#original').hidden=true;$('#transcript').textContent='';$('#anatomy-bar').innerHTML='';$('#anatomy-legend').innerHTML='';$('#all-labels').innerHTML='';$('#post-tags').innerHTML='';$('#post-date').textContent='';$('#post-views').textContent='Unknown';$('#post-likes').textContent='Unknown';$('#post-rate').textContent='Unknown';}}
+function render(){if(!metricsInitialized&&job.posts.length){if(!job.posts.some(p=>p.views>0)&&job.posts.some(p=>p.plays>0))$('#metric').value='plays';else $('#metric').value='views';if(job.posts.length<100||!job.posts.some(p=>p.publishedAt&&(Date.now()-Date.parse(p.publishedAt))/864e5>=7))$('#age').value='0';else $('#age').value='7';metricsInitialized=true;}readStats();calculate();$('.inspector').classList.toggle('no-matches',currentView==='explorer'&&!visible.length);$('#inspector-empty').hidden=currentView==='money'||visible.length>0;renderLegend();buildTiles();layout();renderGroups();if(!selected&&job.posts.length)selectPost((job.posts.find(p=>p.analysis&&!p.excludedReason)||job.posts[0]).id);}
+async function loadJob(id){stopReplay();job=await api(id==='demo'?'/api/demo':`/api/runs/${id}`);resetMoney();selected=(job.posts.find(p=>p.analysis&&!p.excludedReason)||job.posts[0])?.id;metricsInitialized=false;category='all';compareKeys.clear();comparisonOpen=false;examplePage=0;$('#topic-filter').value='all';$('#hook-filter').value='all';$('#tiles').innerHTML='';$('#map-tiles').innerHTML='';$('#comparison').hidden=true;render();renderMoney();scheduleMoney();if(selected)selectPost(selected);else{$('#opening').textContent='Collecting the archive. The first spoken opening will appear here.';$('#post-creator').textContent=`@${job.creator}`;$('#preview-image').hidden=true;$('#preview-play').hidden=true;$('#original').hidden=true;$('#transcript').textContent='';$('#anatomy-bar').innerHTML='';$('#anatomy-legend').innerHTML='';$('#all-labels').innerHTML='';$('#post-tags').innerHTML='';$('#post-date').textContent='';$('#post-views').textContent='Unknown';$('#post-likes').textContent='Unknown';$('#post-rate').textContent='Unknown';}}
+// A context belongs to one loaded run/version; late responses cannot replace another view.
+function resetMoney(version=''){
+ if(moneyState)clearTimeout(moneyState.timer);
+ moneyState={runId:job.id,version,report:null,error:'',loading:false,inFlight:false,pending:false,timer:null};
+}
+function renderMoneySelection(){
+ const demo=job.id==='demo'||job.synthetic;
+ $('#money-inspector').innerHTML=renderMoneyInspector(moneyState?.report?.results?.[selected],{demo,error:moneyState?.error,loading:moneyState?.loading});
+ for(const b of $$('#money-view [data-money-inspect]')){const active=b.dataset.moneyInspect===selected;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));}
+}
+function renderMoney(){
+ const node=$('#money-view'),open=[...node.querySelectorAll('details[open]')].map(d=>d.dataset.moneyDetails),focus=document.activeElement;
+ const focusedId=node.contains(focus)?focus.dataset.moneyInspect:null,focusedVersion=focus.id==='money-version';
+ node.innerHTML=renderMoneyView(moneyState?.report,{demo:job.id==='demo'||job.synthetic,error:moneyState?.error,loading:moneyState?.loading,posts:job.posts,selected});
+ for(const d of node.querySelectorAll('details'))d.open=open.includes(d.dataset.moneyDetails);
+ node.querySelectorAll('[data-money-inspect]').forEach(b=>b.onclick=()=>{selectPost(b.dataset.moneyInspect);if(innerWidth<=760||document.body.classList.contains('portrait'))$('.inspector').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});});
+ node.querySelectorAll('img').forEach(img=>img.onerror=()=>{img.hidden=true;img.parentElement.classList.add('missing');});
+ if($('#money-version'))$('#money-version').onchange=e=>{resetMoney(e.target.value);renderMoney();scheduleMoney();};
+ if(focusedId)[...node.querySelectorAll('[data-money-inspect]')].find(b=>b.dataset.moneyInspect===focusedId)?.focus({preventScroll:true});
+ else if(focusedVersion)$('#money-version')?.focus({preventScroll:true});
+ renderMoneySelection();
+}
+function scheduleMoney(){
+ if(!moneyState||job.id==='demo'||job.synthetic)return;
+ const state=moneyState;state.pending=true;
+ if(state.inFlight||state.timer)return;
+ const wait=Math.max(0,2000-(Date.now()-(moneyFetchedAt.get(state.runId)||0)));
+ if(wait){state.loading=true;if(!state.report)renderMoney();state.timer=setTimeout(()=>{state.timer=null;fetchMoney(state);},wait);return;}
+ fetchMoney(state);
+}
+async function fetchMoney(state){
+ if(state!==moneyState)return;
+ state.pending=false;state.inFlight=true;state.loading=true;state.error='';moneyFetchedAt.set(state.runId,Date.now());if(!state.report)renderMoney();
+ try{const report=await api(`/api/runs/${encodeURIComponent(state.runId)}/money${state.version?'?version='+encodeURIComponent(state.version):''}`);if(state===moneyState)state.report=report;}
+ catch(e){if(state===moneyState)state.error=e.message;}
+ finally{state.inFlight=false;state.loading=false;if(state===moneyState){renderMoney();if(state.pending)scheduleMoney();}}
+}
+function setView(view){
+ stopReplay();currentView=view;const money=view==='money';
+ $('#explorer-controls').hidden=money;$('#explorer-canvas').hidden=money;$('#findings').hidden=money;$('#money-view').hidden=!money;$('.explorer').classList.toggle('money-active',money);
+ for(const [id,active]of [['explorer-view-button',!money],['money-view-button',money]]){$('#'+id).classList.toggle('active',active);$('#'+id).setAttribute('aria-pressed',String(active));}
+ $('.inspector').classList.toggle('no-matches',!money&&!visible.length);$('#inspector-empty').hidden=money||visible.length>0;layout();
+}
+$('#explorer-view-button').onclick=()=>setView('explorer');
+$('#money-view-button').onclick=()=>setView('money');
 async function refresh(){boot=await api('/api/bootstrap');const current=job?.id||'demo';$('#run-select').innerHTML='<option value="demo">Motion rehearsal · synthetic data</option>'+boot.runs.map(r=>`<option value="${r.id}">@${escape(r.creator)} · ${r.completed}/${r.count} · ${r.status}</option>`).join('');$('#run-select').value=current;renderConnections();}
 function renderConnections(){const active=['apify',boot.transcriptionProvider||'groq','jev'];const count=active.filter(k=>boot.connections[k]?.configured).length;$('#connection-status').textContent=`${count}/3 keys configured`;for(const k of ['apify','groq','fireworks','jev'])$(`#${k}-status`).textContent=boot.connections[k]?.verified?'· key verified':boot.connections[k]?.configured?'· configured':active.includes(k)?'· needed':'· optional';$('#transcription-provider').textContent=title(boot.transcriptionProvider||'groq');}
 
@@ -139,7 +188,7 @@ async function replay(){
  await sleep(1800);if(token!==replayToken)return;stopReplay();$('#replay-status').textContent='REPLAY COMPLETE';
 }
 async function start(){boot=await api('/api/bootstrap');$('#dimension').innerHTML=Object.entries(boot.dimensions).map(([key,v])=>`<option value="${key}">${v.title}</option>`).join('');$('#dimension').value=dimension;for(const [id,key,label]of [['topic-filter','topic','topics'],['hook-filter','mechanism','hooks']])$(`#${id}`).innerHTML=`<option value="all">All ${label}</option>`+Object.keys(boot.dimensions[key].criteria).map(k=>`<option value="${k}">${title(k)}</option>`).join('');$('#schema-content').innerHTML=Object.entries(boot.dimensions).map(([key,d])=>`<article><h3>${escape(d.title)}</h3><div class="schema-tags">${Object.keys(d.criteria).map(title).join(' / ')}</div><p>${Object.entries(d.criteria).map(([k,v])=>`<b>${title(k)}:</b> ${escape(v)}`).join('<br>')}</p></article>`).join('');await refresh();const params=new URLSearchParams(location.search);const requested=params.get('run');const id=requested==='demo'||boot.runs.some(r=>r.id===requested)?requested:boot.runs[0]?.id||'demo';await loadJob(id);$('#run-select').value=id;if(params.get('focus')==='1')focusDemo(true);
- new ResizeObserver(()=>layout()).observe($('#stage'));const events=new EventSource('/api/events');events.onmessage=e=>{const {id}=JSON.parse(e.data);if(id!==job.id||replaying)return;if(refreshTimer)return;refreshTimer=setTimeout(async()=>{refreshTimer=null;try{const before=job.posts.find(p=>p.id===selected);job=await api(`/api/runs/${id}`);const after=job.posts.find(p=>p.id===selected);render();if(selected&&$('#preview-video').hidden&&(before?.status!==after?.status||before?.analysis?.completedAt!==after?.analysis?.completedAt))selectPost(selected);await refresh();}catch(e){toast(e.message);}},220);};
+ new ResizeObserver(()=>layout()).observe($('#stage'));const events=new EventSource('/api/events');events.onmessage=e=>{const {id}=JSON.parse(e.data);if(id!==job.id)return;if(replaying){scheduleMoney();return;}if(refreshTimer)return;refreshTimer=setTimeout(async()=>{refreshTimer=null;try{const before=job.posts.find(p=>p.id===selected);const updated=await api(`/api/runs/${id}`);if(job.id!==id)return;job=updated;scheduleMoney();const after=job.posts.find(p=>p.id===selected);render();if(selected&&$('#preview-video').hidden&&(before?.status!==after?.status||before?.analysis?.completedAt!==after?.analysis?.completedAt))selectPost(selected);await refresh();}catch(e){toast(e.message);}},220);};
 }
 $('#run-select').onchange=e=>loadJob(e.target.value).catch(e=>toast(e.message));
 $('#dimension').onchange=e=>{stopReplay();dimension=e.target.value;category='all';compareKeys.clear();comparisonOpen=false;examplePage=0;render();};
@@ -156,7 +205,7 @@ function focusDemo(on){document.body.classList.toggle('focused',on);$('.focus-ba
 $('#portrait').onclick=()=>{document.body.classList.toggle('portrait');$('#portrait').textContent=document.body.classList.contains('portrait')?'Desktop view':'Portrait view';setTimeout(layout,30);};
 for(const id of ['new','connections','schema'])$(`#${id}-open`).onclick=()=>$(`#${id}-dialog`).showModal();
 $$('[data-close]').forEach(b=>b.onclick=()=>$(`#${b.dataset.close}`).close());
-$('#resume').onclick=async()=>{try{await api(`/api/runs/${job.id}/run`,{});job=await api(`/api/runs/${job.id}`);render();}catch(e){toast(e.message);}};
+$('#resume').onclick=async()=>{try{await api(`/api/runs/${job.id}/run`,{});job=await api(`/api/runs/${job.id}`);render();scheduleMoney();}catch(e){toast(e.message);}};
 $('#pause').onclick=async()=>{try{await api(`/api/runs/${job.id}/pause`,{});toast('Pausing after in-flight requests finish.');}catch(e){toast(e.message);}};
 $('#export').onclick=()=>window.open(`/api/runs/${job.id}/export`,'_blank');
 $('#new-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;$('#new-error').textContent='';try{const data=Object.fromEntries(new FormData(e.target));data.creator=data.creator.replace(/^@/,'').trim();const file=$('#import-file').files[0];if(file)data.rows=JSON.parse(await file.text());const created=await api('/api/runs',data);await refresh();await loadJob(created.id);await refresh();try{await api(`/api/runs/${created.id}/run`,{});}catch(err){toast(err.message);}$('#new-dialog').close();}catch(err){$('#new-error').textContent=err.message;}finally{b.disabled=false;}};
