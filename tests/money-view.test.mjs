@@ -110,3 +110,10 @@ test('summary line shows median plays, scored comments with their dates, growth,
  const html=renderMoneyView(data);
  for(const text of ['90,416','233,882 comments on scored reels','Aug 26, 2026','Sep 17, 2026','growing fast','approximate scrape time'])assert.ok(html.includes(text),text);
 });
+test('"+N more" is a button; an expanded box shows every reel and offers "Show fewer"',()=>{
+ const results=Object.fromEntries(Array.from({length:15},(_,i)=>[`s${i}`,reel(`s${i}`,'star',i+1)]));
+ const closed=renderMoneyView(report(results)).split('data-money-box="star"')[1].split('</article>')[0];
+ assert.match(closed,/<button[^>]*data-money-more="star"[^>]*>\+3 more<\/button>/);assert.equal((closed.match(/data-money-inspect=/g)||[]).length,12);
+ const open=renderMoneyView(report(results),{expanded:new Set(['star'])}).split('data-money-box="star"')[1].split('</article>')[0];
+ assert.equal((open.match(/data-money-inspect=/g)||[]).length,15);assert.match(open,/<button[^>]*data-money-more="star"[^>]*aria-expanded="true"[^>]*>Show fewer<\/button>/);
+});
