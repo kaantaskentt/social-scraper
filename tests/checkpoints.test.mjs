@@ -54,3 +54,28 @@ test('observedAt comes from Apify finishedAt, retrievedAt from the download',asy
   const disk=JSON.parse(await readFile(join(root,'runs',job.id+'.json'),'utf8'));assert.equal(disk.observedAt,finishedAt);
  }finally{global.fetch=real;await rm(root,{recursive:true,force:true});}
 });
+
+test('a failed first save does not leave the run stuck as active',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'cl-ck-'));let fail=false;const writer=async(path,value)=>{if(fail)throw new Error('disk full');return atomic(path,value);};
+ try{const p=await new Pipeline(root,keys,{writer}).init();const job=await p.create({creator:'tester'},[{id:'x',ownerUsername:'tester',transcript:'one two three four five six'}]);
+  fail=true;await assert.rejects(p.run(job.id),/disk full/);assert.equal(p.active.has(job.id),false);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('a run stays active until its final save is on disk',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'cl-ck-'));const real=global.fetch;let release,hold=false;const gate=new Promise(r=>release=r);
+ const writer=async(path,value)=>{if(hold&&value.status==='complete')await gate;return atomic(path,value);};
+ global.fetch=async(url,opts)=>{if(String(url).includes('typesafe.ai'))return Response.json(jevOk(JSON.parse(opts.body)));throw new Error('unexpected '+url);};
+ try{const p=await new Pipeline(root,keys,{writer}).init();const job=await p.create({creator:'tester'},[{id:'x',ownerUsername:'tester',transcript:'one two three four five six seven'}]);
+  hold=true;await p.run(job.id);while(job.status!=='complete')await new Promise(r=>setTimeout(r,5));await new Promise(r=>setTimeout(r,20));
+  assert.equal(p.active.has(job.id),true,'released before the final save finished');release();await settle(p);assert.equal(p.active.has(job.id),false);
+ }finally{global.fetch=real;await rm(root,{recursive:true,force:true});}
+});
+
+test('restart saves the interrupted status to disk',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'cl-ck-'));
+ try{const p=await new Pipeline(root,keys).init();const job=await p.create({creator:'tester'},[{id:'x',ownerUsername:'tester',transcript:'one two three four five six'}]);
+  job.status='running';await p.save(job,{durable:true});
+  await new Pipeline(root,keys).init();const disk=JSON.parse(await readFile(join(root,'runs',job.id+'.json'),'utf8'));assert.equal(disk.status,'interrupted');
+ }finally{await rm(root,{recursive:true,force:true});}
+});

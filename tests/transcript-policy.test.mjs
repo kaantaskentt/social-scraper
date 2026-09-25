@@ -37,3 +37,14 @@ test('new runs record their transcript policy',async()=>{
  try{const p=await new Pipeline(root,()=>({})).init();const job=await p.create({creator:'tester',language:'tr'});assert.deepEqual(job.transcriptPolicy,{version:2,language:'tr'});}
  finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('unknown future policy versions fail loudly instead of reading legacy transcripts',()=>{
+ assert.throws(()=>transcriptKey({transcriptPolicy:{version:3,language:''}},'abc','groq','m'),/Unsupported transcript policy/);
+});
+test('runs record the provider and model they transcribe with',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'cl-tp-'));
+ try{await new Pipeline(root,()=>({})).init();const r=await runOnce(root,{legacy:false});
+  const {readdir,readFile}=await import('node:fs/promises');const runs=(await readdir(join(root,'runs'))).filter(n=>!n.includes('.raw.'));
+  const job=JSON.parse(await readFile(join(root,'runs',runs[0]),'utf8'));assert.deepEqual(job.transcriptPolicy,{version:2,language:'',provider:'groq',model:'whisper-large-v3-turbo'});
+ }finally{await rm(root,{recursive:true,force:true});}
+});
