@@ -9,3 +9,9 @@ Fork of github.com/artemnovitckii/creator-lab (MIT), remote `upstream`. Being ex
 - No build step, no dependencies. Deploy: none (local only).
 - `data/` holds runs, caches and media: private, gitignored. Back it up (copy) before any storage migration.
 - Paid calls (Apify, Groq/Fireworks, Jev) only after Kaan's yes for new spend beyond a run he starts himself.
+- Money view (build 1, branch `money-radar-build-1`): formulas in `public/money/<version>.mjs` are frozen once shown to
+  Kaan; changes go in a new version file registered in `public/money/index.mjs`. `tests/fixtures/money-1.0-golden.json`
+  guards money-1.0 (regenerate only with `UPDATE_GOLDEN=1` and a written reason).
+- Hand check on real runs: `node scripts/validate-money.mjs` (reads `data/`, prints only).
+- Status: build 1 done (metrics, Money view, crash-safe saves, transcript policy). Next: build 2 spec (discovery, queue,
+  spending guard, storage) with its own Codex review before code. See the spec, section 6.
