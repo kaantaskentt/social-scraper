@@ -48,3 +48,14 @@ test('runs record the provider and model they transcribe with',async()=>{
   const job=JSON.parse(await readFile(join(root,'runs',runs[0]),'utf8'));assert.deepEqual(job.transcriptPolicy,{version:2,language:'',provider:'groq',model:'whisper-large-v3-turbo'});
  }finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('a run keeps the provider it started with; resuming under another provider is refused',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'cl-tp-'));
+ try{const p=await new Pipeline(root,()=>({groq:'g',fireworks:'f',jev:'j'}),{transcriptionProvider:'groq'}).init();
+  const job=await p.create({creator:'tester'},[{id:'r',ownerUsername:'tester',transcript:'one two three four five six seven'}]);
+  job.transcriptPolicy={...job.transcriptPolicy,provider:'groq',model:'whisper-large-v3-turbo'};await p.save(job,{durable:true});
+  const other=await new Pipeline(root,()=>({groq:'g',fireworks:'f',jev:'j'}),{transcriptionProvider:'fireworks'}).init();
+  await assert.rejects(other.run(job.id),/transcribed with Groq/);assert.equal(other.active.size,0);
+  assert.equal(other.jobs.get(job.id).transcriptPolicy.provider,'groq');
+ }finally{await rm(root,{recursive:true,force:true});}
+});

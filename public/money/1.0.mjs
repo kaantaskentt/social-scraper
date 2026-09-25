@@ -10,7 +10,7 @@ const time=iso=>{if(typeof iso!=='string')return null;const t=Date.parse(iso);re
 
 export function median(values){
  const a=values.filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return null;
- const m=(a.length-1)/2;return (a[Math.floor(m)]+a[Math.ceil(m)])/2;
+ const m=(a.length-1)/2;return a[Math.floor(m)]/2+a[Math.ceil(m)]/2; // halves first: no overflow near Number.MAX_VALUE
 }
 
 // Instagram unified plays and views in August 2024; Apify fills one or the other.
@@ -32,7 +32,7 @@ function windowFor(r,dated){
 
 function reachScore(r,B){
  const L=B.map(q=>Math.log1p(q.reach)), mL=median(L), mad=median(L.map(v=>Math.abs(v-mL)));
- const baseline=Math.expm1(mL);let x=r.reach/baseline;if(Math.abs(x-1)<=PARAMS.tol)x=1;
+ const baseline=Math.expm1(mL);let x=r.reach/baseline;if(!Number.isFinite(baseline)||!(baseline>0)||!Number.isFinite(x))return {bucket:'invalid_counts'};if(Math.abs(x-1)<=PARAMS.tol)x=1;
  const z=mad>0?PARAMS.zConstant*(Math.log1p(r.reach)-mL)/mad:null;
  const up=z===null||ge(z,PARAMS.zGate), down=z===null||le(z,-PARAMS.zGate);
  const label=ge(x,PARAMS.bigWinnerX)&&up?'big_winner':ge(x,PARAMS.winnerX)&&up?'winner':le(x,PARAMS.flopX)&&down?'flop':'normal';
@@ -114,8 +114,8 @@ function scoreReel(r,dated){
  if(!out.bucket){
   const B=windowFor(r,dated);out.windowSize=B.length;
   if(B.length<PARAMS.minWindow)out.bucket='short_history';
-  else{
-   Object.assign(out,reachScore(r,B));
+  else Object.assign(out,reachScore(r,B));
+  if(!out.bucket){
    out.growth=growthOf(B);
    // Validation only (spec 4.3): not shown until build 3 decides.
    if(out.growth){const projected=Math.expm1(out.growth.intercept+out.growth.slopePerDay*r.t/DAY);const xe=r.reach/projected;out.xExpected=Number.isFinite(projected)&&projected>0&&Number.isFinite(xe)&&xe>0?xe:null;}
@@ -126,6 +126,7 @@ function scoreReel(r,dated){
  return out;
 }
 
+const finiteOrNull=v=>Number.isFinite(v)?v:null;
 // Account summary (spec 4.7). No per-day lead claim: one snapshot cannot show when comments arrived.
 function summarize(rows,results){
  const all=Object.values(results), scored=all.filter(x=>x.xNormal!==null), withReach=rows.filter(r=>r.reach!==null);
@@ -140,7 +141,7 @@ function summarize(rows,results){
   quadrants:{star:quad('star'),billboard:quad('billboard'),closer:quad('closer'),dud:quad('dud'),insufficient:quad('insufficient')},
   ctaShare:rows.length?all.filter(x=>x.keyword).length/rows.length:null,
   topKeywords:[...kw.values()].sort((a,b)=>b.comments-a.comments||a.keyword.localeCompare(b.keyword)).slice(0,10),
-  cumulativeComments:scored.reduce((s,x)=>s+(x.comments??0),0),
+  cumulativeComments:finiteOrNull(scored.reduce((s,x)=>s+(x.comments??0),0)),
   scoredFirstPublishedAt:sFirst===null?null:new Date(sFirst).toISOString(),scoredLastPublishedAt:sLast===null?null:new Date(sLast).toISOString(),
   firstPublishedAt:first===null?null:new Date(first).toISOString(),lastPublishedAt:last===null?null:new Date(last).toISOString(),
   reelsPerWeek:weeks?ts.length/weeks:null,growth:latest?.growth?.flag??null};

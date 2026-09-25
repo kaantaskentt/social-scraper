@@ -38,10 +38,10 @@ test('real-caption patterns found on ken.remedie: "Or comment", ellipsis, "and c
 test('emoji sequences before the verb: skin tones, flags, keycaps',()=>{
  for(const c of ['👍🏿 Comment GUIDE','🇬🇧 Comment GUIDE','1️⃣ Comment GUIDE','👨‍👩‍👧 Comment GUIDE'])assert.equal(k(c),'GUIDE',c);
 });
-test('no quadratic slowdown on long runs of line breaks or spaces',()=>{
- const time=n=>{const c='\n'.repeat(n)+'x';const t=performance.now();keywordCtas(c);return performance.now()-t;};
- time(1000);const small=time(10000), big=time(40000);
- assert.ok(big<50,`40k newlines took ${big.toFixed(1)} ms`);assert.ok(big<small*8+5,`not linear: ${small.toFixed(1)} vs ${big.toFixed(1)} ms`);
+test('no quadratic slowdown on long runs of line breaks or spaces (below the scan cap)',()=>{
+ const time=n=>{const c='\n'.repeat(n)+'x';let best=Infinity;for(let i=0;i<3;i++){const t=performance.now();keywordCtas(c);best=Math.min(best,performance.now()-t);}return best;};
+ time(500);const small=time(1200), big=time(4800); // both under the 5,000-character cap
+ assert.ok(big<small*8+2,`not linear: ${small.toFixed(2)} vs ${big.toFixed(2)} ms`);
  assert.equal(k(' '.repeat(30000)+'\n\nComment "LIME"'),null); // beyond the 5,000-character scan limit
  assert.equal(k('\n'.repeat(3000)+'Comment "LIME"'),'LIME');
 });

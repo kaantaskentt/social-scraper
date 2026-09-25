@@ -58,7 +58,9 @@ test('observedAt comes from Apify finishedAt, retrievedAt from the download',asy
 test('a failed first save does not leave the run stuck as active',async()=>{
  const root=await mkdtemp(join(tmpdir(),'cl-ck-'));let fail=false;const writer=async(path,value)=>{if(fail)throw new Error('disk full');return atomic(path,value);};
  try{const p=await new Pipeline(root,keys,{writer}).init();const job=await p.create({creator:'tester'},[{id:'x',ownerUsername:'tester',transcript:'one two three four five six'}]);
-  fail=true;await assert.rejects(p.run(job.id),/disk full/);assert.equal(p.active.has(job.id),false);
+  const before=job.status;fail=true;await assert.rejects(p.run(job.id),/disk full/);assert.equal(p.active.has(job.id),false);
+  assert.equal(job.status,before,'status restored so Resume stays available');assert.match(job.error,/Could not start this run: disk full/);
+  fail=false;job.error=null;assert.equal(p.active.size,0);
  }finally{await rm(root,{recursive:true,force:true});}
 });
 

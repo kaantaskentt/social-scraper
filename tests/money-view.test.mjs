@@ -99,3 +99,14 @@ test('invalid counts have their own plain reason, and evidence is not double-quo
  assert.equal(reasonText('invalid_counts'),'The counts for this reel look invalid, so it is not scored.');
  const html=renderMoneyInspector({...reel('a'),keywordEvidence:'Comment “Lime”'});assert.doesNotMatch(html,/“Comment “Lime””/);assert.match(html,/Comment “Lime”/);
 });
+
+test('axis labels match box positions: top row has more views, right column more comments',()=>{
+ const html=renderMoneyView(report());
+ assert.match(html,/more comments than usual →/);assert.match(html,/more views than its previous posts ↑/);
+ assert.doesNotMatch(html,/more views than its previous posts →|more comments than usual ↑/);
+});
+test('summary line shows median plays, scored comments with their dates, growth, and the approximate scrape time',()=>{
+ const data=report();Object.assign(data.summary,{medianReach:90416,cumulativeComments:233882,scoredFirstPublishedAt:'2026-08-26T00:00:00Z',scoredLastPublishedAt:'2026-09-17T00:00:00Z',growth:'growing'});
+ const html=renderMoneyView(data);
+ for(const text of ['90,416','233,882 comments on scored reels','Aug 26, 2026','Sep 17, 2026','growing fast','approximate scrape time'])assert.ok(html.includes(text),text);
+});

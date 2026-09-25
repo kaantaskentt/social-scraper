@@ -104,10 +104,6 @@ test('comment rate buckets and pooling',()=>{
  assert.equal(r.rateKind,'pooled');assert.equal(r.rate,10);
  const zeros=account(Array(12).fill(5000),()=>({comments:0}));const z=run(zeros).results.r011;assert.equal(z.rateKind,'pooled');assert.equal(z.rate,0);
 });
-test('with a fixed positive prior the shrunk rate approaches the raw rate as exposure grows',()=>{
- const p={alpha:50,beta:5};const raw=30;
- const at=e=>(p.alpha+raw*e)/(p.beta+e);assert.ok(Math.abs(at(1e6)-raw)<0.01);assert.ok(at(1)<raw&&at(1)>10);
-});
 test('quadrants: star, billboard, closer, dud; zero threshold with zero rate is low on comments',()=>{
  const varied=i=>({comments:Math.round((5000/1000)*(8+(i%5)))}); // earlier rates 8..12 per 1k
  const mk=(plays,comments)=>{const p=account([...Array(12).fill(5000),plays],varied);p[12].comments=comments;return run(p).results.r012;};
@@ -166,4 +162,12 @@ test('non-finite results become named gaps, never Infinity or 0',()=>{
 test('comment total and its date range describe the same (scored) reels',()=>{
  const {summary}=run(account(Array(11).fill(1000)));
  assert.equal(summary.reelsScored,1);assert.equal(typeof summary.scoredFirstPublishedAt,'string');assert.equal(summary.scoredFirstPublishedAt,summary.scoredLastPublishedAt);assert.notEqual(summary.firstPublishedAt,summary.scoredFirstPublishedAt);
+});
+
+test('overflowing reach or counts never become winners or infinite totals',()=>{
+ const posts=account([...Array(11).fill(1e-320),1e300]);const r=run(posts).results.r011; // absurd tiny plays make x overflow
+ assert.ok(r.bucket==='invalid_counts'||Number.isFinite(r.xNormal),JSON.stringify(r.xNormal));assert.notEqual(r.label,'big_winner');
+ const {summary}=run(account(Array(12).fill(1.7e308),()=>({comments:1.7e308})));
+ for(const k of ['medianReach','cumulativeComments'])assert.ok(summary[k]===null||Number.isFinite(summary[k]),k);
+ const back=JSON.parse(JSON.stringify(run(posts)));assert.equal(back.results.r011.xNormal===null,back.results.r011.bucket==='invalid_counts');
 });

@@ -131,7 +131,8 @@ function renderExamples(){
  $('#example-grid').querySelectorAll('[data-inspect]').forEach(b=>b.onclick=()=>{selectPost(b.dataset.inspect);$('.inspector').scrollIntoView({behavior:'smooth',block:'center'});});
 }
 function render(){if(!metricsInitialized&&job.posts.length){if(!job.posts.some(p=>p.views>0)&&job.posts.some(p=>p.plays>0))$('#metric').value='plays';else $('#metric').value='views';if(job.posts.length<100||!job.posts.some(p=>p.publishedAt&&(Date.now()-Date.parse(p.publishedAt))/864e5>=7))$('#age').value='0';else $('#age').value='7';metricsInitialized=true;}readStats();calculate();$('.inspector').classList.toggle('no-matches',currentView==='explorer'&&!visible.length);$('#inspector-empty').hidden=currentView==='money'||visible.length>0;renderLegend();buildTiles();layout();renderGroups();if(!selected&&job.posts.length)selectPost((job.posts.find(p=>p.analysis&&!p.excludedReason)||job.posts[0]).id);}
-async function loadJob(id){stopReplay();job=await api(id==='demo'?'/api/demo':`/api/runs/${id}`);resetMoney();selected=(job.posts.find(p=>p.analysis&&!p.excludedReason)||job.posts[0])?.id;metricsInitialized=false;category='all';compareKeys.clear();comparisonOpen=false;examplePage=0;$('#topic-filter').value='all';$('#hook-filter').value='all';$('#tiles').innerHTML='';$('#map-tiles').innerHTML='';$('#comparison').hidden=true;render();renderMoney();scheduleMoney();if(selected)selectPost(selected);else{$('#opening').textContent='Collecting the archive. The first spoken opening will appear here.';$('#post-creator').textContent=`@${job.creator}`;$('#preview-image').hidden=true;$('#preview-play').hidden=true;$('#original').hidden=true;$('#transcript').textContent='';$('#anatomy-bar').innerHTML='';$('#anatomy-legend').innerHTML='';$('#all-labels').innerHTML='';$('#post-tags').innerHTML='';$('#post-date').textContent='';$('#post-views').textContent='Unknown';$('#post-likes').textContent='Unknown';$('#post-rate').textContent='Unknown';}}
+let loadGeneration=0; // a response for a run the user has left is dropped
+async function loadJob(id){stopReplay();const generation=++loadGeneration;const loaded=await api(id==='demo'?'/api/demo':`/api/runs/${id}`);if(generation!==loadGeneration)return;job=loaded;resetMoney();selected=(job.posts.find(p=>p.analysis&&!p.excludedReason)||job.posts[0])?.id;metricsInitialized=false;category='all';compareKeys.clear();comparisonOpen=false;examplePage=0;$('#topic-filter').value='all';$('#hook-filter').value='all';$('#tiles').innerHTML='';$('#map-tiles').innerHTML='';$('#comparison').hidden=true;render();renderMoney();scheduleMoney();if(selected)selectPost(selected);else{$('#opening').textContent='Collecting the archive. The first spoken opening will appear here.';$('#post-creator').textContent=`@${job.creator}`;$('#preview-image').hidden=true;$('#preview-play').hidden=true;$('#original').hidden=true;$('#transcript').textContent='';$('#anatomy-bar').innerHTML='';$('#anatomy-legend').innerHTML='';$('#all-labels').innerHTML='';$('#post-tags').innerHTML='';$('#post-date').textContent='';$('#post-views').textContent='Unknown';$('#post-likes').textContent='Unknown';$('#post-rate').textContent='Unknown';}}
 // A context belongs to one loaded run/version; late responses cannot replace another view.
 function resetMoney(version=''){
  if(moneyState)clearTimeout(moneyState.timer);
@@ -144,7 +145,7 @@ function renderMoneySelection(){
 }
 function renderMoney(){
  const node=$('#money-view'),open=[...node.querySelectorAll('details[open]')].map(d=>d.dataset.moneyDetails),focus=document.activeElement;
- const focusedId=node.contains(focus)?focus.dataset.moneyInspect:null,focusedVersion=focus.id==='money-version';
+ const focusedId=node.contains(focus)?focus.dataset.moneyInspect:null,focusedVersion=focus.id==='money-version',focusedDetails=node.contains(focus)&&focus.tagName==='SUMMARY'?focus.parentElement.dataset.moneyDetails:null;
  node.innerHTML=renderMoneyView(moneyState?.report,{demo:job.id==='demo'||job.synthetic,error:moneyState?.error,loading:moneyState?.loading,posts:job.posts,selected});
  for(const d of node.querySelectorAll('details'))d.open=open.includes(d.dataset.moneyDetails);
  node.querySelectorAll('[data-money-inspect]').forEach(b=>b.onclick=()=>{selectPost(b.dataset.moneyInspect);if(innerWidth<=760||document.body.classList.contains('portrait'))$('.inspector').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});});
@@ -152,6 +153,7 @@ function renderMoney(){
  if($('#money-version'))$('#money-version').onchange=e=>{resetMoney(e.target.value);renderMoney();scheduleMoney();};
  if(focusedId)[...node.querySelectorAll('[data-money-inspect]')].find(b=>b.dataset.moneyInspect===focusedId)?.focus({preventScroll:true});
  else if(focusedVersion)$('#money-version')?.focus({preventScroll:true});
+ else if(focusedDetails)node.querySelector(`details[data-money-details="${focusedDetails}"] > summary`)?.focus({preventScroll:true});
  renderMoneySelection();
 }
 function scheduleMoney(){
@@ -205,7 +207,7 @@ function focusDemo(on){document.body.classList.toggle('focused',on);$('.focus-ba
 $('#portrait').onclick=()=>{document.body.classList.toggle('portrait');$('#portrait').textContent=document.body.classList.contains('portrait')?'Desktop view':'Portrait view';setTimeout(layout,30);};
 for(const id of ['new','connections','schema'])$(`#${id}-open`).onclick=()=>$(`#${id}-dialog`).showModal();
 $$('[data-close]').forEach(b=>b.onclick=()=>$(`#${b.dataset.close}`).close());
-$('#resume').onclick=async()=>{try{await api(`/api/runs/${job.id}/run`,{});job=await api(`/api/runs/${job.id}`);render();scheduleMoney();}catch(e){toast(e.message);}};
+$('#resume').onclick=async()=>{const id=job.id,generation=loadGeneration;try{await api(`/api/runs/${id}/run`,{});const updated=await api(`/api/runs/${id}`);if(generation!==loadGeneration||job.id!==id)return;job=updated;render();scheduleMoney();}catch(e){toast(e.message);}};
 $('#pause').onclick=async()=>{try{await api(`/api/runs/${job.id}/pause`,{});toast('Pausing after in-flight requests finish.');}catch(e){toast(e.message);}};
 $('#export').onclick=()=>window.open(`/api/runs/${job.id}/export`,'_blank');
 $('#new-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;$('#new-error').textContent='';try{const data=Object.fromEntries(new FormData(e.target));data.creator=data.creator.replace(/^@/,'').trim();const file=$('#import-file').files[0];if(file)data.rows=JSON.parse(await file.text());const created=await api('/api/runs',data);await refresh();await loadJob(created.id);await refresh();try{await api(`/api/runs/${created.id}/run`,{});}catch(err){toast(err.message);}$('#new-dialog').close();}catch(err){$('#new-error').textContent=err.message;}finally{b.disabled=false;}};

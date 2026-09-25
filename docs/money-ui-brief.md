@@ -44,7 +44,7 @@ Add it next to the existing explorer (a tab or a section switch; follow the page
    - Billboard (top left): "Lots of views, fewer comments. Good for growth."
    - Closer (bottom right): "Fewer views, lots of comments. Good for sales."
    - Dud (bottom left): "Neither. Skip."
-   Axis hints: "more views than its previous posts →" (horizontal meaning: left/right split = reach low/high) and "more comments than usual ↑". Keep the order exactly: top row Billboard | Star, bottom row Dud | Closer. Within each box sort by `xNormal` descending. Show at most 12 per box with "+N more". A small count per box. Reels with `insufficient` are listed below the grid in a collapsed "Not scored (N)" row with their reasons grouped.
+   Axis hints: "more views than its previous posts ↑" (top row = more views) and "more comments than usual →" (right column = more comments). (Corrected after the final review: the first version of this brief had the arrows swapped.) Keep the order exactly: top row Billboard | Star, bottom row Dud | Closer. Within each box sort by `xNormal` descending. Show at most 12 per box with "+N more". A small count per box. Reels with `insufficient` are listed below the grid in a collapsed "Not scored (N)" row with their reasons grouped.
 3. **Top keywords**: a compact table: keyword, reels, total comments (sorted as given).
 4. **"How this is measured"** (collapsed by default), plain words:
    - "x its previous posts = this reel's plays divided by the typical plays of up to 30 earlier reels from the last 90 days. Only earlier reels count, so new reels never change old numbers."
