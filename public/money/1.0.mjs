@@ -119,10 +119,28 @@ function scoreReel(r,dated){
  return out;
 }
 
+// Account summary (spec 4.7). No per-day lead claim: one snapshot cannot show when comments arrived.
+function summarize(rows,results){
+ const all=Object.values(results), scored=all.filter(x=>x.xNormal!==null), withReach=rows.filter(r=>r.reach!==null);
+ const count=l=>scored.filter(x=>x.label===l).length, quad=q=>all.filter(x=>x.quadrant===q).length;
+ const kw=new Map();for(const x of all){if(!x.keyword)continue;const k=kw.get(x.keyword)??{keyword:x.keyword,reels:0,comments:0};k.reels++;k.comments+=x.comments??0;kw.set(x.keyword,k);}
+ const ts=rows.map(r=>r.t).filter(t=>t!==null), first=ts.length?Math.min(...ts):null, last=ts.length?Math.max(...ts):null;
+ const weeks=first!==null&&last>first?(last-first)/(7*DAY):null;
+ const latest=[...scored].sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt))[0];
+ return {reels:rows.length,reelsWithReach:withReach.length,reelsScored:scored.length,medianReach:median(withReach.map(r=>r.reach)),
+  winners:count('winner')+count('big_winner'),bigWinners:count('big_winner'),flops:count('flop'),
+  quadrants:{star:quad('star'),billboard:quad('billboard'),closer:quad('closer'),dud:quad('dud'),insufficient:quad('insufficient')},
+  ctaShare:rows.length?all.filter(x=>x.keyword).length/rows.length:null,
+  topKeywords:[...kw.values()].sort((a,b)=>b.comments-a.comments||a.keyword.localeCompare(b.keyword)).slice(0,10),
+  cumulativeComments:scored.reduce((s,x)=>s+(x.comments??0),0),
+  firstPublishedAt:first===null?null:new Date(first).toISOString(),lastPublishedAt:last===null?null:new Date(last).toISOString(),
+  reelsPerWeek:weeks?ts.length/weeks:null,growth:latest?.growth?.flag??null};
+}
+
 export function scoreRun({posts,observedAt}){
  const obs=time(observedAt);
  const rows=posts.map(p=>{const {reach,disagree}=reachOf(p),t=time(p.publishedAt);return {id:p.id,publishedAt:p.publishedAt??null,t,reach,disagree,comments:known(p.comments)?p.comments:null,caption:typeof p.caption==='string'?p.caption:'',age:obs!==null&&t!==null?(obs-t)/DAY:null};});
  const dated=rows.filter(r=>r.t!==null).sort((a,b)=>a.t-b.t||(a.id<b.id?-1:a.id>b.id?1:0));
  const results={};for(const r of rows)results[r.id]=scoreReel(r,dated);
- return {results,summary:null};
+ return {results,summary:summarize(rows,results)};
 }

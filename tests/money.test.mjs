@@ -118,3 +118,30 @@ test('quadrants: star, billboard, closer, dud; zero threshold with zero rate is 
  // all comments 0: threshold 0 and rate 0 is low on comments; x = 1 is high on reach
  const zero=account(Array(13).fill(5000),()=>({comments:0}));assert.equal(run(zero).results.r012.quadrant,'billboard');
 });
+
+import {readFileSync,writeFileSync} from 'node:fs';
+import {score,observedAtOf,LATEST,VERSIONS} from '../public/money/index.mjs';
+const golden=()=>{const posts=account(Array.from({length:40},(_,i)=>1000+((i*37)%11)*300+(i===30?40000:0)),i=>({comments:Math.round((1000+((i*37)%11)*300)/1000*(5+(i*7)%9)),caption:i%3===0?`Comment "K${i%4}" and I will send it`:'no cta'}));return {id:'golden',scrape:{finishedAt:new Date(OBS).toISOString()},posts};};
+test('summary counts and keywords',()=>{
+ const {summary}=score(golden());
+ assert.equal(summary.reels,40);assert.equal(summary.reelsScored,30);
+ assert.equal(summary.topKeywords.length,4);assert.ok(summary.topKeywords[0].comments>=summary.topKeywords[1].comments);
+ assert.ok(Math.abs(summary.ctaShare-14/40)<1e-9);assert.ok(Math.abs(summary.reelsPerWeek-40/(39/7))<1e-9);
+});
+test('observation time: run field, Apify finishedAt, or unknown for imports',()=>{
+ assert.deepEqual(observedAtOf({observedAt:'2026-09-01T00:00:00Z'}),{observedAt:'2026-09-01T00:00:00Z',source:'run'});
+ assert.deepEqual(observedAtOf({scrape:{finishedAt:'2026-09-02T00:00:00Z'}}),{observedAt:'2026-09-02T00:00:00Z',source:'apify_finishedAt'});
+ assert.deepEqual(observedAtOf({imported:true,scrape:null}),{observedAt:null,source:'unknown'});
+});
+test('manifest names the formula and a stable input hash; unknown versions fail loudly',()=>{
+ const a=score(golden()), b=score(golden());assert.equal(a.manifest.formula,'money-1.0');assert.equal(a.manifest.inputHash,b.manifest.inputHash);
+ const changed=golden();changed.posts[0].plays+=1;assert.notEqual(score(changed).manifest.inputHash,a.manifest.inputHash);
+ assert.throws(()=>score(golden(),'money-9.9'),/Unknown money formula/);assert.equal(LATEST,'money-1.0');assert.ok(VERSIONS['money-1.0']);
+});
+test('money-1.0 output is frozen (golden file)',()=>{
+ const file=new URL('./fixtures/money-1.0-golden.json',import.meta.url);
+ // Written once with UPDATE_GOLDEN=1 before money-1.0 is released; never regenerated afterwards.
+ if(process.env.UPDATE_GOLDEN)writeFileSync(file,JSON.stringify(score(golden()),null,1)+'\n');
+ const expected=JSON.parse(readFileSync(file,'utf8'));
+ assert.deepEqual(JSON.parse(JSON.stringify(score(golden()))),expected);
+});
