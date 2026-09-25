@@ -45,6 +45,7 @@ function growthOf(B){
  if(new Set(pts.map(p=>p.t)).size<PARAMS.minGrowthTimestamps)return null;
  const slopes=[];for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++)if(pts[j].t!==pts[i].t)slopes.push((pts[j].y-pts[i].y)/(pts[j].t-pts[i].t));
  const slope=median(slopes), intercept=median(pts.map(p=>p.y-slope*p.t)), change30=Math.expm1(30*slope);
+ if(!Number.isFinite(slope)||!Number.isFinite(intercept)||!Number.isFinite(change30))return null;
  return {slopePerDay:slope,change30,intercept,flag:change30>PARAMS.growthUp?'growing':change30<PARAMS.growthDown?'shrinking':null};
 }
 
@@ -64,6 +65,7 @@ function commentScore(r,B){
  const P=B.filter(q=>q.comments!==null);if(P.length<PARAMS.minWindow)return {rateBucket:'short_history'};
  const e=P.map(q=>q.reach/1000), prior=gammaPrior(P.map((q,i)=>q.comments/e[i]),e);
  const rate=prior.alpha===null?prior.m:(prior.alpha+r.comments)/(prior.beta+r.reach/1000);
+ if(!Number.isFinite(rate)||!Number.isFinite(prior.m)||!Number.isFinite(prior.s2))return {rateBucket:'invalid_counts'};
  return {rate,rateKind:prior.alpha===null?'pooled':'shrunk',rateBucket:null,prior};
 }
 
@@ -72,20 +74,25 @@ function quadrantOf(out,B){
  if(out.rate===null)return {quadrant:'insufficient',quadrantReason:out.rateBucket};
  const T=B.filter(q=>q.comments!==null&&q.reach>=PARAMS.minReachForRate).map(q=>q.comments/(q.reach/1000));
  if(T.length<PARAMS.minWindow)return {quadrant:'insufficient',quadrantReason:'short_history',threshold:null};
- const threshold=median(T), reachHigh=ge(out.xNormal,1), commentsHigh=out.rate>threshold+PARAMS.tol;
+ const threshold=median(T);if(!Number.isFinite(threshold))return {quadrant:'insufficient',quadrantReason:'invalid_counts',threshold:null};
+ const reachHigh=ge(out.xNormal,1), commentsHigh=out.rate>threshold+PARAMS.tol;
  return {threshold,quadrantReason:null,quadrant:reachHigh?(commentsHigh?'star':'billboard'):(commentsHigh?'closer':'dud')};
 }
 
 // Keyword CTA: an imperative "Comment X" / "DM me X" where X is quoted, or in capitals in the original caption (spec 4.5).
 const ci=w=>[...w].map(c=>c===' '?'\\s+':/[a-z]/.test(c)?`[${c}${c.toUpperCase()}]`:c).join('');
 const STOP=new Set(['YOUR','YOU','THE','OF','BELOW','THIS','THAT','ME','IT','A','AN','AND','OR','TO','FOR','IN','ON','WITH','DOWN','HERE']);
-const LEAD=`(?:^\\s*|[.!?…\\n\\-–—]\\s*|\\p{Extended_Pictographic}\\uFE0F?\\s*|(?<![\\p{L}\\p{N}])(?:${ci('just')}|${ci('please')}|${ci('or')}|${ci('and')})\\s+)`;
+// Whitespace after a boundary never crosses a line break, so each boundary is scanned once (no quadratic backtracking).
+// Emoji: a pictograph, flag letter or keycap mark, plus variation selectors, skin tones and joiners.
+const SP='[^\\S\\n]*', EMOJI='[\\p{Extended_Pictographic}\\p{Regional_Indicator}\\u20E3][\\uFE0F\\u200D\\p{Emoji_Modifier}]*';
+const LEAD=`(?:^${SP}|[.!?…\\n\\-–—]${SP}|${EMOJI}${SP}|(?<![\\p{L}\\p{N}])(?:${ci('just')}|${ci('please')}|${ci('or')}|${ci('and')})\\s+)`;
+const MAX_CAPTION=5000;
 const VERB=`(?<c>${ci('comment')}|${ci('type')}|${ci('reply')}|${ci('write')})|(?<d>(?:${ci('dm')}|${ci('message')}|${ci('send')})\\s+${ci('me')})`;
 const TOKEN=`(?:["“”'‘’](?<q>[\\p{L}\\p{N}]{2,20})["“”'‘’]|(?<u>(?=[\\p{Lu}\\p{N}]*\\p{Lu})[\\p{Lu}\\p{N}]{2,20})(?![\\p{L}\\p{N}]))`;
 const CTA=new RegExp(`${LEAD}(?<verb>${VERB})\\s+(?:${ci('the word')}\\s+|${ci('word')}\\s+)?${TOKEN}`,'gdu');
 const NEGATION=/\b(?:don'?t|do not|never|no need to)\b/;
 export function keywordCtas(caption){
- const text=typeof caption==='string'?caption:'', matches=[];
+ const text=typeof caption==='string'?caption.slice(0,MAX_CAPTION):'', matches=[];
  for(const m of text.matchAll(CTA)){
   const [verbStart]=m.indices.groups.verb, end=m.index+m[0].length;
   const before=text.slice(0,verbStart).replace(/[’‘]/g,"'").toLowerCase().split(/\s+/).filter(Boolean).slice(-3).join(' ');
@@ -111,7 +118,7 @@ function scoreReel(r,dated){
    Object.assign(out,reachScore(r,B));
    out.growth=growthOf(B);
    // Validation only (spec 4.3): not shown until build 3 decides.
-   if(out.growth){const projected=Math.expm1(out.growth.intercept+out.growth.slopePerDay*r.t/DAY);out.xExpected=projected>0?r.reach/projected:null;}
+   if(out.growth){const projected=Math.expm1(out.growth.intercept+out.growth.slopePerDay*r.t/DAY);const xe=r.reach/projected;out.xExpected=Number.isFinite(projected)&&projected>0&&Number.isFinite(xe)&&xe>0?xe:null;}
    Object.assign(out,commentScore(r,B));Object.assign(out,quadrantOf(out,B));
   }
  }
@@ -126,6 +133,7 @@ function summarize(rows,results){
  const kw=new Map();for(const x of all){if(!x.keyword)continue;const k=kw.get(x.keyword)??{keyword:x.keyword,reels:0,comments:0};k.reels++;k.comments+=x.comments??0;kw.set(x.keyword,k);}
  const ts=rows.map(r=>r.t).filter(t=>t!==null), first=ts.length?Math.min(...ts):null, last=ts.length?Math.max(...ts):null;
  const weeks=first!==null&&last>first?(last-first)/(7*DAY):null;
+ const sts=scored.map(x=>Date.parse(x.publishedAt)), sFirst=sts.length?Math.min(...sts):null, sLast=sts.length?Math.max(...sts):null;
  const latest=[...scored].sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt))[0];
  return {reels:rows.length,reelsWithReach:withReach.length,reelsScored:scored.length,medianReach:median(withReach.map(r=>r.reach)),
   winners:count('winner')+count('big_winner'),bigWinners:count('big_winner'),flops:count('flop'),
@@ -133,6 +141,7 @@ function summarize(rows,results){
   ctaShare:rows.length?all.filter(x=>x.keyword).length/rows.length:null,
   topKeywords:[...kw.values()].sort((a,b)=>b.comments-a.comments||a.keyword.localeCompare(b.keyword)).slice(0,10),
   cumulativeComments:scored.reduce((s,x)=>s+(x.comments??0),0),
+  scoredFirstPublishedAt:sFirst===null?null:new Date(sFirst).toISOString(),scoredLastPublishedAt:sLast===null?null:new Date(sLast).toISOString(),
   firstPublishedAt:first===null?null:new Date(first).toISOString(),lastPublishedAt:last===null?null:new Date(last).toISOString(),
   reelsPerWeek:weeks?ts.length/weeks:null,growth:latest?.growth?.flag??null};
 }

@@ -145,3 +145,25 @@ test('money-1.0 output is frozen (golden file)',()=>{
  const expected=JSON.parse(readFileSync(file,'utf8'));
  assert.deepEqual(JSON.parse(JSON.stringify(score(golden()))),expected);
 });
+
+test('production posterior: known answer 70/6 through scoreRun, and convergence as target exposure grows',()=>{
+ // Earlier window: 10 reels at 1,000 plays (e = 1) with comment rates rescaled to mean 10, sample variance 12.
+ const base=[8,9,10,11,12,10,10,6,14,10], s2=base.reduce((s,v)=>s+(v-10)**2,0)/9, rates=base.map(v=>10+(v-10)*Math.sqrt(12/s2));
+ const mk=(plays,comments)=>{const posts=account([...Array(10).fill(1000),plays]);posts.forEach((p,i)=>{if(i<10)p.comments=rates[i];});posts[10].comments=comments;return run(posts).results.r010;};
+ const r=mk(1000,20);assert.equal(r.rateKind,'shrunk');assert.ok(Math.abs(r.prior.alpha-50)<1e-9&&Math.abs(r.prior.beta-5)<1e-9);assert.ok(Math.abs(r.rate-70/6)<1e-9);
+ const far=mk(1e7,1e7/1000*30);assert.ok(Math.abs(far.rate-30)<0.01,String(far.rate));
+});
+test('pooled rate ignores the target\'s own comments by design',()=>{
+ const mk=c=>{const p=account(Array(12).fill(5000),()=>({comments:50}));p[11].comments=c;return run(p).results.r011;};
+ assert.equal(mk(0).rate,10);assert.equal(mk(500).rate,10);assert.equal(mk(0).rateKind,'pooled');
+});
+test('non-finite results become named gaps, never Infinity or 0',()=>{
+ const t0=Date.UTC(2026,7,1);const posts=Array.from({length:15},(_,i)=>({id:`s${String(i).padStart(2,'0')}`,publishedAt:new Date(t0+i*1000).toISOString(),plays:1000*(i+1)**3,comments:5,caption:''}));
+ const r=run(posts).results.s14;assert.ok(r.growth===null||Number.isFinite(r.growth.change30));assert.ok(r.xExpected===null||(Number.isFinite(r.xExpected)&&r.xExpected>0));
+ const huge=account(Array(12).fill(5000),i=>({comments:i===11?1e308:1e307}));const h=run(huge).results.r011;
+ assert.ok(h.rate===null||Number.isFinite(h.rate));assert.ok(h.threshold===null||Number.isFinite(h.threshold));if(h.rate===null)assert.equal(h.rateBucket,'invalid_counts');
+});
+test('comment total and its date range describe the same (scored) reels',()=>{
+ const {summary}=run(account(Array(11).fill(1000)));
+ assert.equal(summary.reelsScored,1);assert.equal(typeof summary.scoredFirstPublishedAt,'string');assert.equal(summary.scoredFirstPublishedAt,summary.scoredLastPublishedAt);assert.notEqual(summary.firstPublishedAt,summary.scoredFirstPublishedAt);
+});
