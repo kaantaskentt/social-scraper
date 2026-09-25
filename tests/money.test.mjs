@@ -82,3 +82,39 @@ test('xExpected equals 1 for a reel exactly on a clean exponential trend',()=>{
  const plays=Array.from({length:21},(_,i)=>Math.expm1(Math.log1p(1000)+0.02*i));
  const r=run(account(plays)).results.r020;assert.ok(Math.abs(r.xExpected-1)<1e-6);
 });
+
+import {gammaPrior} from '../public/money/1.0.mjs';
+test('gamma prior known answer: m=10, s2=12, e=1 gives alpha 50, beta 5',()=>{
+ const rates=[8,9,10,11,12,10,10,6,14,10]; // mean 10
+ const s2=rates.reduce((s,v)=>s+(v-10)**2,0)/(rates.length-1);
+ const k=12/s2, scaled=rates.map(v=>10+(v-10)*Math.sqrt(k)); // rescale to s2 = 12 exactly
+ const p=gammaPrior(scaled,Array(10).fill(1));
+ assert.ok(Math.abs(p.m-10)<1e-9&&Math.abs(p.s2-12)<1e-9&&Math.abs(p.tau2-2)<1e-9);
+ assert.ok(Math.abs(p.alpha-50)<1e-9&&Math.abs(p.beta-5)<1e-9);
+ assert.ok(Math.abs((p.alpha+20)/(p.beta+1)-70/6)<1e-9);
+});
+test('gamma prior uses mean(1/e), not 1/mean(e)',()=>{
+ const p=gammaPrior([10,10,10,10,10,10,10,10,10,30],[1,1,1,1,1,1,1,1,1,10]);
+ const m=12, s2=40, meanInv=(9+0.1)/10;assert.ok(Math.abs(p.tau2-(s2-m*meanInv))<1e-9);
+});
+test('comment rate buckets and pooling',()=>{
+ const noComments=account(Array(12).fill(5000),i=>i===11?{comments:null}:{});assert.equal(run(noComments).results.r011.rateBucket,'no_comments');
+ const small=account(Array(12).fill(5000),i=>i===11?{plays:900}:{});assert.equal(run(small).results.r011.rateBucket,'too_few_plays');
+ const flatRates=account(Array(12).fill(5000),()=>({comments:50}));const r=run(flatRates).results.r011;
+ assert.equal(r.rateKind,'pooled');assert.equal(r.rate,10);
+ const zeros=account(Array(12).fill(5000),()=>({comments:0}));const z=run(zeros).results.r011;assert.equal(z.rateKind,'pooled');assert.equal(z.rate,0);
+});
+test('with a fixed positive prior the shrunk rate approaches the raw rate as exposure grows',()=>{
+ const p={alpha:50,beta:5};const raw=30;
+ const at=e=>(p.alpha+raw*e)/(p.beta+e);assert.ok(Math.abs(at(1e6)-raw)<0.01);assert.ok(at(1)<raw&&at(1)>10);
+});
+test('quadrants: star, billboard, closer, dud; zero threshold with zero rate is low on comments',()=>{
+ const varied=i=>({comments:Math.round((5000/1000)*(8+(i%5)))}); // earlier rates 8..12 per 1k
+ const mk=(plays,comments)=>{const p=account([...Array(12).fill(5000),plays],varied);p[12].comments=comments;return run(p).results.r012;};
+ assert.equal(mk(20000,20000/1000*40).quadrant,'star');
+ assert.equal(mk(20000,20000/1000*2).quadrant,'billboard');
+ assert.equal(mk(3000,3*40).quadrant,'closer');
+ assert.equal(mk(3000,3*2).quadrant,'dud');
+ // all comments 0: threshold 0 and rate 0 is low on comments; x = 1 is high on reach
+ const zero=account(Array(13).fill(5000),()=>({comments:0}));assert.equal(run(zero).results.r012.quadrant,'billboard');
+});

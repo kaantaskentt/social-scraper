@@ -48,6 +48,34 @@ function growthOf(B){
  return {slopePerDay:slope,change30,intercept,flag:change30>PARAMS.growthUp?'growing':change30<PARAMS.growthDown?'shrinking':null};
 }
 
+const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
+// Method of moments for Gamma(shape alpha, rate beta) latent rates under Poisson counts with exposure e (1k reach).
+// Observed-rate variance = latent variance + m * mean(1/e); subtract the Poisson part before fitting.
+export function gammaPrior(rates,exposures){
+ const m=mean(rates), s2=rates.reduce((s,v)=>s+(v-m)**2,0)/(rates.length-1), tau2=s2-m*mean(exposures.map(e=>1/e));
+ if(!(tau2>0)||m===0)return {m,s2,tau2,alpha:null,beta:null};
+ return {m,s2,tau2,alpha:m*m/tau2,beta:m/tau2};
+}
+
+// Comment rate per 1,000 reach, shrunk toward the earlier reels' typical rate (spec 4.4).
+function commentScore(r,B){
+ if(r.comments===null)return {rateBucket:'no_comments'};
+ if(r.reach<PARAMS.minReachForRate)return {rateBucket:'too_few_plays'};
+ const P=B.filter(q=>q.comments!==null);if(P.length<PARAMS.minWindow)return {rateBucket:'short_history'};
+ const e=P.map(q=>q.reach/1000), prior=gammaPrior(P.map((q,i)=>q.comments/e[i]),e);
+ const rate=prior.alpha===null?prior.m:(prior.alpha+r.comments)/(prior.beta+r.reach/1000);
+ return {rate,rateKind:prior.alpha===null?'pooled':'shrunk',rateBucket:null,prior};
+}
+
+// Comment threshold: median raw rate of window reels with known comments and 1,000+ reach; needs 10 (spec 4.6).
+function quadrantOf(out,B){
+ if(out.rate===null)return {quadrant:'insufficient',quadrantReason:out.rateBucket};
+ const T=B.filter(q=>q.comments!==null&&q.reach>=PARAMS.minReachForRate).map(q=>q.comments/(q.reach/1000));
+ if(T.length<PARAMS.minWindow)return {quadrant:'insufficient',quadrantReason:'short_history',threshold:null};
+ const threshold=median(T), reachHigh=ge(out.xNormal,1), commentsHigh=out.rate>threshold+PARAMS.tol;
+ return {threshold,quadrantReason:null,quadrant:reachHigh?(commentsHigh?'star':'billboard'):(commentsHigh?'closer':'dud')};
+}
+
 function scoreReel(r,dated){
  const out={id:r.id,publishedAt:r.publishedAt,reach:r.reach,reachDisagree:r.disagree,ageDays:r.age,comments:r.comments,
   bucket:null,xNormal:null,z:null,label:null,baseline:null,windowSize:0,windowMedianAgeDays:null,growth:null,xExpected:null,
@@ -61,6 +89,7 @@ function scoreReel(r,dated){
    out.growth=growthOf(B);
    // Validation only (spec 4.3): not shown until build 3 decides.
    if(out.growth){const projected=Math.expm1(out.growth.intercept+out.growth.slopePerDay*r.t/DAY);out.xExpected=projected>0?r.reach/projected:null;}
+   Object.assign(out,commentScore(r,B));Object.assign(out,quadrantOf(out,B));
   }
  }
  if(out.bucket){out.rateBucket=out.bucket;out.quadrantReason=out.bucket;}
