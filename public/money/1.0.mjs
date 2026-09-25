@@ -76,8 +76,31 @@ function quadrantOf(out,B){
  return {threshold,quadrantReason:null,quadrant:reachHigh?(commentsHigh?'star':'billboard'):(commentsHigh?'closer':'dud')};
 }
 
+// Keyword CTA: an imperative "Comment X" / "DM me X" where X is quoted, or in capitals in the original caption (spec 4.5).
+const ci=w=>[...w].map(c=>c===' '?'\\s+':/[a-z]/.test(c)?`[${c}${c.toUpperCase()}]`:c).join('');
+const STOP=new Set(['YOUR','YOU','THE','OF','BELOW','THIS','THAT','ME','IT','A','AN','AND','OR','TO','FOR','IN','ON','WITH','DOWN','HERE']);
+const LEAD=`(?:^\\s*|[.!?…\\n\\-–—]\\s*|\\p{Extended_Pictographic}\\uFE0F?\\s*|(?<![\\p{L}\\p{N}])(?:${ci('just')}|${ci('please')}|${ci('or')}|${ci('and')})\\s+)`;
+const VERB=`(?<c>${ci('comment')}|${ci('type')}|${ci('reply')}|${ci('write')})|(?<d>(?:${ci('dm')}|${ci('message')}|${ci('send')})\\s+${ci('me')})`;
+const TOKEN=`(?:["“”'‘’](?<q>[\\p{L}\\p{N}]{2,20})["“”'‘’]|(?<u>(?=[\\p{Lu}\\p{N}]*\\p{Lu})[\\p{Lu}\\p{N}]{2,20})(?![\\p{L}\\p{N}]))`;
+const CTA=new RegExp(`${LEAD}(?<verb>${VERB})\\s+(?:${ci('the word')}\\s+|${ci('word')}\\s+)?${TOKEN}`,'gdu');
+const NEGATION=/\b(?:don'?t|do not|never|no need to)\b/;
+export function keywordCtas(caption){
+ const text=typeof caption==='string'?caption:'', matches=[];
+ for(const m of text.matchAll(CTA)){
+  const [verbStart]=m.indices.groups.verb, end=m.index+m[0].length;
+  const before=text.slice(0,verbStart).replace(/[’‘]/g,"'").toLowerCase().split(/\s+/).filter(Boolean).slice(-3).join(' ');
+  if(NEGATION.test(before))continue;
+  const token=m.groups.q??m.groups.u;if(!m.groups.q&&STOP.has(token))continue;
+  matches.push({keyword:token.toLocaleUpperCase('en'),channel:m.groups.c?'comment':'dm',evidence:text.slice(verbStart,end).trim().slice(0,80)});
+ }
+ const primary=matches.find(x=>x.channel==='comment')??matches[0]??null;
+ return {keyword:primary?.keyword??null,channel:primary?.channel??null,evidence:primary?.evidence??null,matches};
+}
+
 function scoreReel(r,dated){
+ const kw=keywordCtas(r.caption);
  const out={id:r.id,publishedAt:r.publishedAt,reach:r.reach,reachDisagree:r.disagree,ageDays:r.age,comments:r.comments,
+  keyword:kw.keyword,keywordChannel:kw.channel,keywordEvidence:kw.evidence,keywordMatches:kw.matches,
   bucket:null,xNormal:null,z:null,label:null,baseline:null,windowSize:0,windowMedianAgeDays:null,growth:null,xExpected:null,
   rate:null,rateKind:null,rateBucket:null,prior:null,threshold:null,quadrant:'insufficient',quadrantReason:null};
  out.bucket=r.t===null?'no_date':r.reach===null?'no_reach':r.age===null?'unknown_observation':r.age<PARAMS.minAgeDays?'too_new':null;

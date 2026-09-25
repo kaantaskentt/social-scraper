@@ -78,7 +78,7 @@ All reels of the run with a known reach, regardless of speech, transcript status
 ### 4.5 Keyword CTA
 - Grammar (case-insensitive verbs; token boundaries on both sides): `(comment|type|reply|write) + [the word] + TOKEN` and `(dm|message|send) + me + [the word] + TOKEN`, where TOKEN is either quoted (straight or curly quotes) or written in capitals in the original caption, 2 to 20 letters or digits.
 - Stoplist for unquoted capitals: YOUR, YOU, THE, OF, BELOW, THIS, THAT, ME, IT, A, AN, AND, OR, TO, FOR, IN, ON, WITH, DOWN, HERE.
-- Imperative only: the verb must start a sentence or clause (start of caption, after `.!?`, a line break, an emoji, a dash, or after "just"/"please"). Negated forms are skipped: "don't", "do not", "never", "no need to" within the 3 tokens before the verb.
+- Imperative only: the verb must start a sentence or clause (start of caption, after `.!?…`, a line break, an emoji, a dash, or after the whole words "just", "please", "or", "and"). "Comment the STATE you live in" (an open answer) is a comment CTA without a fixed keyword, so no keyword. Checked on ken.remedie: 99 of 100 captions parsed; the one left is that open-answer CTA. Negated forms are skipped: "don't", "do not", "never", "no need to" within the 3 tokens before the verb.
 - Keep every match with channel (`comment` or `dm`) and the evidence text. Primary keyword = first comment-channel match, else first DM match.
 - Tests: 30 real ken.remedie captions (all positive), negatives ("Comment your thoughts", "type of business", "comment below", "Don't comment GUIDE", "people keep asking me to comment LIME"), overlong tokens, emoji, Unicode quotes, multiple CTAs, a DM-only CTA.
 
