@@ -70,3 +70,15 @@ test('future-append invariance: newer reels never change older results',()=>{
 });
 
 test('params match the spec',()=>{assert.deepEqual({...PARAMS},{minAgeDays:7,windowSize:30,windowDays:90,minWindow:10,winnerX:2,bigWinnerX:5,flopX:0.5,zGate:1,zConstant:0.6745,minReachForRate:1000,disagreeTolerance:0.05,growthUp:0.5,growthDown:-0.33,minGrowthTimestamps:5,tol:1e-9});});
+
+test('growth: doubling every 30 days is flagged growing; flat is not; too few timestamps gives null',()=>{
+ const grow=account(Array.from({length:30},(_,i)=>Math.round(1000*2**(i/30))));
+ const g=run(grow).results.r029.growth;assert.equal(g.flag,'growing');assert.ok(Math.abs(g.change30-1)<0.05);
+ assert.equal(run(account(Array(30).fill(1000))).results.r029.growth.flag,null);
+ const sameDay=account(Array(12).fill(1000)).map((p,i)=>i<11?{...p,publishedAt:new Date(OBS-(30+(i%4))*DAY).toISOString()}:p);
+ assert.equal(run(sameDay).results.r011.growth,null);
+});
+test('xExpected equals 1 for a reel exactly on a clean exponential trend',()=>{
+ const plays=Array.from({length:21},(_,i)=>Math.expm1(Math.log1p(1000)+0.02*i));
+ const r=run(account(plays)).results.r020;assert.ok(Math.abs(r.xExpected-1)<1e-6);
+});

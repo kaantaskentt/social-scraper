@@ -39,6 +39,15 @@ function reachScore(r,B){
  return {baseline,xNormal:x,z,label,windowMedianAgeDays:median(B.map(q=>q.age))};
 }
 
+// Theil-Sen slope of log1p(reach) per day over the window; pairs with equal publish times are skipped.
+function growthOf(B){
+ const pts=B.map(q=>({t:q.t/DAY,y:Math.log1p(q.reach)}));
+ if(new Set(pts.map(p=>p.t)).size<PARAMS.minGrowthTimestamps)return null;
+ const slopes=[];for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++)if(pts[j].t!==pts[i].t)slopes.push((pts[j].y-pts[i].y)/(pts[j].t-pts[i].t));
+ const slope=median(slopes), intercept=median(pts.map(p=>p.y-slope*p.t)), change30=Math.expm1(30*slope);
+ return {slopePerDay:slope,change30,intercept,flag:change30>PARAMS.growthUp?'growing':change30<PARAMS.growthDown?'shrinking':null};
+}
+
 function scoreReel(r,dated){
  const out={id:r.id,publishedAt:r.publishedAt,reach:r.reach,reachDisagree:r.disagree,ageDays:r.age,comments:r.comments,
   bucket:null,xNormal:null,z:null,label:null,baseline:null,windowSize:0,windowMedianAgeDays:null,growth:null,xExpected:null,
@@ -47,7 +56,12 @@ function scoreReel(r,dated){
  if(!out.bucket){
   const B=windowFor(r,dated);out.windowSize=B.length;
   if(B.length<PARAMS.minWindow)out.bucket='short_history';
-  else Object.assign(out,reachScore(r,B));
+  else{
+   Object.assign(out,reachScore(r,B));
+   out.growth=growthOf(B);
+   // Validation only (spec 4.3): not shown until build 3 decides.
+   if(out.growth){const projected=Math.expm1(out.growth.intercept+out.growth.slopePerDay*r.t/DAY);out.xExpected=projected>0?r.reach/projected:null;}
+  }
  }
  if(out.bucket){out.rateBucket=out.bucket;out.quadrantReason=out.bucket;}
  return out;
