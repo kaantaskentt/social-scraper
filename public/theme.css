@@ -141,3 +141,28 @@ dialog .close{font-size:18px}
 #axes .axis-title{font-weight:560;fill:var(--ink)}
 #axes .median-label{font-size:10px;fill:#9a958a}
 #axes .corner-hint{font-size:11px;fill:#9a958a}
+
+/* Create studio */
+.studio-view{padding:20px 23px 24px}
+.studio-top{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(300px,1fr);gap:24px}
+.studio-step{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:560;margin:0 0 4px}
+.studio-step span{display:grid;place-items:center;width:22px;height:22px;border-radius:9999px;background:var(--ink);color:var(--paper);font-size:11px}
+.studio-hint,.studio-empty{color:var(--muted);font-size:12px;margin:0 0 12px}
+.studio-picks{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.studio-pick{position:relative;padding:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card);aspect-ratio:9/16;text-align:left}
+.studio-pick img{width:100%;height:100%;object-fit:cover;display:block}
+.studio-pick[aria-pressed="true"]{outline:2px solid var(--ink);outline-offset:2px}
+.studio-pick:hover{border-color:var(--ink)}
+.studio-x{position:absolute;top:6px;left:6px;background:rgba(0,0,0,.72);color:#fff;border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:600}
+.studio-meta{position:absolute;inset:auto 0 0;padding:14px 8px 6px;font-size:11px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.7))}
+.studio-right #studio-reel video{width:100%;max-height:320px;border-radius:14px;background:#000;margin:6px 0 10px}
+.studio-form .replicate-open,.studio-form [data-replicate="cancel"]{display:none}
+.studio-tray{margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
+.studio-jobs{display:flex;gap:12px;overflow-x:auto;padding:6px 0}
+.studio-job{flex:none;width:150px}
+.studio-job img,.studio-job video{width:150px;aspect-ratio:9/16;object-fit:cover;border-radius:12px;background:var(--card);display:block}
+.studio-job-generating img,.studio-job-submitting img,.studio-job-finishing img{opacity:.55;animation:studio-pulse 1.6s ease-in-out infinite}
+@keyframes studio-pulse{50%{opacity:.3}}
+.studio-job-status{font-size:12px;margin:6px 0 2px}
+.studio-active .stage-layout{grid-template-columns:1fr}
+@media(max-width:900px){.studio-top{grid-template-columns:1fr}.studio-picks{grid-template-columns:repeat(3,minmax(0,1fr))}}

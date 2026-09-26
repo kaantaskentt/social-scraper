@@ -1,0 +1,27 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {pickWinners,renderPicks,renderJobs} from '../public/studio-view.mjs';
+
+const posts=[{id:'a'},{id:'b'},{id:'c'},{id:'d'},{id:'e'},{id:'f'}];
+const results={a:{quadrant:'billboard',xNormal:8.6,reach:4.7e6},b:{quadrant:'star',xNormal:3.1,reach:9e5},c:{quadrant:'dud',xNormal:9.9},
+ d:{quadrant:'closer',xNormal:5},e:{quadrant:'star',xNormal:12,reach:2e6},f:{quadrant:'billboard',xNormal:null}};
+
+test('winners: only high-reach boxes (Star, Billboard) with a video, best "x normal" first, capped',()=>{
+ const w=pickWinners(posts,results,{hasVideo:p=>p.id!=='e'});
+ assert.deepEqual(w.map(x=>x.id),['a','b']);
+ assert.deepEqual(pickWinners(posts,results,{hasVideo:()=>true,limit:1}).map(x=>x.id),['e']);
+ assert.equal(w[0].box,'Billboard');assert.equal(w[0].xNormal,8.6);
+ assert.deepEqual(pickWinners(posts,{},{hasVideo:()=>true}),[]);
+});
+
+test('picks: cards with multiple and box, the selected one marked, empty state explains why',()=>{
+ const html=renderPicks([{id:'a',image:'/media/r/a',xNormal:8.6,box:'Billboard',reach:4.7e6}],'a');
+ assert.match(html,/data-studio-pick="a"/);assert.match(html,/8\.6×/);assert.match(html,/Billboard/);assert.match(html,/aria-pressed="true"/);
+ assert.match(renderPicks([],null),/No winners/);
+});
+
+test('jobs tray: progress, done with video, failures, and escaping',()=>{
+ const html=renderJobs([{id:'1',postId:'a',status:'generating',credits:84},{id:'2',postId:'b',status:'done',video:'/replicas/2.mp4'},{id:'3',postId:'c',status:'failed',error:'<b>x</b>'}],id=>`/media/r/${id}`);
+ assert.match(html,/Generating/);assert.match(html,/src="\/replicas\/2.mp4#t=0.5"/);assert.match(html,/&lt;b&gt;x/);assert.doesNotMatch(html,/<b>x/);
+ assert.match(renderJobs([],()=>''),/Nothing generating yet/);
+});

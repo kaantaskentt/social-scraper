@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,rm,readFile,writeFile,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {buildReplicatePrompt,higgsfieldArgs,parseCredits,Replicator} from '../lib/replicate.mjs';
+import {buildReplicatePrompt,higgsfieldArgs,parseCredits,jobIdFrom,Replicator} from '../lib/replicate.mjs';
 
 test('prompt: video is master for camera and pacing only, references are the only design, no copied text',()=>{
  const p=buildReplicatePrompt({images:2,shots:[{start:0,end:3.2},{start:3.2,end:12.5}],overlayText:'dev team justifying a dinner'});
@@ -102,5 +102,18 @@ test('saves of one replicate land in order even when the disk is slow',async()=>
   const rep={id:'00000000-0000-0000-0000-000000000001',runId:'a',postId:'b',status:'one',createdAt:'x'};
   const writes=[];for(const st of ['two','three','four','done']){rep.status=st;writes.push(r.save(rep));}
   await Promise.all(writes);assert.equal(JSON.parse(await readFile(join(root,'replicas',rep.id+'.json'),'utf8')).status,'done');
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('job id is read from every answer shape the CLI gives (a bare id list was missed on 2026-09-26 and cost a manual recovery)',()=>{
+ const id='e53674b9-80d4-4bb8-bc44-9c6b08fc0e35';
+ for(const out of [[id],id,[{id}],{id},{job_ids:[id]},{jobs:[{id}]}])assert.equal(jobIdFrom(out),id,JSON.stringify(out));
+ assert.equal(jobIdFrom([]),null);assert.equal(jobIdFrom({status:'queued'}),null);
+});
+
+test('start keeps the job id when create answers with a bare id list',async()=>{
+ const run=async args=>{if(args[1]==='cost')return '84 credits';if(args[1]==='create')return '["job-7"]';return '{"id":"job-7","status":"in_progress"}';};
+ const {root,r,input}=await setup({run});
+ try{const rep=await r.start({...input,confirmCredits:84});assert.equal(rep.status,'generating');assert.equal(rep.jobId,'job-7');r.items.get(rep.id).status='done';
  }finally{await rm(root,{recursive:true,force:true});}
 });

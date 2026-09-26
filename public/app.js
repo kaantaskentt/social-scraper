@@ -3,6 +3,7 @@ import {renderMoneyView,renderMoneyInspector} from './money-view.mjs';
 import {segmentAt,partRow,barPart} from './anatomy-view.mjs';
 import {parseHandles} from './handles.mjs';
 import {renderReplicatePanel} from './replicate-view.mjs';
+import {pickWinners,renderPicks,renderJobs} from './studio-view.mjs';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const openingLine=p=>{const text=p.analysis?.opening||p.transcript?.text||'';const sentence=text.match(/^.*?[.!?](?:\s|$)/s)?.[0]?.trim();return sentence||((text.length>180?text.slice(0,177)+'…':text));};
@@ -151,7 +152,7 @@ function renderMoneySelection(){
  $('#money-inspector').innerHTML=renderMoneyInspector(moneyState?.report?.results?.[selected],{demo,error:moneyState?.error,loading:moneyState?.loading});
  for(const b of $$('#money-view [data-money-inspect]')){const active=b.dataset.moneyInspect===selected;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));}
 }
-function renderMoney(){
+function renderMoney(){if(currentView==='studio')queueMicrotask(renderStudio);
  const node=$('#money-view'),open=[...node.querySelectorAll('details[open]')].map(d=>d.dataset.moneyDetails),focus=document.activeElement;
  const focusedId=node.contains(focus)?focus.dataset.moneyInspect:null,focusedVersion=focus.id==='money-version',focusedDetails=node.contains(focus)&&focus.tagName==='SUMMARY'?focus.parentElement.dataset.moneyDetails:null;
  node.innerHTML=renderMoneyView(moneyState?.report,{demo:job.id==='demo'||job.synthetic,error:moneyState?.error,loading:moneyState?.loading,posts:job.posts,selected,expanded:moneyExpanded});
@@ -181,13 +182,15 @@ async function fetchMoney(state){
  finally{state.inFlight=false;state.loading=false;if(state===moneyState){renderMoney();if(state.pending)scheduleMoney();}}
 }
 function setView(view){
- stopReplay();currentView=view;const money=view==='money';
- $('#explorer-controls').hidden=money;$('#explorer-canvas').hidden=money;$('#findings').hidden=money;$('#money-view').hidden=!money;$('.explorer').classList.toggle('money-active',money);
- for(const [id,active]of [['explorer-view-button',!money],['money-view-button',money]]){$('#'+id).classList.toggle('active',active);$('#'+id).setAttribute('aria-pressed',String(active));}
+ stopReplay();currentView=view;const money=view==='money',studio=view==='studio',explorer=view==='explorer';
+ $('#explorer-controls').hidden=!explorer;$('#explorer-canvas').hidden=!explorer;$('#findings').hidden=!explorer;$('#money-view').hidden=!money;$('#studio-view').hidden=!studio;$('.inspector').hidden=studio;$('.explorer').classList.toggle('money-active',money);$('.explorer').classList.toggle('studio-active',studio);
+ if(studio)renderStudio();else clearTimeout(studioTimer);
+ for(const [id,active]of [['explorer-view-button',explorer],['money-view-button',money],['studio-view-button',studio]]){$('#'+id).classList.toggle('active',active);$('#'+id).setAttribute('aria-pressed',String(active));}
  $('.inspector').classList.toggle('no-matches',!money&&!visible.length);$('#inspector-empty').hidden=money||visible.length>0;layout();
 }
 $('#explorer-view-button').onclick=()=>setView('explorer');
 $('#money-view-button').onclick=()=>setView('money');
+$('#studio-view-button').onclick=()=>setView('studio');
 async function refresh(){boot=await api('/api/bootstrap');const current=job?.id||'demo';$('#run-select').innerHTML='<option value="demo">Demo · sample data</option>'+boot.runs.map(r=>`<option value="${r.id}">@${escape(r.creator)} · ${r.completed}/${r.count} · ${r.status}</option>`).join('');$('#run-select').value=current;renderConnections();}
 function renderConnections(){const active=['apify',boot.transcriptionProvider||'groq','jev'];const count=active.filter(k=>boot.connections[k]?.configured).length;$('#connection-status').textContent=`${count}/3 keys configured`;for(const k of ['apify','groq','fireworks','jev'])$(`#${k}-status`).textContent=boot.connections[k]?.verified?'· key verified':boot.connections[k]?.configured?'· configured':active.includes(k)?'· needed':'· optional';$('#transcription-provider').textContent=title(boot.transcriptionProvider||'groq');}
 
@@ -221,26 +224,39 @@ const REFS_KEY='socialScraper.references';
 const loadRefs=()=>{try{return JSON.parse(localStorage.getItem(REFS_KEY)||'[]').filter(r=>r&&/^[0-9a-f-]{36}$/.test(r.id)).slice(0,4);}catch{return [];}};
 const storeRefs=refs=>{try{localStorage.setItem(REFS_KEY,JSON.stringify(refs));}catch{}};
 const rep={refs:loadRefs(),open:false,overlayText:'',keepSound:true,estimate:null,busy:'',error:'',replicas:[],timer:null,key:''};
-function renderReplicate(){const el=$('#replicate-panel'),p=job?.posts.find(x=>x.id===selected);if(!el)return;if(!p||job.id==='demo'||job.synthetic){el.innerHTML='';return;}el.innerHTML=renderReplicatePanel({runId:job.id,post:p,savedVideo:videoState.runId===job.id&&videoState.saved.has(p.id),refs:rep.refs,open:rep.open,overlayText:rep.overlayText,keepSound:rep.keepSound,estimate:rep.estimate,busy:rep.busy,error:rep.error,replicas:rep.replicas});}
+function renderReplicate(){const el=$('#replicate-panel'),p=job?.posts.find(x=>x.id===selected);if(!el)return;if(!p||job.id==='demo'||job.synthetic){el.innerHTML='';return;}const state={runId:job.id,post:p,savedVideo:videoState.runId===job.id&&videoState.saved.has(p.id),refs:rep.refs,open:rep.open,overlayText:rep.overlayText,keepSound:rep.keepSound,estimate:rep.estimate,busy:rep.busy,error:rep.error,replicas:rep.replicas};el.innerHTML=renderReplicatePanel(state);if(currentView==='studio')$('#studio-form').innerHTML=renderReplicatePanel({...state,open:true,replicas:[]});}
 function resetReplicate(){const key=`${job?.id}:${selected}`;if(rep.key===key){renderReplicate();return;}clearTimeout(rep.timer);Object.assign(rep,{key,open:false,estimate:null,busy:'',error:'',replicas:[]});renderReplicate();loadReplicas();}
 async function loadReplicas(){clearTimeout(rep.timer);if(!job||job.synthetic||job.id==='demo'||!selected)return;const key=rep.key;try{const list=await api(`/api/replicas?runId=${encodeURIComponent(job.id)}&postId=${encodeURIComponent(selected)}`);if(rep.key!==key)return;rep.replicas=list;renderReplicate();if(list.some(r=>['submitting','generating','finishing'].includes(r.status)))rep.timer=setTimeout(loadReplicas,10000);}catch(e){if(rep.key===key){rep.error=e.message;renderReplicate();}}}
 const readAsDataUrl=file=>new Promise((ok,fail)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>fail(new Error(`Could not read ${file.name}`));r.readAsDataURL(file);});
 const replicateBody=()=>({postId:selected,referenceIds:rep.refs.map(r=>r.id),overlayText:rep.overlayText,keepSound:rep.keepSound});
-$('#replicate-panel').addEventListener('click',async e=>{
+for(const panel of [$('#replicate-panel'),$('#studio-form')]){panel.addEventListener('click',async e=>{
  const btn=e.target.closest('[data-replicate],[data-remove-ref]');if(!btn||btn.disabled||btn.tagName==='INPUT'||btn.tagName==='LABEL')return;
  if(btn.dataset.removeRef){rep.refs=rep.refs.filter(r=>r.id!==btn.dataset.removeRef);storeRefs(rep.refs);rep.estimate=null;renderReplicate();return;}
  const act=btn.dataset.replicate,key=rep.key;
  if(act==='open'){rep.open=true;rep.error='';renderReplicate();return;}
  if(act==='cancel'){Object.assign(rep,{open:false,estimate:null,busy:'',error:''});renderReplicate();return;}
  if(act==='estimate'){rep.busy='Checking cost…';rep.error='';renderReplicate();try{const est=await api(`/api/runs/${encodeURIComponent(job.id)}/replicate/estimate`,replicateBody());if(rep.key===key)rep.estimate=est;}catch(err){if(rep.key===key)rep.error=err.message;}finally{if(rep.key===key){rep.busy='';renderReplicate();}}return;}
- if(act==='start'&&rep.estimate){rep.busy='Sending to Higgsfield…';rep.error='';renderReplicate();try{const r=await api(`/api/runs/${encodeURIComponent(job.id)}/replicate`,{...replicateBody(),confirmCredits:rep.estimate.credits});if(rep.key===key){Object.assign(rep,{open:false,estimate:null});rep.replicas=[r,...rep.replicas];loadReplicas();}}catch(err){if(rep.key===key){rep.error=err.message;rep.estimate=null;}}finally{if(rep.key===key){rep.busy='';renderReplicate();}}}
+ if(act==='start'&&rep.estimate){rep.busy='Sending to Higgsfield…';rep.error='';renderReplicate();try{const r=await api(`/api/runs/${encodeURIComponent(job.id)}/replicate`,{...replicateBody(),confirmCredits:rep.estimate.credits});if(rep.key===key){Object.assign(rep,{open:false,estimate:null});rep.replicas=[r,...rep.replicas];loadReplicas();loadStudioJobs();}}catch(err){if(rep.key===key){rep.error=err.message;rep.estimate=null;}}finally{if(rep.key===key){rep.busy='';renderReplicate();}}}
 });
-$('#replicate-panel').addEventListener('change',async e=>{
+panel.addEventListener('change',async e=>{
  const t=e.target;
  if(t.dataset.replicate==='sound'){rep.keepSound=t.checked;rep.estimate=null;renderReplicate();return;}
  if(t.dataset.replicate==='files'){const files=[...t.files].slice(0,4-rep.refs.length);rep.busy='Uploading…';rep.error='';renderReplicate();try{for(const f of files){if(f.size>10*1024*1024)throw new Error(`${f.name} is over 10 MB`);rep.refs.push(await api('/api/references',{dataUrl:await readAsDataUrl(f)}));}storeRefs(rep.refs);rep.estimate=null;}catch(err){rep.error=err.message;}finally{rep.busy='';renderReplicate();}}
 });
-$('#replicate-panel').addEventListener('input',e=>{if(e.target.dataset.replicate==='text')rep.overlayText=e.target.value;});
+panel.addEventListener('input',e=>{if(e.target.dataset.replicate==='text')rep.overlayText=e.target.value;});}
+// Create studio: winners from the Money scores, the replicate form for the picked reel, and every recreation of this run.
+let studioTimer=null;
+function renderStudio(){if(currentView!=='studio')return;const real=job&&!job.synthetic&&job.id!=='demo';
+ const winners=real?pickWinners(job.posts,moneyState?.runId===job.id?moneyState.report?.results:null,{hasVideo:p=>Boolean(videoSource(p))}).map(w=>({...w,image:imageURL(job.posts.find(p=>p.id===w.id))})):[];
+ $('#studio-picks').innerHTML=real?renderPicks(winners,selected):'<p class="studio-empty">Pick a real account under Your research to start.</p>';
+ const p=job?.posts.find(x=>x.id===selected),src=real&&videoSource(p);
+ if($('#studio-reel').dataset.post!==String(selected)){$('#studio-reel').dataset.post=String(selected);$('#studio-reel').innerHTML=src?`<video src="${escape(src)}" controls playsinline muted preload="metadata"></video>`:'';}
+ $('#studio-form').innerHTML='';renderReplicate();loadStudioJobs();}
+async function loadStudioJobs(){clearTimeout(studioTimer);if(currentView!=='studio'||!job||job.synthetic||job.id==='demo'){$('#studio-jobs').innerHTML=renderJobs([],()=>'');return;}const id=job.id;
+ try{const list=await api(`/api/replicas?runId=${encodeURIComponent(id)}`);if(job.id!==id||currentView!=='studio')return;$('#studio-jobs').innerHTML=renderJobs(list,postId=>{const p=job.posts.find(x=>x.id===postId);return p?imageURL(p):'';});
+  if(list.some(r=>['submitting','generating','finishing'].includes(r.status)))studioTimer=setTimeout(loadStudioJobs,10000);}
+ catch(e){$('#studio-jobs').innerHTML=`<p class="replica-error">${escape(e.message)}</p>`;}}
+$('#studio-picks').addEventListener('click',e=>{const b=e.target.closest('[data-studio-pick]');if(!b)return;selectPost(b.dataset.studioPick);renderStudio();});
 // Clickable script parts: open the player on the saved (or Instagram) video, jump to the part, and follow playback.
 const videoSource=p=>p&&videoState.runId===job?.id&&videoState.saved.has(p.id)?`/videos/${encodeURIComponent(job.id)}/${encodeURIComponent(p.id)}`:safeLink(p?.videoUrl);
 function openPlayer(p){const v=$('#preview-video'),src=p&&videoSource(p);if(!src)return null;if(v.hidden||v.dataset.post!==p.id){$('#preview-image').hidden=true;$('#preview-play').hidden=true;$('.preview-media').classList.add('playing');v.hidden=false;v.dataset.post=p.id;v.src=src;}return v;}
