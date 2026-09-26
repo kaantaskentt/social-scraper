@@ -166,3 +166,27 @@ dialog .close{font-size:18px}
 .studio-job-status{font-size:12px;margin:6px 0 2px}
 .studio-active .stage-layout{grid-template-columns:1fr}
 @media(max-width:900px){.studio-top{grid-template-columns:1fr}.studio-picks{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Replicate form, polished */
+.replicate-form{padding:18px}
+.replicate-title{font-size:14px;font-weight:600}
+.ref,.ref-add{width:76px;height:76px;border-radius:12px}
+.ref button{opacity:0;transition:opacity .15s;width:22px;height:22px}
+.ref:hover button,.ref button:focus-visible{opacity:1}
+.ref-add{font-size:24px;background:var(--paper)}
+.replicate-field input{border-radius:10px;padding:9px 12px;background:var(--paper)}
+.replicate-check input{accent-color:var(--ink);width:15px;height:15px;margin:0}
+.replicate-actions .primary{padding:10px 18px}
+.replicate-note{font-size:11px;color:var(--muted);margin:10px 0 0;line-height:1.5}
+/* Studio: the form sits flat in its column; wide screens put the reel beside the form */
+.studio-form .replicate-form{background:transparent;border:0;padding:0}
+.studio-right{display:grid;grid-template-columns:200px minmax(0,1fr);gap:0 20px;align-content:start}
+.studio-right>.studio-step{grid-column:1/-1;margin-bottom:12px}
+.studio-right #studio-reel video{width:200px;max-height:none;aspect-ratio:9/16;object-fit:cover;margin:0}
+.studio-view{max-width:1500px}
+.studio-top{grid-template-columns:minmax(0,1.25fr) minmax(460px,1fr);gap:36px}
+.studio-picks{gap:12px}
+@media(max-width:1180px){.studio-top{grid-template-columns:1fr}}
+@media(max-width:560px){.studio-right{grid-template-columns:1fr}.studio-right #studio-reel video{width:100%;max-height:360px;margin-bottom:12px}}
+.studio-form .replicate-title{display:none}
+.studio-job .quiet{padding-left:0}

@@ -20,6 +20,6 @@ export function renderPicks(winners,selectedId){
 export function renderJobs(jobs,imageFor){
  if(!jobs.length)return '<p class="studio-empty">Nothing generating yet. Your recreations appear here.</p>';
  return `<div class="studio-jobs">${jobs.map(j=>`<article class="studio-job studio-job-${escape(j.status)}">${j.status==='done'&&j.video
-  ?`<video src="${escape(j.video)}#t=0.5" controls playsinline preload="metadata"></video>`:`<img src="${escape(imageFor(j.postId))}" alt="">`}
+  ?`<video src="${escape(j.video)}#t=0.5" controls playsinline preload="auto"></video>`:`<img src="${escape(imageFor(j.postId))}" alt="">`}
 <p class="studio-job-status">${escape(STATUS[j.status]||j.status)}${j.credits?` · ${escape(j.credits)} cr`:''}</p>${j.error?`<p class="replica-error">${escape(j.error)}</p>`:''}${j.status==='done'&&j.video?`<a class="quiet" href="${escape(j.video)}" download>Download ↓</a>`:''}</article>`).join('')}</div>`;
 }

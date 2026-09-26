@@ -248,9 +248,10 @@ panel.addEventListener('input',e=>{if(e.target.dataset.replicate==='text')rep.ov
 let studioTimer=null;
 function renderStudio(){if(currentView!=='studio')return;const real=job&&!job.synthetic&&job.id!=='demo';
  const winners=real?pickWinners(job.posts,moneyState?.runId===job.id?moneyState.report?.results:null,{hasVideo:p=>Boolean(videoSource(p))}).map(w=>({...w,image:imageURL(job.posts.find(p=>p.id===w.id))})):[];
+ if(real&&winners.length&&!winners.some(w=>w.id===selected)){selectPost(winners[0].id);}
  $('#studio-picks').innerHTML=real?renderPicks(winners,selected):'<p class="studio-empty">Pick a real account under Your research to start.</p>';
  const p=job?.posts.find(x=>x.id===selected),src=real&&videoSource(p);
- if($('#studio-reel').dataset.post!==String(selected)){$('#studio-reel').dataset.post=String(selected);$('#studio-reel').innerHTML=src?`<video src="${escape(src)}" controls playsinline muted preload="metadata"></video>`:'';}
+ if($('#studio-reel').dataset.post!==String(selected)){$('#studio-reel').dataset.post=String(selected);$('#studio-reel').innerHTML=src?`<video src="${escape(src)}" poster="${escape(imageURL(p))}" controls playsinline preload="metadata"></video>`:'';}
  $('#studio-form').innerHTML='';renderReplicate();loadStudioJobs();}
 async function loadStudioJobs(){clearTimeout(studioTimer);if(currentView!=='studio'||!job||job.synthetic||job.id==='demo'){$('#studio-jobs').innerHTML=renderJobs([],()=>'');return;}const id=job.id;
  try{const list=await api(`/api/replicas?runId=${encodeURIComponent(id)}`);if(job.id!==id||currentView!=='studio')return;$('#studio-jobs').innerHTML=renderJobs(list,postId=>{const p=job.posts.find(x=>x.id===postId);return p?imageURL(p):'';});

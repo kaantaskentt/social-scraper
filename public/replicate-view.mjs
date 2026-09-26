@@ -17,10 +17,10 @@ export function renderReplicatePanel(s){
  const canAdd=s.refs.length<4;
  const action=s.estimate?`<button type="button" class="primary" data-replicate="start">Replicate for ${escape(s.estimate.credits)} credits</button><span class="replicate-hint">${escape(s.estimate.seconds)} s video · 720p</span>`
   :`<button type="button" class="primary" data-replicate="estimate"${s.refs.length&&!s.busy?'':' disabled'}>Check cost</button>`;
- return `<div class="replicate-form"><p class="replicate-title">Add your product images</p><p class="replicate-hint">Front and back work best. The reel's camera, timing and place are copied; people and text are new.</p>
+ return `<div class="replicate-form"><p class="replicate-title">Add your product images</p><p class="replicate-hint">Front and back work best.</p>
 <div class="refs">${refs}${canAdd?`<label class="ref-add">+<input type="file" accept="image/png,image/jpeg,image/webp" multiple data-replicate="files" hidden></label>`:''}</div>
 <label class="replicate-field">Text on screen (optional)<input type="text" maxlength="80" data-replicate="text" value="${escape(s.overlayText)}" placeholder="e.g. dev team justifying a dinner"></label>
 <label class="replicate-check"><input type="checkbox" data-replicate="sound"${s.keepSound?' checked':''}> Keep the original sound</label>
 ${s.busy?`<p class="replicate-hint">${escape(s.busy)}</p>`:''}${s.error?`<p class="replica-error">${escape(s.error)}</p>`:''}
-<div class="replicate-actions">${action}<button type="button" class="quiet" data-replicate="cancel">Cancel</button></div></div>${list}`;
+<div class="replicate-actions">${action}<button type="button" class="quiet" data-replicate="cancel">Cancel</button></div><p class="replicate-note">Copies the reel's camera, timing and place. New people, your product. Nothing is spent until you press Replicate.</p></div>${list}`;
 }
