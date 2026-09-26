@@ -19,7 +19,7 @@ test('prompt: video is master for camera and pacing only, references are the onl
 
 test('CLI arguments: cost vs create, references, duration clamped to 4..30, sound off when keeping the original',()=>{
  const base={prompt:'P',videoPath:'/v.mp4',imagePaths:['/a.png','/b.png'],duration:12.49,keepSound:true};
- assert.deepEqual(higgsfieldArgs('cost',base),['generate','cost','seedance_2_5','--prompt','P','--mode','omni_reference','--video-references','/v.mp4','--image-references','/a.png','--image-references','/b.png','--duration','12','--aspect_ratio','9:16','--resolution','720p','--generate_audio','false']);
+ assert.deepEqual(higgsfieldArgs('cost',base),['generate','cost','seedance_2_5','--prompt','P','--mode','omni_reference','--video-references','/v.mp4','--image-references','/a.png','--image-references','/b.png','--duration','12','--aspect_ratio','9:16','--resolution','720p','--generate_audio','false','--json']);
  const create=higgsfieldArgs('create',{...base,keepSound:false,duration:2});
  assert.deepEqual(create.slice(0,3),['generate','create','seedance_2_5']);assert.equal(create.at(-1),'--json');
  assert.equal(create[create.indexOf('--duration')+1],'4');assert.equal(create[create.indexOf('--generate_audio')+1],'true');
@@ -27,9 +27,12 @@ test('CLI arguments: cost vs create, references, duration clamped to 4..30, soun
  assert.throws(()=>higgsfieldArgs('cost',{...base,imagePaths:[]}),/at least one reference image/);
 });
 
-test('parseCredits reads the CLI estimate and fails loudly on anything else',()=>{
- assert.equal(parseCredits('84 credits\n'),84);assert.equal(parseCredits('Estimated: 12.5 credits'),12.5);
+test('parseCredits reads the CLI estimate (JSON or one plain line) and fails loudly on anything else',()=>{
+ assert.equal(parseCredits('{\n  "credits": 84\n}'),84);assert.equal(parseCredits('{"credits":12.5}'),12.5);assert.equal(parseCredits('84 credits\n'),84);
  assert.throws(()=>parseCredits('Error: Session expired'),/credit estimate/);
+ // Found in review 2026-09-26: these read as NaN, 200 and 500, and NaN skipped the confirm check.
+ for(const bad of ['Cost. Credits: 90','1,200 credits','Balance: 500 credits, cost 90 credits','{"credits":"84"}','{"credits":-1}','{"credits":null}','null','[]'])
+  assert.throws(()=>parseCredits(bad),/credit estimate/,bad);
 });
 
 const tick=()=>new Promise(r=>setTimeout(r,5));
@@ -38,7 +41,7 @@ async function setup(overrides={}){
  await writeFile(join(root,'refs','a.png'),'png');await writeFile(join(root,'src.mp4'),'video');
  const calls=[];let gets=0;
  const run=overrides.run||(async args=>{calls.push(args);
-  if(args[1]==='cost')return '84 credits';
+  if(args[1]==='cost')return '{"credits":84}';
   if(args[1]==='create')return JSON.stringify([{id:'job-1',status:'queued'}]);
   if(args[1]==='get'){gets++;return JSON.stringify(gets<2?{id:'job-1',status:'in_progress'}:{id:'job-1',status:'completed',result_url:'https://cdn.example/out.mp4'});}
   throw new Error('unexpected '+args.join(' '));});
@@ -115,5 +118,48 @@ test('start keeps the job id when create answers with a bare id list',async()=>{
  const run=async args=>{if(args[1]==='cost')return '84 credits';if(args[1]==='create')return '["job-7"]';return '{"id":"job-7","status":"in_progress"}';};
  const {root,r,input}=await setup({run});
  try{const rep=await r.start({...input,confirmCredits:84});assert.equal(rep.status,'generating');assert.equal(rep.jobId,'job-7');r.items.get(rep.id).status='done';
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+const settle=async(r,id,states=['submitting','generating','finishing'])=>{for(let i=0;i<5000&&states.includes(r.get(id).status);i++)await tick();return r.get(id);};
+
+test('a double click pays once: a second start for the same reel is refused while the first is in flight or generating',async()=>{
+ let creates=0;const run=async args=>{if(args[1]==='cost'){await tick();return '{"credits":84}';}if(args[1]==='create'){creates++;return '["job-1"]';}return '{"id":"job-1","status":"in_progress"}';};
+ const {root,r,input}=await setup({run});
+ try{const both=await Promise.allSettled([r.start({...input,confirmCredits:84}),r.start({...input,confirmCredits:84})]);
+  assert.equal(both.filter(x=>x.status==='fulfilled').length,1);assert.match(both.find(x=>x.status==='rejected').reason.message,/already/);
+  await assert.rejects(r.start({...input,confirmCredits:84}),/already being recreated/);
+  assert.equal(creates,1);
+  const other=await r.start({...input,postId:'reel2',confirmCredits:84});assert.equal(other.status,'generating');
+  for(const x of r.items.values())x.status='done';
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('an unreadable price never reaches the paid step',async()=>{
+ let creates=0;const run=async args=>{if(args[1]==='cost')return 'Cost. Credits: 90';if(args[1]==='create')creates++;return '[]';};
+ const {root,r,input}=await setup({run});
+ try{await assert.rejects(r.start({...input,confirmCredits:90}),/credit estimate/);assert.equal(creates,0);}finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('odd status answers never crash the app; a job we lose touch with becomes "uncertain" with its id, not "failed"',async()=>{
+ for(const answer of ['null','[]','{"id":"job-3"}','{"id":"job-3","status":"completed"}']){
+  const run=async args=>{if(args[1]==='cost')return '{"credits":84}';if(args[1]==='create')return '["job-3"]';return answer;};
+  const {root,r,input}=await setup({run});
+  try{r.maxPollFailures=3;const rep=await r.start({...input,confirmCredits:84});const x=await settle(r,rep.id);
+   assert.equal(x.status,'uncertain',answer);assert.match(x.error,/job-3/);
+  }finally{await rm(root,{recursive:true,force:true});}
+ }
+});
+
+test('a job that never finishes stops polling after the time limit and is marked uncertain',async()=>{
+ const run=async args=>{if(args[1]==='cost')return '{"credits":84}';if(args[1]==='create')return '["job-4"]';return '{"id":"job-4","status":"weird_new_state"}';};
+ const {root,r,input}=await setup({run});
+ try{r.maxWaitMs=30;const rep=await r.start({...input,confirmCredits:84});const x=await settle(r,rep.id);assert.equal(x.status,'uncertain');assert.match(x.error,/job-4/);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('a disk error while polling is recorded, not thrown into the void',async()=>{
+ const {root,r,input}=await setup({download:async()=>{throw new Error('disk full');}});
+ try{const rep=await r.start({...input,confirmCredits:84});const x=await settle(r,rep.id);assert.equal(x.status,'failed');assert.match(x.error,/disk full/);assert.match(x.error,/cdn\.example/);
  }finally{await rm(root,{recursive:true,force:true});}
 });

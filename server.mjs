@@ -10,8 +10,7 @@ import {metrics} from './lib/data.mjs';
 import {checkProvider,download} from './lib/providers.mjs';
 import {demo,artwork} from './lib/demo.mjs';
 import {moneyReport} from './lib/money-report.mjs';
-import {saveVideos,deleteVideos,videoInfo,videoPath,parseRange} from './lib/videos.mjs';
-import {createReadStream} from 'node:fs';
+import {saveVideos,deleteVideos,videoInfo,videoPath,parseRange,streamFile} from './lib/videos.mjs';
 import {Replicator} from './lib/replicate.mjs';
 import {handleReplicate} from './lib/replicate-http.mjs';
 const ROOT=dirname(fileURLToPath(import.meta.url));
@@ -67,8 +66,8 @@ const server=http.createServer(async(req,res)=>{
   }
   const video=path.match(/^\/videos\/([\w-]+)\/([\w-]+)$/);
   if(video){let file,info;try{file=videoPath(pipeline.root,video[1],video[2]);info=await stat(file);}catch{res.writeHead(404);res.end();return;}
-   const range=req.headers.range;if(range){const r=parseRange(range,info.size);if(!r){res.writeHead(416,{'Content-Range':`bytes */${info.size}`});res.end();return;}res.writeHead(206,{'Content-Type':'video/mp4','Accept-Ranges':'bytes','Content-Range':`bytes ${r.start}-${r.end}/${info.size}`,'Content-Length':r.end-r.start+1,'Cache-Control':'no-cache'});createReadStream(file,{start:r.start,end:r.end}).pipe(res);return;}
-   res.writeHead(200,{'Content-Type':'video/mp4','Accept-Ranges':'bytes','Content-Length':info.size,'Cache-Control':'no-cache'});createReadStream(file).pipe(res);return;}
+   const range=req.headers.range;if(range){const r=parseRange(range,info.size);if(!r){res.writeHead(416,{'Content-Range':`bytes */${info.size}`});res.end();return;}res.writeHead(206,{'Content-Type':'video/mp4','Accept-Ranges':'bytes','Content-Range':`bytes ${r.start}-${r.end}/${info.size}`,'Content-Length':r.end-r.start+1,'Cache-Control':'no-cache'});streamFile(res,file,{start:r.start,end:r.end});return;}
+   res.writeHead(200,{'Content-Type':'video/mp4','Accept-Ranges':'bytes','Content-Length':info.size,'Cache-Control':'no-cache'});streamFile(res,file);return;}
   const art=path.match(/^\/demo-art\/(\d+)\.svg$/);if(art){res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'});res.end(artwork(Number(art[1])));return;}
   const thumb=path.match(/^\/media\/([\w-]+)\/([\w-]+)$/);if(thumb){const job=pipeline.jobs.get(thumb[1]),post=job?.posts.find(p=>p.id===thumb[2]);if(!post?.thumbnailUrl){res.writeHead(404);res.end();return;}const file=join(pipeline.root,'media',post.id+'.img');let bytes;try{bytes=await readFile(file);}catch{if(!mediaPending.has(file))mediaPending.set(file,mediaTask(async()=>{const result=await download(post.thumbnailUrl,8*1024*1024);if(!/^image\/(jpeg|png|webp)/.test(result.type))throw new Error('Unsupported thumbnail format');await writeFile(file,result.bytes);return result.bytes;}).finally(()=>mediaPending.delete(file)));bytes=await mediaPending.get(file);}const type=bytes[0]===0x89?'image/png':bytes.toString('ascii',8,12)==='WEBP'?'image/webp':'image/jpeg';res.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=86400'});res.end(bytes);return;}
   const files={'/record':'record.html','/record.js':'record.js','/record.css':'record.css','/':'index.html','/app.js':'app.js','/research.mjs':'research.mjs','/money-view.mjs':'money-view.mjs','/anatomy-view.mjs':'anatomy-view.mjs','/replicate-view.mjs':'replicate-view.mjs','/studio-view.mjs':'studio-view.mjs','/handles.mjs':'handles.mjs','/styles.css':'styles.css','/theme.css':'theme.css','/money/index.mjs':'money/index.mjs','/money/1.0.mjs':'money/1.0.mjs'};
