@@ -184,7 +184,7 @@ async function fetchMoney(state){
 function setView(view){
  stopReplay();currentView=view;const money=view==='money',studio=view==='studio',explorer=view==='explorer';
  $('#explorer-controls').hidden=!explorer;$('#explorer-canvas').hidden=!explorer;$('#findings').hidden=!explorer;$('#money-view').hidden=!money;$('#studio-view').hidden=!studio;$('.inspector').hidden=studio;$('.explorer').classList.toggle('money-active',money);$('.explorer').classList.toggle('studio-active',studio);
- if(studio)renderStudio();else clearTimeout(studioTimer);
+ if(studio)renderStudio();else{clearTimeout(studioTimer);studioTimer=null;}
  for(const [id,active]of [['explorer-view-button',explorer],['money-view-button',money],['studio-view-button',studio]]){$('#'+id).classList.toggle('active',active);$('#'+id).setAttribute('aria-pressed',String(active));}
  $('.inspector').classList.toggle('no-matches',!money&&!visible.length);$('#inspector-empty').hidden=money||visible.length>0;layout();
 }
@@ -231,8 +231,9 @@ function resetReplicate(){const key=`${job?.id}:${selected}`;if(rep.key===key){r
 async function loadReplicas(){clearTimeout(rep.timer);if(!job||job.synthetic||job.id==='demo'||!selected)return;const key=rep.key;try{const list=await api(`/api/replicas?runId=${encodeURIComponent(job.id)}&postId=${encodeURIComponent(selected)}`);if(rep.key!==key)return;rep.replicas=list;renderReplicate();if(list.some(r=>['submitting','generating','finishing'].includes(r.status)))rep.timer=setTimeout(loadReplicas,10000);}catch(e){if(rep.key===key){rep.error=e.message;renderReplicate();}}}
 const readAsDataUrl=file=>new Promise((ok,fail)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>fail(new Error(`Could not read ${file.name}`));r.readAsDataURL(file);});
 const replicateBody=()=>({postId:selected,referenceIds:rep.refs.map(r=>r.id),overlayText:rep.overlayText,keepSound:rep.keepSound});
-for(const panel of [$('#replicate-panel'),$('#studio-form')]){panel.addEventListener('click',async e=>{
- const btn=e.target.closest('[data-replicate],[data-remove-ref]');if(!btn||btn.disabled||btn.tagName==='INPUT'||btn.tagName==='LABEL')return;
+for(const panel of [$('#replicate-panel'),$('#studio-form'),$('#studio-jobs')]){panel.addEventListener('click',async e=>{
+ const btn=e.target.closest('[data-replicate],[data-remove-ref],[data-dismiss-rep]');if(!btn||btn.disabled||btn.tagName==='INPUT'||btn.tagName==='LABEL')return;
+ if(btn.dataset.dismissRep){if(!confirm('Only continue if Higgsfield shows no video for this try (or you already have it). A new try is charged again.'))return;try{await api(`/api/replicas/${encodeURIComponent(btn.dataset.dismissRep)}/dismiss`,{});}catch(err){toast(err.message);}loadReplicas();loadStudioJobs();return;}
  if(rep.busy&&btn.dataset.replicate!=='cancel')return; // one request at a time: never a second paid start
  if(btn.dataset.removeRef){rep.refs=rep.refs.filter(r=>r.id!==btn.dataset.removeRef);storeRefs(rep.refs);rep.estimate=null;renderReplicate();return;}
  const act=btn.dataset.replicate,key=rep.key;
@@ -263,7 +264,7 @@ function renderStudio(){if(currentView!=='studio')return;const real=job&&!job.sy
  if($('#studio-reel').dataset.post!==`${job?.id}/${selected}/${src}`){$('#studio-reel').dataset.post=`${job?.id}/${selected}/${src}`;$('#studio-reel').innerHTML=src?`<video src="${escape(src)}" poster="${escape(imageURL(p))}" controls playsinline preload="metadata"></video>`:'';}
  renderReplicate();if(!studioTimer||studioFor!==job?.id)loadStudioJobs();}
 let studioFor=null;async function loadStudioJobs(){clearTimeout(studioTimer);studioTimer=null;studioFor=job?.id;if(currentView!=='studio'||!job||job.synthetic||job.id==='demo'){$('#studio-jobs').innerHTML=renderJobs([],()=>'');return;}const id=job.id;
- try{const list=await api(`/api/replicas?runId=${encodeURIComponent(id)}`);if(job.id!==id||currentView!=='studio')return;$('#studio-jobs').innerHTML=renderJobs(list,postId=>{const p=job.posts.find(x=>x.id===postId);return p?imageURL(p):'';});
+ try{const list=await api(`/api/replicas?runId=${encodeURIComponent(id)}`);if(job.id!==id||currentView!=='studio')return;paint($('#studio-jobs'),renderJobs(list,postId=>{const p=job.posts.find(x=>x.id===postId);return p?imageURL(p):'';}));
   if(list.some(r=>['submitting','generating','finishing'].includes(r.status)))studioTimer=setTimeout(loadStudioJobs,10000);}
  catch(e){$('#studio-jobs').innerHTML=`<p class="replica-error">${escape(e.message)}</p>`;}}
 $('#studio-picks').addEventListener('click',e=>{const b=e.target.closest('[data-studio-pick]');if(!b)return;selectPost(b.dataset.studioPick);renderStudio();});

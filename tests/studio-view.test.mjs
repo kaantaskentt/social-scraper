@@ -30,5 +30,5 @@ test('picks: loading and error say what is happening instead of "no winners"; br
  assert.match(renderPicks([],null,{loading:true}),/Scoring/);assert.match(renderPicks([],null,{error:'boom <b>'}),/boom &lt;b&gt;/);
  assert.match(renderPicks([{id:'a',image:'/media/r/a',xNormal:2,box:'Star'}],'a'),/onerror=/);
  assert.doesNotMatch(renderJobs([{id:'1',postId:'x',status:'generating'}],()=>''),/src=""/);
- assert.match(renderJobs([{id:'1',postId:'x',status:'uncertain',jobId:'job-9',error:'Lost'}],()=>''),/job-9/);
+ assert.match(renderJobs([{id:'1',postId:'x',status:'uncertain',jobId:'job-9',error:'Lost'}],()=>''),/job-9[\s\S]*data-dismiss-rep="1"/);
 });

@@ -163,3 +163,14 @@ test('a disk error while polling is recorded, not thrown into the void',async()=
  try{const rep=await r.start({...input,confirmCredits:84});const x=await settle(r,rep.id);assert.equal(x.status,'failed');assert.match(x.error,/disk full/);assert.match(x.error,/cdn\.example/);
  }finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('after an uncertain submit, a new paid start waits until someone confirms they checked Higgsfield',async()=>{
+ let creates=0;const run=async args=>{if(args[1]==='cost')return '{"credits":84}';if(args[1]==='create'){creates++;throw new Error('request failed (no response received)');}return '{}';};
+ const {root,r,input}=await setup({run});
+ try{const first=await r.start({...input,confirmCredits:84});assert.equal(first.status,'uncertain');
+  await assert.rejects(r.start({...input,confirmCredits:84}),/check Higgsfield/i);assert.equal(creates,1);
+  await assert.rejects(r.dismiss('00000000-0000-0000-0000-000000000000'),/not found/i);
+  const cleared=await r.dismiss(first.id);assert.equal(cleared.status,'dismissed');
+  await r.start({...input,confirmCredits:84});assert.equal(creates,2);
+ }finally{await rm(root,{recursive:true,force:true});}
+});

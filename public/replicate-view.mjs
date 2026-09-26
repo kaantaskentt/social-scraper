@@ -1,8 +1,8 @@
 // Replicate panel in the reel sidebar: references in, cost confirmed, then the new video next to the original.
 // Pure render (data in, HTML out) so Node tests can import it.
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const jobLine=r=>r.status==='uncertain'&&r.jobId?`<p class="replicate-hint">Higgsfield job: ${escape(r.jobId)}</p>`:'';
-const STATUS={submitting:'Sending to Higgsfield…',generating:'Generating… usually 3 to 8 minutes',finishing:'Saving the video…',done:'Done',failed:'Failed',uncertain:'Check Higgsfield'};
+const jobLine=r=>r.status!=='uncertain'?'':`${r.jobId?`<p class="replicate-hint">Higgsfield job: ${escape(r.jobId)}</p>`:''}<button type="button" class="quiet" data-dismiss-rep="${escape(r.id)}">I checked Higgsfield, allow a new try</button>`;
+const STATUS={submitting:'Sending to Higgsfield…',generating:'Generating… usually 3 to 8 minutes',finishing:'Saving the video…',done:'Done',failed:'Failed',uncertain:'Check Higgsfield',dismissed:'Cleared after checking Higgsfield'};
 
 function replicaRow(r,originalSrc){
  const head=`<p class="replica-status replica-${escape(r.status)}">${escape(STATUS[r.status]||r.status)}${r.credits?` · ${escape(r.credits)} credits`:''}</p>`;

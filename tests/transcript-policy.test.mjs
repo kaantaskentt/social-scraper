@@ -52,7 +52,8 @@ test('runs record the provider and model they transcribe with',async()=>{
 test('a run keeps the provider it started with; resuming under another provider is refused',async()=>{
  const root=await mkdtemp(join(tmpdir(),'cl-tp-'));
  try{const p=await new Pipeline(root,()=>({groq:'g',fireworks:'f',jev:'j'}),{transcriptionProvider:'groq'}).init();
-  const job=await p.create({creator:'tester'},[{id:'r',ownerUsername:'tester',transcript:'one two three four five six seven'}]);
+  // The lock matters when new transcripts would be made (reel 'n'); a run with nothing left to transcribe may resume.
+  const job=await p.create({creator:'tester'},[{id:'r',ownerUsername:'tester',transcript:'one two three four five six seven'},{id:'n',ownerUsername:'tester',videoUrl:'https://scontent.cdninstagram.com/n.mp4'}]);
   job.transcriptPolicy={...job.transcriptPolicy,provider:'groq',model:'whisper-large-v3-turbo'};await p.save(job,{durable:true});
   const other=await new Pipeline(root,()=>({groq:'g',fireworks:'f',jev:'j'}),{transcriptionProvider:'fireworks'}).init();
   await assert.rejects(other.run(job.id),/transcribed with Groq/);assert.equal(other.active.size,0);

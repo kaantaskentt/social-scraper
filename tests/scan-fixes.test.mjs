@@ -89,3 +89,34 @@ test('pasted post or reel links are refused instead of scanning an account calle
   assert.match(parseHandles(link).error,/post or reel link/,link);
  assert.deepEqual(parseHandles('instagram.com/ken.remedie www.instagram.com/brand_a/').handles,['ken.remedie','brand_a']);
 });
+
+test('if saving the lyrics answer fails, the reel is retried on resume instead of being stuck',async()=>{
+ let checks=0;
+ await withPipeline(async(url,opts)=>{const req=JSON.parse(opts.body);if(req.questions.lyrics){checks++;return Response.json(jevAnswer(req,0.8));}return Response.json(jevAnswer(req));},async p=>{
+  const j=await p.create({creator:'tester'},[{id:'lyric',ownerUsername:'tester',transcript:'Black Beatles in the city be back immediately to confiscate the money',...song}]);
+  const write=p.writeCache.bind(p);let fail=true;p.writeCache=async(k,v)=>{if(fail&&k.startsWith('lyrics')){fail=false;throw new Error('disk full');}return write(k,v);};
+  await p.run(j.id);await settle(p);assert.equal(j.posts[0].status,'failed');assert.equal(j.posts[0].lyrics,undefined);
+  await p.run(j.id);await settle(p);assert.equal(j.posts[0].status,'music');assert.equal(j.status,'complete');assert.equal(checks,2);
+ });
+});
+
+test('silent reels are not "duplicates" of each other',async()=>{
+ await withPipeline(async url=>{if(String(url).includes('groq.com'))return Response.json({text:'',segments:[],duration:8});throw new Error('unexpected');},async p=>{
+  const rows=['q1','q2','q3'].map(id=>({id,ownerUsername:'tester',videoUrl:`https://scontent.cdninstagram.com/${id}.mp4`,videoDuration:8}));
+  const j=await p.create({creator:'tester'},rows);await p.run(j.id);await settle(p);
+  assert.deepEqual(j.posts.map(x=>x.duplicateOf),[null,null,null]);
+ });
+});
+
+test('an old run pinned to another transcription provider can still get the lyrics check when nothing needs transcribing',async()=>{
+ await withPipeline(async(url,opts)=>{const req=JSON.parse(opts.body);return Response.json(jevAnswer(req,0.8));},async p=>{
+  const j=await p.create({creator:'tester'},[{id:'lyric',ownerUsername:'tester',transcript:'Black Beatles in the city be back immediately to confiscate the money',...song},{id:'mute',ownerUsername:'tester'}]);
+  j.transcriptPolicy={...j.transcriptPolicy,provider:'fireworks',model:'whisper-v3-turbo'};Object.assign(j.posts[1],{status:'no_audio',excludedReason:'No audio track'});
+  await p.run(j.id);await settle(p);assert.equal(j.posts[0].status,'music');
+ });
+});
+
+test('more non-handles are refused',()=>{
+ for(const bad of ['https://m.instagram.com/p/abc','instagr.am/p/x','instagram.com'])assert.ok(parseHandles(bad).error,bad);
+ assert.deepEqual(parseHandles('m.instagram.com/brand_a').handles,['brand_a']);
+});
