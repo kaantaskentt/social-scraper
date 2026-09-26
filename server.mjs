@@ -12,6 +12,8 @@ import {demo,artwork} from './lib/demo.mjs';
 import {moneyReport} from './lib/money-report.mjs';
 import {saveVideos,deleteVideos,videoInfo,videoPath,parseRange} from './lib/videos.mjs';
 import {createReadStream} from 'node:fs';
+import {Replicator} from './lib/replicate.mjs';
+import {handleReplicate} from './lib/replicate-http.mjs';
 const ROOT=dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||5190),HOST='127.0.0.1';
 const CSRF=randomBytes(32).toString('hex');
@@ -27,6 +29,7 @@ function startVideoSave(job){const existing=videoJobs.get(job.id);if(existing?.r
 const finished=j=>['complete','partial'].includes(j.status);
 for(const j of pipeline.jobs.values())if(finished(j))startVideoSave(j);
 pipeline.listeners.add(id=>{const j=pipeline.jobs.get(id);if(j&&finished(j)&&!videoJobs.get(id)?.running&&!videoJobs.get(id)?.result)startVideoSave(j);});
+const replicator=await new Replicator(pipeline.root).init();
 const clients=new Set();pipeline.listeners.add(id=>{for(const res of clients)res.write(`data: ${JSON.stringify({id})}\n\n`);});
 const publicJob=j=>{const copy=structuredClone(j);for(const p of copy.posts){if(p.transcript)delete p.transcript.raw;if(p.analysis)delete p.analysis.raw;}return copy;};
 const summary=j=>({id:j.id,creator:j.creator,status:j.status,createdAt:j.createdAt,count:j.posts.length,completed:j.posts.filter(p=>p.analysis).length});
@@ -45,6 +48,7 @@ const server=http.createServer(async(req,res)=>{
   if(path==='/api/events'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache',Connection:'keep-alive'});res.write(': connected\n\n');clients.add(res);req.on('close',()=>clients.delete(res));return;}
   if(path==='/api/demo'){json(res,200,demo());return;}
   if(path==='/api/runs'&&req.method==='POST'){const data=await body(req);const job=await pipeline.create(data,data.rows);json(res,201,publicJob(job));return;}
+  if(await handleReplicate({req,res,path,url,root:pipeline.root,jobs:pipeline.jobs,replicator,json,body}))return;
   const vids=path.match(/^\/api\/runs\/([\w-]+)\/videos(?:\/(save|delete))?$/);
   if(vids){const job=pipeline.jobs.get(vids[1]);if(!job){json(res,404,{error:'Run not found'});return;}const state=videoJobs.get(job.id);
    if(vids[2]==='save'&&req.method==='POST')startVideoSave(job);
