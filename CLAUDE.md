@@ -1,4 +1,4 @@
-# Creator Lab (Kaan's fork)
+# Social Scraper (Kaan's fork of Creator Lab, MIT)
 
 Fork of github.com/artemnovitckii/creator-lab (MIT), remote `upstream`. Being extended into "Money Radar": see
 `docs/superpowers/specs/2026-09-25-money-radar-design.md`. Read `lessons.md` too.

@@ -1,0 +1,58 @@
+/* Social Scraper look: warm parchment surfaces, one variable sans, pill controls, soft rounded cards.
+   Loaded after styles.css and only overrides appearance; layout and behaviour stay in styles.css and app.js. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap');
+
+:root{
+ --paper:#fcfbf8;--card:#f7f4ed;--ink:#1c1c1c;--ink-strong:#030303;--muted:#5f5f5d;--line:#eceae4;--stone:#d4d3d0;
+ --accent:#efeadf;--dark:#1c1c1c;
+ --sans:'Inter',ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--mono:var(--sans);--serif:var(--sans);
+ --prism:linear-gradient(90deg,#82bcff 0%,#2483ff 20%,#ff66f4 45%,#ff3029 70%,#fe7b02 100%);
+}
+body{background:var(--paper);color:var(--ink);letter-spacing:-.025em;font-feature-settings:"liga" 0;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+
+/* Brand */
+.brand{font-size:17px;font-weight:560;letter-spacing:-.03em;gap:10px}
+.brand-mark{width:18px;height:18px;border-radius:50%;background:var(--prism);font-size:0;letter-spacing:0;margin:0;flex:none}
+.brand .edition{display:none}
+
+/* Type: one family, weight 480 for headings, no italics */
+h1,h2,h3,h4{font-weight:480;font-style:normal;letter-spacing:-.025em}
+h1{font-size:clamp(40px,4.6vw,60px);line-height:1;letter-spacing:-.035em}
+h1 span{font-style:normal;color:var(--muted)}
+.eyebrow,.small-label,.stats span,.panel-label,.stage-heading,.inspector-heading,.money-stats span,.money-box-heading>span,.canvas-flow,.research-filters label,.money-axes{font-size:11px;letter-spacing:.01em;color:var(--muted);font-weight:500}
+#intro-copy,.findings-header p,.money-note{color:var(--muted)}
+
+/* Prism horizon behind the hero, the only colour moment */
+.intro{position:relative;isolation:isolate}
+.intro::before{content:"";position:absolute;left:0;right:0;top:-60px;height:240px;background:var(--prism);filter:blur(70px);opacity:.22;z-index:-1;pointer-events:none;border-radius:50%}
+@media (prefers-reduced-motion:no-preference){.intro::before{animation:prism-in 1.2s cubic-bezier(.4,0,.2,1) both}}
+@keyframes prism-in{from{opacity:0;transform:translateY(-12px)}to{opacity:.22;transform:none}}
+
+/* Controls: pills everywhere */
+.primary,button.primary{background:rgba(0,0,0,.88);color:var(--paper);border:0;border-radius:9999px;padding:8px 16px;font-weight:500}
+.primary:hover{background:#000}
+.quiet{border-radius:9999px;transition:background-color .15s ease,color .15s ease,border-color .15s ease}
+.quiet:hover{background:var(--card)}
+#connections-open,.demo-tools>summary,button.money-more,.money-details>summary,.view-switch button{border:1px solid var(--line);border-radius:9999px;padding:6px 12px;background:transparent}
+.view-switch button.active,.view-switch button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+select,input:not([type=checkbox]):not([type=radio]):not([type=file]){border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}
+:focus-visible{outline:2px solid #3451b2;outline-offset:2px}
+
+/* Surfaces: warm sand cards, beige hairlines, rounded */
+.stats,.run-log{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+/* The explorer positions tiles freely, so it is rounded but never clipped. */
+.explorer,.findings{background:var(--card);border:1px solid var(--line);border-radius:20px}
+.inspector{background:var(--paper)}
+.money-box{background:var(--paper);border:1px solid var(--line);border-radius:16px}
+.demo-menu{border-radius:16px;background:var(--paper);border:1px solid var(--line)}
+dialog{border:1px solid var(--line);border-radius:24px;background:var(--card);box-shadow:0 0 0 1px rgba(0,0,0,.04),0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1)}
+.tile img,.money-thumbnail,.money-thumbnail img,#preview-image,#preview-video{border-radius:10px}
+.stats strong{font-weight:480;letter-spacing:-.03em}
+footer{color:var(--muted);border-top:1px solid var(--line)}
+
+/* Small labels: readable sizes (the old 8-9px monospace labels) */
+#anatomy-legend,#replay-status,.anatomy-heading,.anatomy-heading small,.comparison small,.connection,.examples-pagination,.filterbar label,.findings-sort,.focus-bar,.inspector-heading,.metric-count,.modes button,.money-box .money-more,.money-box-heading>span,.money-more,.money-thumbnail>span,.money-unscored-reels button,.money-version,.notice,.panel-label,.post-metrics span,.preview-caption time,.research-filters label,.research-summary small,.run-log summary span,.segment small,.small-label,.stage-footer,.stats span{font-size:11px;letter-spacing:.01em}
+#axes text{font-size:10px}
+.view-switch button[aria-pressed="true"] span,.view-switch button.active span{color:inherit}
+.notice{border-left:2px solid var(--stone);border-radius:0 12px 12px 0;color:var(--muted)}
+.status-dot{background:var(--ink)}

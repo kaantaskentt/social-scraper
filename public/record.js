@@ -11,7 +11,7 @@ const thumb=p=>job.id==='demo'?p.thumbnailUrl:`/media/${encodeURIComponent(job.i
 const img=(p,cls='')=>`<img class="${cls}" src="${esc(thumb(p))}" alt="" loading="eager">`;
 function safeImages(){document.querySelectorAll('img').forEach(el=>{el.onerror=()=>{el.onerror=null;el.src='/demo-art/0.svg';};});}
 function resize(){const scale=Math.min(innerWidth/1080,(innerHeight-(document.body.classList.contains('clean')?0:140))/1000);const s=Math.max(.2,scale);$('#canvas').style.transform=`scale(${s})`;$('#holder').style.width=`${1080*s}px`;$('#holder').style.height=`${1000*s}px`;}
-function source(){return job.id==='demo'?'Synthetic motion rehearsal':`@${job.creator} · saved analysis`;}
+function source(){return job.id==='demo'?'Demo · sample data':`@${job.creator} · saved analysis`;}
 function build(){
  $('#canvas').className=variant;$('#source').textContent=source();$('#headline').textContent={scanner:'Inside the content.',map:'Watch the patterns form.',script:'Every script has a structure.'}[variant];
  $('#detail-title').textContent=variant==='map'?'PERFORMANCE MAP':'UNDER THE FRAME';

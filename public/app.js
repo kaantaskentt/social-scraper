@@ -31,15 +31,15 @@ function readStats(){
  const audioCosts=['groq','fireworks'].map(provider=>{const audio=transcribed.filter(p=>p.transcript.source===provider&&!p.transcript.reused);return audio.length?`${title(provider)} ${audio.some(p=>p.transcript.costUsd==null)?'unknown':`~${money(audio.reduce((sum,p)=>sum+p.transcript.costUsd,0),3)}`}`:null;}).filter(Boolean).join(' · ')||'Transcription $0';
  $('#stat-cost').textContent=job.synthetic?'Demo':jevUnknown?'Unknown':money(jev);
  $('#pipeline-progress').style.width=`${ps.length?completed.length/ps.length*100:0}%`;
- $('#pipeline-label').textContent=job.synthetic?'MOTION REHEARSAL':`${job.status.toUpperCase()} · ${completed.length}/${ps.length}`;
+ $('#pipeline-label').textContent=job.synthetic?'DEMO':`${job.status.toUpperCase()} · ${completed.length}/${ps.length}`;
  $('#cost-detail').textContent=job.synthetic?'Synthetic data · no API calls':`${audioCosts} · Apify ${money(job.costs.apify,3)} · ${job.retries||0} retries`;
- $('#notice').textContent=job.synthetic?'Motion rehearsal. All examples, portraits and metrics below are synthetic.':`@${job.creator} · ${ps.length} retrieved Reels · ${completed.length} classified${excluded?` · ${excluded} excluded from speech analysis`:""}${failed?` · ${failed} need retry`:""} · Metrics are a collection-time snapshot${job.retries?' · Cost estimates may omit uncertain retry charges':''}`;
- $('#focus-title').textContent=job.synthetic?'MOTION REHEARSAL · SYNTHETIC DATA':`@${job.creator.toUpperCase()} / ${ps.length} REELS / CREATOR LAB`;$('#intro-copy').textContent=job.synthetic?'Rehearse the movement. Collect a creator to find real patterns.':`${ps.length} collected Reels. Explore the scripts behind the numbers.`;$('#notice').classList.toggle('real',!job.synthetic);$('#run-label').textContent=job.synthetic?'THE CREATOR RESEARCH LAB':`RESEARCHING @${job.creator.toUpperCase()}`;
+ $('#notice').textContent=job.synthetic?'Demo data: everything below is made up for practice.':`@${job.creator} · ${ps.length} retrieved Reels · ${completed.length} classified${excluded?` · ${excluded} excluded from speech analysis`:""}${failed?` · ${failed} need retry`:""} · Metrics are a collection-time snapshot${job.retries?' · Cost estimates may omit uncertain retry charges':''}`;
+ $('#focus-title').textContent=job.synthetic?'DEMO · SAMPLE DATA':`@${job.creator.toUpperCase()} / ${ps.length} REELS / SOCIAL SCRAPER`;$('#intro-copy').textContent=job.synthetic?'Scrape any account. See which reels win, what they say, and what to copy.':`${ps.length} reels collected. See which ones win, and why.`;$('#notice').classList.toggle('real',!job.synthetic);$('#run-label').textContent=job.synthetic?'SOCIAL SCRAPER':`RESEARCHING @${job.creator.toUpperCase()}`;
  $('#run-state').textContent=job.status;$('#run-error').textContent=job.error||'';
  $('#attach-form').hidden=!job.scrapeUncertain;
  $('#events').textContent=(job.events||[]).slice().reverse().map(e=>`${new Date(e.at).toLocaleTimeString()}  ${e.message}`).join('\n');
  const running=['running','scraping'].includes(job.status);$('#resume').hidden=job.synthetic||running;$('#pause').hidden=job.synthetic||!running;$('#export').hidden=job.synthetic;
- $('#run-note').textContent=job.synthetic?'Rehearse the visual. Start an analysis to see real evidence.':`${(job.elapsedMs/1000).toFixed(1)}s recorded processing · ${completed.filter(p=>p.analysis.review).length} need label review`;
+ $('#run-note').textContent=job.synthetic?'Start a new analysis to see real accounts.':`${(job.elapsedMs/1000).toFixed(1)}s recorded processing · ${completed.filter(p=>p.analysis.review).length} need label review`;
 }
 function calculate(){
  const metric=$('#metric').value;
@@ -185,7 +185,7 @@ function setView(view){
 }
 $('#explorer-view-button').onclick=()=>setView('explorer');
 $('#money-view-button').onclick=()=>setView('money');
-async function refresh(){boot=await api('/api/bootstrap');const current=job?.id||'demo';$('#run-select').innerHTML='<option value="demo">Motion rehearsal · synthetic data</option>'+boot.runs.map(r=>`<option value="${r.id}">@${escape(r.creator)} · ${r.completed}/${r.count} · ${r.status}</option>`).join('');$('#run-select').value=current;renderConnections();}
+async function refresh(){boot=await api('/api/bootstrap');const current=job?.id||'demo';$('#run-select').innerHTML='<option value="demo">Demo · sample data</option>'+boot.runs.map(r=>`<option value="${r.id}">@${escape(r.creator)} · ${r.completed}/${r.count} · ${r.status}</option>`).join('');$('#run-select').value=current;renderConnections();}
 function renderConnections(){const active=['apify',boot.transcriptionProvider||'groq','jev'];const count=active.filter(k=>boot.connections[k]?.configured).length;$('#connection-status').textContent=`${count}/3 keys configured`;for(const k of ['apify','groq','fireworks','jev'])$(`#${k}-status`).textContent=boot.connections[k]?.verified?'· key verified':boot.connections[k]?.configured?'· configured':active.includes(k)?'· needed':'· optional';$('#transcription-provider').textContent=title(boot.transcriptionProvider||'groq');}
 
 function stopReplay(){replayToken++;replaying=false;replayRevealed.clear();$('#replay').innerHTML='<span>▶</span> Replay analysis';$('#replay-status').textContent='';$$('.tile').forEach(t=>t.classList.remove('processing','unseen'));if(job)layout();}
