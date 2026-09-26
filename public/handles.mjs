@@ -3,7 +3,9 @@ export const MAX_PARALLEL=3;
 export function parseHandles(text){
  const handles=[];
  for(const raw of String(text||'').split(/[\s,]+/).filter(Boolean)){
-  const h=raw.replace(/^https?:\/\/(www\.)?instagram\.com\//i,'').replace(/[/?#].*$/,'').replace(/^@/,'');
+  const path=raw.replace(/^(https?:\/\/)?(www\.)?instagram\.com\//i,'');
+  if(path!==raw&&/^(p|reel|reels|tv|stories|explore)(\/|$)/i.test(path))return {handles:[],error:`"${raw}" is a post or reel link. Paste the account's profile link or @handle instead.`};
+  const h=path.replace(/[/?#].*$/,'').replace(/^@/,'');
   if(!/^[a-zA-Z0-9_.]{1,30}$/.test(h))return {handles:[],error:`"${raw}" is not an Instagram handle`};
   if(!handles.includes(h))handles.push(h);
  }
