@@ -25,3 +25,10 @@ test('jobs tray: progress, done with video, failures, and escaping',()=>{
  assert.match(html,/Generating/);assert.match(html,/src="\/replicas\/2.mp4#t=0.5"/);assert.match(html,/&lt;b&gt;x/);assert.doesNotMatch(html,/<b>x/);
  assert.match(renderJobs([],()=>''),/Nothing generating yet/);
 });
+
+test('picks: loading and error say what is happening instead of "no winners"; broken covers get a fallback',()=>{
+ assert.match(renderPicks([],null,{loading:true}),/Scoring/);assert.match(renderPicks([],null,{error:'boom <b>'}),/boom &lt;b&gt;/);
+ assert.match(renderPicks([{id:'a',image:'/media/r/a',xNormal:2,box:'Star'}],'a'),/onerror=/);
+ assert.doesNotMatch(renderJobs([{id:'1',postId:'x',status:'generating'}],()=>''),/src=""/);
+ assert.match(renderJobs([{id:'1',postId:'x',status:'uncertain',jobId:'job-9',error:'Lost'}],()=>''),/job-9/);
+});

@@ -33,3 +33,18 @@ test('busy and error states, and everything from data is escaped',()=>{
  const evil='<script>x</script>';const html=renderReplicatePanel({...base,open:true,overlayText:evil,error:evil,replicas:[{id:'9',status:'failed',error:evil}]});
  assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;/);
 });
+
+test('while sending, the paid button and every input are locked, so a double click cannot pay twice',()=>{
+ const refs=[{id:'a',url:'/references/a'}];
+ const html=renderReplicatePanel({...base,open:true,refs,estimate:{credits:84,seconds:12},busy:'Sending to Higgsfield…'});
+ assert.match(html,/data-replicate="start"[^>]*disabled/);assert.match(html,/data-remove-ref="a"[^>]*disabled/);
+ assert.match(html,/data-replicate="sound"[^>]*disabled/);assert.doesNotMatch(html,/type="file"/);
+});
+test('a reel with no video says so instead of offering a recreation',()=>{
+ const html=renderReplicatePanel({...base,post:{id:'reel1',videoUrl:''},savedVideo:false});
+ assert.doesNotMatch(html,/data-replicate="open"/);assert.match(html,/no video/i);
+});
+test('an uncertain job shows its Higgsfield id to look up',()=>{
+ const html=renderReplicatePanel({...base,replicas:[{id:'r',status:'uncertain',jobId:'job-3',error:'Lost contact'}]});
+ assert.match(html,/job-3/);
+});
