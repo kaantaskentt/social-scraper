@@ -2,6 +2,7 @@ import {filterPosts,groupPosts,summarize,sortExamples,rate} from './research.mjs
 import {renderMoneyView,renderMoneyInspector} from './money-view.mjs';
 import {segmentAt,partRow,barPart} from './anatomy-view.mjs';
 import {parseHandles} from './handles.mjs';
+import {renderReplicatePanel} from './replicate-view.mjs';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const openingLine=p=>{const text=p.analysis?.opening||p.transcript?.text||'';const sentence=text.match(/^.*?[.!?](?:\s|$)/s)?.[0]?.trim();return sentence||((text.length>180?text.slice(0,177)+'…':text));};
@@ -103,9 +104,11 @@ function selectPost(id){selected=id;const p=job.posts.find(p=>p.id===id);if(!p)r
  $('#transcript').innerHTML=anatomy.length?anatomy.map((s,i)=>partRow(s,i,part(s))).join(''):`<p>${escape(p.transcript?.text||'The transcript will appear here as the pipeline completes.')}</p>`;
  for(const b of [...$('#anatomy-bar').querySelectorAll('button'),...$('#transcript').querySelectorAll('button.segment')])b.onclick=()=>playPart(anatomy,+b.dataset.segment);
  $('#all-labels').innerHTML=Object.entries(p.analysis?.labels||{}).map(([key,a])=>`<div class="label-line"><span>${escape(boot.dimensions[key]?.title||key)}</span><span>${title(a.value)}</span><span>${Math.round(a.confidence*100)}%</span></div>`).join('');
- $('#post-error').textContent=p.excludedReason||((p.error||p.analysis?.review)?'Review: '+(p.error||'Some labels are uncertain. Check the spoken source.'):'');
+ const silent=Boolean(p.excludedReason)||!anatomy.length;$('#anatomy-section').hidden=silent;$('#no-speech').hidden=!p.excludedReason;$('#opening').hidden=Boolean(p.excludedReason);
+ $('#post-error').textContent=p.error?`Review: ${p.error}`:'';
  for(const tile of $$('.tile'))tile.classList.toggle('selected',tile.dataset.id===selected);
  renderMoneySelection();
+ resetReplicate();
 }
 const formatRate=(n,digits=1)=>n===null?'Unknown':n.toFixed(digits);
 function researchPosts(){return visible.filter(p=>p.analysis&&!p.excludedReason&&(category==='all'||value(p)===category));}
@@ -213,6 +216,31 @@ $('#demo-tools').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#demo-to
 $('.demo-menu').addEventListener('click',e=>{if(e.target.closest('button'))$('#demo-tools').open=false;});
 document.addEventListener('click',e=>{if($('#demo-tools').open&&!$('#demo-tools').contains(e.target))$('#demo-tools').open=false;});
 $('#preview-play').onclick=()=>{const v=openPlayer(job.posts.find(p=>p.id===selected));v?.play().catch(()=>toast('Preview could not play. Use the original Reel link or refresh its media URL.'));};
+// Replicate: product references (remembered on this Mac across reels), cost check, confirmed start, results per reel.
+const REFS_KEY='socialScraper.references';
+const loadRefs=()=>{try{return JSON.parse(localStorage.getItem(REFS_KEY)||'[]').filter(r=>r&&/^[0-9a-f-]{36}$/.test(r.id)).slice(0,4);}catch{return [];}};
+const storeRefs=refs=>{try{localStorage.setItem(REFS_KEY,JSON.stringify(refs));}catch{}};
+const rep={refs:loadRefs(),open:false,overlayText:'',keepSound:true,estimate:null,busy:'',error:'',replicas:[],timer:null,key:''};
+function renderReplicate(){const el=$('#replicate-panel'),p=job?.posts.find(x=>x.id===selected);if(!el)return;if(!p||job.id==='demo'||job.synthetic){el.innerHTML='';return;}el.innerHTML=renderReplicatePanel({runId:job.id,post:p,savedVideo:videoState.runId===job.id&&videoState.saved.has(p.id),refs:rep.refs,open:rep.open,overlayText:rep.overlayText,keepSound:rep.keepSound,estimate:rep.estimate,busy:rep.busy,error:rep.error,replicas:rep.replicas});}
+function resetReplicate(){const key=`${job?.id}:${selected}`;if(rep.key===key){renderReplicate();return;}clearTimeout(rep.timer);Object.assign(rep,{key,open:false,estimate:null,busy:'',error:'',replicas:[]});renderReplicate();loadReplicas();}
+async function loadReplicas(){clearTimeout(rep.timer);if(!job||job.synthetic||job.id==='demo'||!selected)return;const key=rep.key;try{const list=await api(`/api/replicas?runId=${encodeURIComponent(job.id)}&postId=${encodeURIComponent(selected)}`);if(rep.key!==key)return;rep.replicas=list;renderReplicate();if(list.some(r=>['submitting','generating','finishing'].includes(r.status)))rep.timer=setTimeout(loadReplicas,10000);}catch(e){if(rep.key===key){rep.error=e.message;renderReplicate();}}}
+const readAsDataUrl=file=>new Promise((ok,fail)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>fail(new Error(`Could not read ${file.name}`));r.readAsDataURL(file);});
+const replicateBody=()=>({postId:selected,referenceIds:rep.refs.map(r=>r.id),overlayText:rep.overlayText,keepSound:rep.keepSound});
+$('#replicate-panel').addEventListener('click',async e=>{
+ const btn=e.target.closest('[data-replicate],[data-remove-ref]');if(!btn||btn.disabled||btn.tagName==='INPUT'||btn.tagName==='LABEL')return;
+ if(btn.dataset.removeRef){rep.refs=rep.refs.filter(r=>r.id!==btn.dataset.removeRef);storeRefs(rep.refs);rep.estimate=null;renderReplicate();return;}
+ const act=btn.dataset.replicate,key=rep.key;
+ if(act==='open'){rep.open=true;rep.error='';renderReplicate();return;}
+ if(act==='cancel'){Object.assign(rep,{open:false,estimate:null,busy:'',error:''});renderReplicate();return;}
+ if(act==='estimate'){rep.busy='Checking cost…';rep.error='';renderReplicate();try{const est=await api(`/api/runs/${encodeURIComponent(job.id)}/replicate/estimate`,replicateBody());if(rep.key===key)rep.estimate=est;}catch(err){if(rep.key===key)rep.error=err.message;}finally{if(rep.key===key){rep.busy='';renderReplicate();}}return;}
+ if(act==='start'&&rep.estimate){rep.busy='Sending to Higgsfield…';rep.error='';renderReplicate();try{const r=await api(`/api/runs/${encodeURIComponent(job.id)}/replicate`,{...replicateBody(),confirmCredits:rep.estimate.credits});if(rep.key===key){Object.assign(rep,{open:false,estimate:null});rep.replicas=[r,...rep.replicas];loadReplicas();}}catch(err){if(rep.key===key){rep.error=err.message;rep.estimate=null;}}finally{if(rep.key===key){rep.busy='';renderReplicate();}}}
+});
+$('#replicate-panel').addEventListener('change',async e=>{
+ const t=e.target;
+ if(t.dataset.replicate==='sound'){rep.keepSound=t.checked;rep.estimate=null;renderReplicate();return;}
+ if(t.dataset.replicate==='files'){const files=[...t.files].slice(0,4-rep.refs.length);rep.busy='Uploading…';rep.error='';renderReplicate();try{for(const f of files){if(f.size>10*1024*1024)throw new Error(`${f.name} is over 10 MB`);rep.refs.push(await api('/api/references',{dataUrl:await readAsDataUrl(f)}));}storeRefs(rep.refs);rep.estimate=null;}catch(err){rep.error=err.message;}finally{rep.busy='';renderReplicate();}}
+});
+$('#replicate-panel').addEventListener('input',e=>{if(e.target.dataset.replicate==='text')rep.overlayText=e.target.value;});
 // Clickable script parts: open the player on the saved (or Instagram) video, jump to the part, and follow playback.
 const videoSource=p=>p&&videoState.runId===job?.id&&videoState.saved.has(p.id)?`/videos/${encodeURIComponent(job.id)}/${encodeURIComponent(p.id)}`:safeLink(p?.videoUrl);
 function openPlayer(p){const v=$('#preview-video'),src=p&&videoSource(p);if(!src)return null;if(v.hidden||v.dataset.post!==p.id){$('#preview-image').hidden=true;$('#preview-play').hidden=true;$('.preview-media').classList.add('playing');v.hidden=false;v.dataset.post=p.id;v.src=src;}return v;}
@@ -221,7 +249,7 @@ function playPart(anatomy,i){const s=anatomy[i],p=job.posts.find(x=>x.id===selec
 $('#preview-video').addEventListener('timeupdate',()=>{const v=$('#preview-video'),p=job?.posts.find(x=>x.id===selected);if(!p||v.dataset.post!==p.id)return;const i=segmentAt(p.analysis?.anatomy||[],v.currentTime);if(i!==lastPart){lastPart=i;highlightPart(i);}});
 // Saved videos line: progress while saving, size, delete (keeps every score, transcript and label), save missing.
 const megabytes=b=>b>=1e9?`${(b/1e9).toFixed(1)} GB`:`${Math.round(b/1e6)} MB`;
-async function refreshVideos(){clearTimeout(videoState.timer);if(!job||job.id==='demo'||job.synthetic){videoState={runId:null,saved:new Set(),info:null,timer:null};renderVideoLine();return;}const id=job.id;try{const info=await api(`/api/runs/${encodeURIComponent(id)}/videos`);if(job.id!==id)return;videoState={runId:id,saved:new Set(info.saved),info,timer:info.saving?setTimeout(refreshVideos,3000):null};renderVideoLine();const p=job.posts.find(x=>x.id===selected);if(p&&$('#preview-video').hidden)$('#preview-play').hidden=!videoSource(p);}catch(e){if(job.id===id){$('#video-line').hidden=false;$('#video-line').textContent=`Could not read saved videos: ${e.message}`;}}}
+async function refreshVideos(){clearTimeout(videoState.timer);if(!job||job.id==='demo'||job.synthetic){videoState={runId:null,saved:new Set(),info:null,timer:null};renderVideoLine();return;}const id=job.id;try{const info=await api(`/api/runs/${encodeURIComponent(id)}/videos`);if(job.id!==id)return;videoState={runId:id,saved:new Set(info.saved),info,timer:info.saving?setTimeout(refreshVideos,3000):null};renderVideoLine();renderReplicate();const p=job.posts.find(x=>x.id===selected);if(p&&$('#preview-video').hidden)$('#preview-play').hidden=!videoSource(p);}catch(e){if(job.id===id){$('#video-line').hidden=false;$('#video-line').textContent=`Could not read saved videos: ${e.message}`;}}}
 function renderVideoLine(){const el=$('#video-line'),i=videoState.info;if(!i||videoState.runId!==job?.id){el.hidden=true;el.innerHTML='';return;}el.hidden=false;
  const text=i.saving?`Saving videos… ${i.progress?`${i.progress.saved}/${i.progress.total}`:''}`:`Videos on this Mac: ${i.saved.length}/${i.total} · ${megabytes(i.bytes)}`;
  el.innerHTML=`<span>${escape(text)}</span>${!i.saving&&i.saved.length?'<button class="quiet" id="videos-delete">Delete saved videos</button>':''}${!i.saving&&i.saved.length<i.total?'<button class="quiet" id="videos-save">Save missing videos</button>':''}`;
@@ -236,7 +264,9 @@ $('#resume').onclick=async()=>{const id=job.id,generation=loadGeneration;try{awa
 $('#pause').onclick=async()=>{try{await api(`/api/runs/${job.id}/pause`,{});toast('Pausing after in-flight requests finish.');}catch(e){toast(e.message);}};
 $('#export').onclick=()=>window.open(`/api/runs/${job.id}/export`,'_blank');
 // Up to 3 handles become 3 runs that are started together; the first one opens on screen.
-$('#new-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;$('#new-error').textContent='';try{const data=Object.fromEntries(new FormData(e.target));const {handles,error}=parseHandles(data.creator);if(error)throw new Error(error);const file=$('#import-file').files[0];if(file&&handles.length>1)throw new Error('Import one JSON export for one handle at a time.');if(file)data.rows=JSON.parse(await file.text());const created=[];for(const creator of handles)created.push(await api('/api/runs',{...data,creator}));await refresh();await loadJob(created[0].id);const failed=[];for(const run of created){try{await api(`/api/runs/${run.id}/run`,{});}catch(err){failed.push(`@${run.creator}: ${err.message}`);}}await refresh();if(failed.length)toast(failed.join(' · '));else if(created.length>1)toast(`${created.length} analyses running in parallel. Switch between them under Your research.`);$('#new-dialog').close();}catch(err){$('#new-error').textContent=err.message;}finally{b.disabled=false;}};
+// Account fields: start with one, "+" adds another, up to 3 (run in parallel).
+$('#account-add').onclick=()=>{const rows=$('#accounts').querySelectorAll('.account-row');if(rows.length>=3)return;const row=document.createElement('div');row.className='account-row';row.innerHTML=`<label>Account ${rows.length+1}<input name="account" placeholder="@handle or link" autocomplete="off"></label><button type="button" class="account-remove" aria-label="Remove this account">×</button>`;row.querySelector('.account-remove').onclick=()=>{row.remove();$('#accounts').querySelectorAll('.account-row label').forEach((l,i)=>l.firstChild.textContent=`Account ${i+1}`);$('#account-add').hidden=false;};$('#accounts').append(row);row.querySelector('input').focus();$('#account-add').hidden=rows.length+1>=3;};
+$('#new-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;$('#new-error').textContent='';try{const form=new FormData(e.target),data=Object.fromEntries(form);delete data.account;const {handles,error}=parseHandles(form.getAll('account').filter(v=>v.trim()).join(','));if(error)throw new Error(error);const file=$('#import-file').files[0];if(file&&handles.length>1)throw new Error('Import one JSON export for one handle at a time.');if(file)data.rows=JSON.parse(await file.text());const created=[];for(const creator of handles)created.push(await api('/api/runs',{...data,creator}));await refresh();await loadJob(created[0].id);const failed=[];for(const run of created){try{await api(`/api/runs/${run.id}/run`,{});}catch(err){failed.push(`@${run.creator}: ${err.message}`);}}await refresh();if(failed.length)toast(failed.join(' · '));else if(created.length>1)toast(`${created.length} analyses running in parallel. Switch between them under Your research.`);$('#new-dialog').close();}catch(err){$('#new-error').textContent=err.message;}finally{b.disabled=false;}};
 $('#connections-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;$('#connections-result').textContent='Checking provider access…';try{await api('/api/connections',Object.fromEntries(new FormData(e.target)));e.target.reset();const checks=await api('/api/connections/check',{});$('#connections-result').textContent=Object.entries(checks).map(([k,v])=>`${title(k)}: ${v.verified?'verified':v.error||'key needed'}`).join(' · ');await refresh();}catch(err){$('#connections-result').textContent=err.message;}finally{b.disabled=false;}};
 $('#attach-form').onsubmit=async e=>{e.preventDefault();try{await api(`/api/runs/${job.id}/attach`,{runId:$('#attach-id').value.trim()});await loadJob(job.id);toast('Apify run attached. Resume to retrieve its results.');}catch(err){toast(err.message);}};
 start().catch(e=>{toast(e.message);$('#notice').textContent='Could not load the local app. '+e.message;});

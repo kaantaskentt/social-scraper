@@ -82,3 +82,37 @@ blockquote#opening,#opening{font-size:18px;line-height:1.3}
 dialog h2{font-size:28px;line-height:1.1}
 dialog .close{font-size:18px}
 .stats small,.money-stats small,.money-box>p,#all-labels .label-line span{font-size:11px}
+
+/* Replicate panel */
+.replicate-panel{margin:14px 0}
+.replicate-open{width:100%}
+.replicate-form{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
+.replicate-title{font-weight:520;margin:0 0 2px}
+.replicate-hint{color:var(--muted);font-size:11px;margin:2px 0 10px}
+.refs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.ref{position:relative;margin:0;width:64px;height:64px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--paper)}
+.ref img{width:100%;height:100%;object-fit:cover}
+.ref button{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:9999px;border:0;background:rgba(0,0,0,.7);color:#fff;font-size:12px;line-height:20px;padding:0;cursor:pointer}
+.ref-add{width:64px;height:64px;border:1px dashed var(--stone);border-radius:10px;display:grid;place-items:center;font-size:22px;color:var(--muted);cursor:pointer}
+.ref-add:hover{border-color:var(--ink);color:var(--ink)}
+.replicate-field{display:block;font-size:11px;color:var(--muted);margin-bottom:8px}
+.replicate-field input{display:block;width:100%;margin-top:4px;padding:7px 10px}
+.replicate-check{display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:10px}
+.replicate-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.replicate-actions .replicate-hint{margin:0}
+.replica{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+.replica-status{font-size:12px;margin:0 0 6px}
+.replica-generating,.replica-submitting,.replica-finishing{color:var(--muted)}
+.replica-error{font-size:11px;color:#a33a2a;margin:4px 0}
+.replica-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.replica-compare figure{margin:0}.replica-compare video{width:100%;border-radius:10px;background:#000;aspect-ratio:9/16}
+.replica-compare figcaption{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* New analysis: account rows and a quiet Advanced section */
+.accounts{display:grid;gap:8px;margin-bottom:12px}
+.account-row{display:flex;gap:8px;align-items:flex-end}.account-row label{flex:1;margin:0}
+.account-add,.account-remove{width:34px;height:34px;flex:none;border-radius:9999px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:18px;line-height:1;padding:0;cursor:pointer}
+.account-add:hover,.account-remove:hover{border-color:var(--ink)}
+.advanced{margin:4px 0 12px;border-top:1px solid var(--line);padding-top:10px}
+.advanced summary{cursor:pointer;font-size:12px;color:var(--muted)}
+.advanced[open] summary{margin-bottom:10px}
