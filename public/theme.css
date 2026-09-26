@@ -128,3 +128,16 @@ dialog .close{font-size:18px}
 .more-filters .filterbar{border-bottom:0}
 .fold>summary{cursor:pointer;list-style:none}
 .explorer-toolbar:not(:has(#replay-status:not(:empty))){display:none}
+
+/* Header: videos live in the More menu */
+.demo-menu{min-width:240px}
+.demo-menu .video-line{flex-direction:column;align-items:flex-start;text-align:left;width:100%;margin:4px 0 0;padding-top:8px;border-top:1px solid var(--line);font:11px/1.5 var(--sans)}
+.demo-menu .video-line button{padding:4px 0}
+.notice{cursor:default}
+/* Performance map: readable axes */
+#axes text{font:11px var(--sans);fill:var(--muted)}
+#axes line{stroke:var(--line)}
+#axes .median{stroke:#b9b4a8;stroke-dasharray:3 4}
+#axes .axis-title{font-weight:560;fill:var(--ink)}
+#axes .median-label{font-size:10px;fill:#9a958a}
+#axes .corner-hint{font-size:11px;fill:#9a958a}

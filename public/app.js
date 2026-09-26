@@ -34,13 +34,13 @@ function readStats(){
  $('#pipeline-progress').style.width=`${ps.length?completed.length/ps.length*100:0}%`;
  $('#pipeline-label').textContent=job.synthetic?'DEMO':`${job.status.toUpperCase()} · ${completed.length}/${ps.length}`;
  $('#cost-detail').textContent=job.synthetic?'Synthetic data · no API calls':`${audioCosts} · Apify ${money(job.costs.apify,3)} · ${job.retries||0} retries`;
- $('#notice').textContent=job.synthetic?'Demo data: everything below is made up for practice.':`@${job.creator} · ${ps.length} retrieved Reels · ${completed.length} classified${excluded?` · ${excluded} excluded from speech analysis`:""}${failed?` · ${failed} need retry`:""} · Metrics are a collection-time snapshot${job.retries?' · Cost estimates may omit uncertain retry charges':''}`;
+ $('#notice').textContent=job.synthetic?'Demo data: everything below is made up for practice.':`@${job.creator} · ${ps.length} reels · ${completed.length} with speech analysed${excluded?` · ${excluded} without speech`:''}${failed?` · ${failed} need retry`:''}`;$('#notice').title=job.synthetic?'':`Metrics are a snapshot from collection time.${job.retries?' Cost estimates may omit uncertain retry charges.':''}`;
  $('#focus-title').textContent=job.synthetic?'DEMO · SAMPLE DATA':`@${job.creator.toUpperCase()} / ${ps.length} REELS / SOCIAL SCRAPER`;$('#intro-copy').textContent=job.synthetic?'Scrape any account. See which reels win, what they say, and what to copy.':`${ps.length} reels collected. See which ones win, and why.`;$('#notice').classList.toggle('real',!job.synthetic);$('#run-label').textContent=job.synthetic?'SOCIAL SCRAPER':`RESEARCHING @${job.creator.toUpperCase()}`;
  $('#run-state').textContent=job.status;$('#run-error').textContent=job.error||'';
  $('#attach-form').hidden=!job.scrapeUncertain;
  $('#events').textContent=(job.events||[]).slice().reverse().map(e=>`${new Date(e.at).toLocaleTimeString()}  ${e.message}`).join('\n');
  const running=['running','scraping'].includes(job.status);$('#resume').hidden=job.synthetic||running;$('#pause').hidden=job.synthetic||!running;$('#export').hidden=job.synthetic;
- $('#run-note').textContent=job.synthetic?'Start a new analysis to see real accounts.':`${(job.elapsedMs/1000).toFixed(1)}s recorded processing · ${completed.filter(p=>p.analysis.review).length} need label review`;
+ $('#run-note').hidden=!job.synthetic;$('#run-note').textContent=job.synthetic?'Start a new analysis to see real accounts.':`${(job.elapsedMs/1000).toFixed(1)}s recorded processing · ${completed.filter(p=>p.analysis.review).length} need label review`;
 }
 function calculate(){
  const metric=$('#metric').value;
@@ -88,10 +88,10 @@ function layout(){
  const mx=median(active.map(p=>p.x)),my=median(active.map(p=>p.y));let svg='';
  for(let i=0;i<=4;i++){const val=ymax*i/4,y=top+ph*(1-i/4);svg+=`<line x1="${left}" x2="${w-right}" y1="${y}" y2="${y}"/><text x="${left-8}" y="${y+3}" text-anchor="end">${val.toFixed(0)}</text>`;}
  for(let i=lo;i<=hi;i++){const x=left+(i-lo)/(hi-lo)*pw;svg+=`<text x="${x}" y="${h-13}" text-anchor="middle">${compact(10**i)}</text>`;}
- if(mx!==null){const [x,y]=xy({x:mx,y:my});svg+=`<line class="median" x1="${x}" x2="${x}" y1="${top}" y2="${h-bottom}"/><line class="median" x1="${left}" x2="${w-right}" y1="${y}" y2="${y}"/>`;}
- svg+=`<text x="${left}" y="${mapY+32}">LIKES / 1K ${$('#metric').value.toUpperCase()} ↑</text>`;$('#axes').innerHTML=svg;
- $('#canvas-title').textContent='FROM SCRIPT TO PERFORMANCE';$('#canvas-note').textContent=replaying?'Saved analysis replay · both views stay visible':'Dashed lines = plotted sample medians';
- $('#plotted-count').textContent=`${visible.length} frames · ${active.length} / ${plot.length} plotted`;$('#axis-caption').textContent=`${$('#metric').value.toUpperCase()} · LOG SCALE →`;$('#empty').hidden=visible.length>0;
+ if(mx!==null){const [x,y]=xy({x:mx,y:my});svg+=`<line class="median" x1="${x}" x2="${x}" y1="${top}" y2="${h-bottom}"/><line class="median" x1="${left}" x2="${w-right}" y1="${y}" y2="${y}"/><text class="median-label" x="${x+5}" y="${h-bottom-6}">median</text><text class="median-label" x="${w-right}" y="${y-5}" text-anchor="end">median</text>`;}
+ svg+=`<text class="axis-title" x="${left}" y="${mapY+32}">↑ Likes per 1,000 ${$('#metric').value}</text><text class="axis-title" x="${w-right}" y="${h-bottom-8}" text-anchor="end">${$('#metric').value[0].toUpperCase()+$('#metric').value.slice(1)} →</text>`;$('#axes').innerHTML=svg;
+ $('#canvas-title').textContent='FROM SCRIPT TO PERFORMANCE';$('#canvas-note').textContent=replaying?'Saved analysis replay · both views stay visible':'';
+ $('#plotted-count').textContent=`${visible.length} frames · ${active.length} / ${plot.length} plotted`;$('#axis-caption').textContent=`${$('#metric').value[0].toUpperCase()+$('#metric').value.slice(1)} on a log scale: each step is 10×`;$('#empty').hidden=visible.length>0;
 }
 function selectPost(id){selected=id;const p=job.posts.find(p=>p.id===id);if(!p)return;$('#preview-video').pause();$('#preview-video').hidden=true;$('#preview-video').removeAttribute('src');delete $('#preview-video').dataset.post;lastPart=-1;$('.preview-media').classList.remove('playing');$('#preview-image').hidden=false;$('#preview-image').src=imageURL(p);$('#preview-play').hidden=!videoSource(p);$('#post-creator').textContent=`@${p.creator}`;$('#post-date').textContent=p.publishedAt?new Date(p.publishedAt).toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'}):'Date unavailable';$('#post-index').textContent=`${job.posts.indexOf(p)+1} / ${job.posts.length}`;
  $('#original').hidden=!safeLink(p.url);$('#original').href=safeLink(p.url);$('#opening').textContent=openingLine(p)||'Waiting for the spoken transcript.';
