@@ -116,3 +116,15 @@ dialog .close{font-size:18px}
 .advanced{margin:4px 0 12px;border-top:1px solid var(--line);padding-top:10px}
 .advanced summary{cursor:pointer;font-size:12px;color:var(--muted)}
 .advanced[open] summary{margin-bottom:10px}
+
+/* Calmer layout: breadcrumb gone, extra filters and the script fold away */
+.canvas-flow{display:none}
+.more-filters{border-top:1px solid var(--line)}
+.more-filters>summary{cursor:pointer;list-style:none;padding:10px 20px;font-size:12px;color:var(--muted)}
+.more-filters>summary::-webkit-details-marker,.fold>summary::-webkit-details-marker{display:none}
+.more-filters>summary::after,.fold>summary span::after{content:' ▾';font-size:10px}
+.more-filters:not([open])>summary::after,.fold:not([open])>summary span::after{content:' ▸'}
+.more-filters[open]>summary{padding-bottom:0}
+.more-filters .filterbar{border-bottom:0}
+.fold>summary{cursor:pointer;list-style:none}
+.explorer-toolbar:not(:has(#replay-status:not(:empty))){display:none}
