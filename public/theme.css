@@ -297,3 +297,20 @@ dialog .close{font-size:18px}
 .secret-bars i{width:calc(var(--w)*120px)}
 .secret-list li.secret-num{grid-template-columns:minmax(0,1fr) 90px 110px}
 .secret-list li.secret-num b{text-align:right}
+.secret-list li.unclear b{color:var(--muted);font-weight:400}.secret-list li small{color:var(--muted);font-size:12px;margin-left:6px}
+
+.secret-why .secret-mech{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:0}
+.secret-why .secret-mech b{font-size:14px;font-weight:600}
+.secret-strength{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.secret-strong{border-color:var(--ink);color:var(--ink)}
+.secret-meaning{color:var(--muted);font-size:13px!important}
+.secret-source{font-size:11.5px!important;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
+.secret-critique{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.secret-critique li{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:12px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px}
+.secret-critique p{margin:0;font-size:15px;line-height:1.45}
+.secret-kind{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;justify-self:start;border:1px solid var(--line)}
+.secret-kind-risk{background:#f6e3dc;color:#8a3a1f;border-color:#e8c4b6}
+.secret-kind-weakness{background:var(--card)}
+.secret-kind-opportunity{background:#e3eee6;color:#2f5a3e;border-color:#c5dccb}
+@media(max-width:560px){.secret-critique li{grid-template-columns:1fr}}
+.secret-dropped{font-size:12.5px;color:var(--muted)}.secret-dropped summary{cursor:pointer}.secret-dropped ul{margin:6px 0 0;padding-left:18px}

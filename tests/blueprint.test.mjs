@@ -39,3 +39,18 @@ test('aligns transcript parts and Jev roles to shots by overlap',()=>{
  assert.deepEqual(out[1].words,['Pharmacies hate this.','Add cinnamon.']);assert.deepEqual(out[1].roles,['setup','advice']);
  assert.equal(out[1].duration,3);
 });
+
+import {pickCuts,CUTS_VERSION} from '../lib/blueprint.mjs';
+const frames=(scores,fps=25)=>scores.map((s,i)=>[i/fps,s]);
+test('cuts are spikes against the frames around them: steady motion is not a cut, a jump cut in the same room is',()=>{
+ const steady=frames(Array(100).fill(0.2));assert.deepEqual(pickCuts(steady),[],'constant heavy motion (an animated zoom) gives no cuts');
+ const jump=frames(Array(100).fill(0.01).map((s,i)=>i===50?0.16:s));assert.deepEqual(pickCuts(jump),[2],'a small but sudden change in a still room is a cut');
+ const hard=frames(Array(100).fill(0.03).map((s,i)=>i===25||i===75?0.6:s));assert.deepEqual(pickCuts(hard),[1,3]);
+ const wobble=frames(Array(100).fill(0.01).map((s,i)=>i===50?0.08:s));assert.deepEqual(pickCuts(wobble),[],'below the floor: a hand move, not a cut');
+ const burst=frames(Array(100).fill(0.02).map((s,i)=>i>=40&&i<=45?0.7:s));assert.ok(pickCuts(burst).length<=1,'a flash of several frames counts at most once (cuts at least 0.4 s apart)');
+ assert.equal(typeof CUTS_VERSION,'number');
+});
+test('review round 2: a spike too close to the start does not hide the next real cut; missing scores are ignored',()=>{
+ const rows=frames(Array(40).fill(0.01).map((s,i)=>i===3||i===11?0.5:s));assert.deepEqual(pickCuts(rows),[0.44]);
+ const withNaN=frames(Array(60).fill(0.01).map((s,i)=>i===29?NaN:i===30?0.5:s));assert.deepEqual(pickCuts(withNaN),[1.2]);
+});

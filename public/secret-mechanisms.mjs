@@ -1,0 +1,23 @@
+// The only "why it works" explanations the Secret may use: each is a mechanism with evidence, its strength and a source.
+// Researched 2026-09-27; raw reports in ~/Dev/reference/research-library/raw/2026-09-27-why-content-hooks-psychology.md and
+// 2026-09-27-reel-critique-practitioners.md. Strength: strong = meta-analysis, large replication or platform fact;
+// moderate = solid but observational or lab-only; weak = little or indirect evidence. Shared by the server and the page.
+export const MECHANISMS={
+ stop_in_3_seconds:{name:'Stops the scroll in 3 seconds',strength:'strong',source:'Instagram: skip rate = viewers who leave in the first 3 s (Instagram Creators, Aug 2025)',meaning:'Instagram measures who leaves in the first 3 seconds. What the viewer sees and hears first decides most of the reach.'},
+ watch_time:{name:'Keeps people watching',strength:'strong',source:'Instagram: watch time, likes per reach and sends per reach are the top Reels signals (Mosseri, Jan 2025)',meaning:'Seconds watched is a top ranking signal; a flat retention line means people stay.'},
+ disgust_memory:{name:'Disgust sticks',strength:'moderate',source:'Chapman 2013 and later lab work; contamination stories spread best (Heath 2001; Eriksson & Coultas 2014)',meaning:'Gross, contaminated images are remembered better than scary ones, and "you ate something contaminated" stories get passed on.'},
+ fear_with_action:{name:'Fear, then one clear fix',strength:'strong',source:'Tannenbaum 2015 meta-analysis (fear appeals work, d≈0.27, best with an efficacy message)',meaning:'Fear persuades when it comes with one simple thing the viewer can do right away.'},
+ seeing_is_believing:{name:'Seeing is believing',strength:'moderate',source:'Wittenberg 2021 (n=7,609): video makes people believe an event happened',meaning:'Showing it happen on camera makes the claim feel proven, whether or not the conclusion is right.'},
+ repetition_truth:{name:'Repeated claims feel true',strength:'strong',source:'Illusory truth effect, meta-analysis of 51 studies (Dechêne 2010)',meaning:'The same kind of claim across many reels starts to feel true to regular viewers.'},
+ curiosity_gap:{name:'A question you want answered',strength:'moderate',source:'Loewenstein information-gap theory; research library finding "curiosity-gap"',meaning:'Opening a specific question and answering it later keeps people watching.'},
+ negative_click:{name:'Negative framing wins the click',strength:'moderate',source:'Robertson 2023: 22,743 headline tests, +2.3% clicks per negative word',meaning:'Warnings and "this is bad for you" pull attention, but they do not earn more likes.'},
+ emotion_sharing:{name:'Emotion gets shared',strength:'moderate',source:'Berger & Milkman 2012 (7,000 articles); Tellis 2019 (video ads)',meaning:'Amusement, awe, excitement, anger and anxiety get shared more than plain information or sadness. (Surprise holds attention; there is no evidence here that it drives sharing.)'},
+ closeness:{name:'Feels like friends',strength:'moderate',source:'Tukachinsky 2020 meta-analysis of parasocial relationships (120 studies, mostly correlational)',meaning:'Casual, familiar presenters build a sense of closeness that goes with being persuaded.'},
+ real_expertise:{name:'Real expertise, small boost',strength:'strong',source:'Wilson & Sherrell 1993; Hamer 2026 (d≈0.14, largest for real medical credentials)',meaning:'Real credentials persuade a little. Looking like an expert without being one is untested and can be deceptive.'},
+ captions_help:{name:'Captions help people follow',strength:'moderate',source:'Gernsbacher 2015 review of 100+ studies (mostly educational video)',meaning:'On-screen captions improve understanding and attention, including with sound off.'},
+ story_transport:{name:'Stories lower resistance',strength:'strong',source:'van Laer 2014 meta-analysis (132 effects)',meaning:'When viewers are pulled into a story they argue back less.'},
+ cuts_attention:{name:'Cuts refresh attention, up to a point',strength:'moderate',source:'Wals et al. (eye tracking); Xiao et al. (2,511 TikTok ads, inverted U)',meaning:'New shots re-grab attention, but too many or too busy overloads viewers.'}
+};
+// Claims the Secret must never use: they failed replication or have no source.
+export const MYTHS=['Arousal or energy alone makes people share (failed replication, Prowten 2024)','Open loops make people remember (Zeigarnik: failed for memory, 2025 meta-analysis)','"Scrolling is a dopamine slot machine" (no study measured it in viewers)','An ideal reel length (no controlled evidence)','"A DM send is worth 3-5 likes" or "cut every 1.5 s" (no source)'];
+export const STRENGTH_LABEL={strong:'Strong evidence',moderate:'Moderate evidence',weak:'Weak evidence'};

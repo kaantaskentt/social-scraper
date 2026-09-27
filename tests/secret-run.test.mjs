@@ -8,7 +8,7 @@ import {LABELS} from '../lib/secret.mjs';
 
 async function setup({failOn}={}){
  const root=await mkdtemp(join(tmpdir(),'cl-secret-'));await mkdir(join(root,'videos','run1'),{recursive:true});
- const posts=Array.from({length:12},(_,i)=>({id:`r${i}`,duration:20+i,transcript:{text:`Opening words for reel ${i} and more`}}));
+ const posts=Array.from({length:12},(_,i)=>({id:`r${i}`,duration:20+i,transcript:{text:`Opening words for reel ${i} and more`},analysis:{labels:{mechanism:{value:i<6?'mistake':'curiosity'},emotion:{value:'concern'}}}}));
  for(const p of posts)await writeFile(join(root,'videos','run1',`${p.id}.mp4`),`video-${p.id}`);
  const results=Object.fromEntries(posts.map((p,i)=>[p.id,{quadrant:'dud',xNormal:12-i}]));
  const calls={watch:[],write:0,jev:0};
@@ -35,6 +35,9 @@ test('before building: an estimate and no spend; building watches each picked re
   const s=JSON.parse(await readFile(join(root,'secret','run1','secret.json'),'utf8'));
   assert.deepEqual(s.secret.person.evidence,['r0','r1']);assert.equal(s.secret.setting,null);assert.deepEqual(s.dropped,['setting']);
   const doc=s.stats.differences.find(d=>d.question==='look'&&d.value==='doctor_or_expert');assert.deepEqual([doc.winners,doc.flops,doc.perSide],[6,0,6]);
+  const said=s.stats.differences.find(d=>d.question==='said_mechanism'&&d.value==='mistake');assert.deepEqual([said.winners,said.flops],[6,0],'what was said is compared too');
+  assert.ok(s.stats.house.some(h=>h.question==='said_emotion'&&h.value==='concern'));assert.match(s.stats.names.said_mechanism.values.mistake,/Warns of a mistake/);
+  assert.equal(s.stats.names.look.values.doctor_or_expert.slice(0,7),'Like a ');
   assert.equal(s.picked.length,12);assert.ok(s.costUsd>0.05);assert.equal(s.models.watch,MODELS.watch);
   const after=await b.status(job,results);assert.equal(after.state,'done');assert.equal(after.saved.secret.headline,'He looks like a doctor.');
  }finally{await rm(root,{recursive:true,force:true});}

@@ -20,18 +20,28 @@ test('while building: the step and progress; after a failure: the reason and a c
 const saved={account:'ken.remedie',createdAt:'2026-09-27T10:00:00Z',costUsd:0.27,dropped:['setting'],picked:Array.from({length:30},(_,i)=>({id:`r${i}`,group:i<15?'winner':'flop'})),
  stats:{house:[{question:'look',value:'doctor_or_expert',count:27,total:30}],differences:[{question:'opening',value:'bold_claim',winners:9,flops:3,perSide:15,evidence:['r1']}],numbers:{seconds:{winners:38,flops:61},secondsPerShot:{winners:2.1,flops:4.5}}},
  secret:{headline:'A doctor <i>look</i> and a bold first line.',person:{text:'Looks like a doctor',evidence:['r1','r2']},setting:null,format:{text:'Demonstration',evidence:['r3']},script:{text:'Claim first',evidence:['r1']},sound:{text:'Voice',evidence:['r1']},pace:{text:'Fast',evidence:['r1']},
-  differences:[{claim:'Bold first line: 9 of 15 best, 3 of 15 weakest',evidence:['r1','r4']}],recipe:[{step:'Wear a white coat',evidence:['r2']}]}};
+  differences:[{claim:'Bold first line: 9 of 15 best, 3 of 15 weakest',evidence:['r1','r4']}],recipe:[{step:'Wear a white coat',evidence:['r2']}],
+  why:[{mechanism:'disgust_memory',pattern:'Gross foam <b> first',evidence:['r1']}],critique:[{point:'Check the health claims before copying',kind:'risk',evidence:['r2']}]}};
 
 test('the finished page: headline, formula cards with playable proof, house style and differences with counts, the recipe',()=>{
  const html=renderSecret({state:'done',saved},{account:'ken.remedie',imageFor:img});
  assert.match(html,/A doctor &lt;i&gt;look&lt;\/i&gt; and a bold first line\./);
  assert.match(html,/The person[\s\S]*Looks like a doctor[\s\S]*data-secret-play="r1"[\s\S]*data-secret-play="r2"/);
- assert.doesNotMatch(html,/The setting/,'a part without proof is not shown');assert.match(html,/1 part removed because it had no proof/);
+ assert.doesNotMatch(html,/The setting/,'a part without proof is not shown');
+ assert.match(renderSecret({state:'done',saved:{...saved,droppedWhy:[{part:'person',text:'An <i>x</i>',reason:'ethnicity or race'}]}},{account:'k',imageFor:img}),/1 part removed by the honesty check[\s\S]*ethnicity or race<\/b>: An &lt;i&gt;x/);assert.match(html,/1 part removed because it had no proof/);
  assert.match(html,/Like a doctor, scientist or expert[\s\S]*27 of 30 reels/);
+ const named=renderSecret({state:'done',saved:{...saved,stats:{...saved.stats,house:[{question:'said_cta',value:'comment',count:25,total:30}],names:{said_cta:{title:'Words: Spoken CTA',values:{comment:'Comment or reply'}}}}}},{account:'k',imageFor:img});assert.match(named,/Comment or reply[\s\S]*25 of 30 reels/);
  assert.match(html,/A bold or surprising statement[\s\S]*9 of 15 best[\s\S]*3 of 15 weakest/);
- assert.match(html,/Length[\s\S]*38 s[\s\S]*61 s/);assert.match(html,/New shot every[\s\S]*2\.1 s[\s\S]*4\.5 s/);
+ assert.match(html,/Length[\s\S]*38 s[\s\S]*61 s/);
+ assert.match(renderSecret({state:'done',saved:{...saved,stats:{...saved.stats,numbers:{seconds:{winners:40,flops:42,clear:false},secondsPerShot:{winners:2,flops:4,clear:true}}}}},{account:'k',imageFor:img}),/Length <small>no clear gap<\/small>/);assert.match(html,/New shot every[\s\S]*2\.1 s[\s\S]*4\.5 s/);
  assert.match(html,/<ol class="secret-recipe">[\s\S]*Wear a white coat/);
  assert.match(html,/src="\/media\/run1\/r1"/);assert.match(html,/data-secret="rewrite"[^>]*>Write it again/);
  assert.match(renderSecret({state:'done',saved:{...saved,spentAllTime:0.33}},{account:'k',imageFor:img}),/cost \$0\.27 \(all builds \$0\.33\)/);
  assert.match(renderSecret({state:'done',saved:{...saved,secret:{...saved.secret,headline:null}}},{account:'k',imageFor:img}),/<h2>Why @ken\.remedie wins<\/h2>/);
+});
+
+test('why it works shows the mechanism, its evidence strength and source; the critique shows its kind',()=>{
+ const html=renderSecret({state:'done',saved},{account:'ken.remedie',imageFor:img});
+ assert.match(html,/Why it works on people[\s\S]*Disgust sticks[\s\S]*Moderate evidence[\s\S]*Gross foam &lt;b&gt; first[\s\S]*Chapman 2013/);
+ assert.match(html,/What a strategist would flag[\s\S]*Risk[\s\S]*Check the health claims before copying/);
 });
