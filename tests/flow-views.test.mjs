@@ -28,8 +28,8 @@ test('secret: 3 things to do with dots and proof, 1 to avoid, what every reel ha
  assert.match(html,/Kitchen tests &lt;b&gt;/);assert.doesNotMatch(html,/<b>Kitchen/);
  assert.match(html,/Do these[\s\S]*Step by step[\s\S]*12 of 15[\s\S]*5 of 15[\s\S]*Starts mid-action/);
  assert.equal((html.match(/class="on"/g)||[]).length>=12+5,true,'dots are drawn');
- assert.match(html,/Avoid[\s\S]*Problem, then fix/);assert.match(html,/Every reel has[\s\S]*Kitchen/);
- assert.match(html,/A question you want answered/);assert.match(html,/Before you copy[\s\S]*Check health claims/);
+ assert.match(html,/Their weakest reels do this more[\s\S]*Problem, then fix/);assert.match(html,/Every reel has[\s\S]*Kitchen/);
+ assert.match(html,/When you want to know the answer, you keep watching\.[\s\S]*Backed by research/);assert.match(html,/Before you copy[\s\S]*Check health claims/);
  assert.match(html,/data-feedback="yes"/);assert.match(html,/data-step="make"/);assert.doesNotMatch(html,/\d+\.\d+ s/,'no numbers soup');
  assert.match(renderSecret({account:'ken',status:{state:'none',plan:{usd:0.336,reels:30}},imageFor:img}),/Find the secret · about \$0\.34/);
 });
@@ -65,4 +65,17 @@ test('one card per account (the fullest scan); made ideas are marked and show th
  const html=renderMake({account:'k',plan,make:{state:'none',reels:[{id:'0-celery',url:'/channels/a/0-celery/reel.mp4',title:'Celery'}]}});
  assert.match(html,/Made ✓/);assert.match(html,/0-celery\/reel\.mp4#t=0\.5/);assert.doesNotMatch(html,/data-act="make"/);
  assert.match(renderMake({account:'k',plan:{...plan,plan:{...plan.plan,price:{total:1}}}}),/Checking the price/,'an old price is refreshed before it is shown');
+});
+
+test('nothing is said twice: a difference is not repeated under "every reel has"',()=>{
+ const st={...saved.stats,house:[{question:'said_structure',value:'steps',count:25,total:30},{question:'setting',value:'kitchen',count:22,total:30}]};
+ const html=renderSecret({account:'ken',status:{state:'done',saved:{...saved,stats:st}},imageFor:img});
+ const every=html.slice(html.indexOf('Every reel has'));assert.doesNotMatch(every,/Step by step/);assert.match(every,/Kitchen/);
+});
+
+test('"did we get it right?" shows the short labels the system understood, with a picture, not long paragraphs',()=>{
+ const st={...saved.stats,house:[{question:'presenter',value:'two_or_more',count:23,total:30},{question:'look',value:'casual_creator',count:25,total:30},{question:'setting',value:'kitchen',count:22,total:30},{question:'format',value:'demonstration',count:26,total:30}]};
+ const html=renderSecret({account:'ken',status:{state:'done',saved:{...saved,stats:st}},imageFor:img});
+ const check=html.slice(html.indexOf('Did we understand it right?'));
+ assert.match(check,/Who<\/span><p>Two or more people · Casual creator/);assert.match(check,/Where<\/span><p>Kitchen/);assert.match(check,/What happens<\/span><p>Demonstration/);assert.match(check,/src="\/media\/r\/r1"/);
 });

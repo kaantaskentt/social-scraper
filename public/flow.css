@@ -135,3 +135,5 @@ dialog::backdrop{background:rgba(20,18,14,.45)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .plain{margin:-4px 0 2px;color:var(--muted);font-size:14px}
 .compare b{justify-self:end}
+.why-kid{margin:0 0 8px!important;color:var(--ink)!important;font-size:16px!important;font-weight:500}
+.why-list .tag{margin-left:0}

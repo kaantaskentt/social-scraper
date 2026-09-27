@@ -46,3 +46,12 @@ test('price: every shot, the real voiceover text and the reference image are pri
  assert.ok(calls.filter(a=>a[2]==='seedance_2_0').every(a=>a[a.indexOf('--generate_audio')+1]==='false'),'shots are silent');
  assert.ok(calls.every(a=>a[0]==='generate'&&a[1]==='cost'));
 });
+
+import {kitPrompt,shotPrompt} from '../lib/reel-make.mjs';
+test('nothing is Ken-specific: ideas stay in the channel\'s own topic and the place comes from its Secret',()=>{
+ const fashion={account:'nudeproject',secret:{headline:'Show the outfit being put together',format:{text:'Outfit reveals'},setting:{text:'A concrete studio with a clothing rail'}},stats:{house:[],differences:[]}};
+ const pattern=patternFrom(fashion);assert.equal(pattern.setting,'A concrete studio with a clothing rail');
+ const p=ideaPrompt(pattern,fashion);assert.doesNotMatch(p,/kitchen/i);assert.match(p,/channel's own topic and setting/);
+ const kit=kitPrompt({pattern});assert.match(kit,/concrete studio with a clothing rail/);assert.doesNotMatch(kit,/kitchen/i);
+ assert.doesNotMatch(shotPrompt({visual:'Hands fold a tee',camera:'top-down'}),/kitchen/i);
+});

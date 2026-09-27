@@ -55,11 +55,17 @@ export function renderSecret({account,status,imageFor,feedback=null}){
  const s=status.saved,st=s.stats,sec=s.secret,diffs=[...st.differences].sort((a,b)=>Math.abs(b.winners-b.flops)-Math.abs(a.winners-a.flops));
  const doMore=diffs.filter(d=>d.winners>d.flops).slice(0,3),avoid=diffs.find(d=>d.flops>d.winners);
  const dos=doMore.map((d,i)=>`<article class="card do-card"><span class="num">${i+1}</span><h3>${esc(name(d.question,d.value))}</h3><p class="plain">${esc(plain(d.question,d.value))}</p>${compareRow(d)}${thumbs(d.evidence,imageFor)}</article>`).join('');
- const avoidCard=avoid?`<article class="card avoid-card"><span class="tag tag-avoid">Avoid</span><h3>${esc(name(avoid.question,avoid.value))}</h3><p class="plain">${esc(plain(avoid.question,avoid.value))}</p>${compareRow(avoid)}</article>`:'';
- const every=(st.house||[]).slice(0,6).map(h=>`<span class="chip">${esc(name(h.question,h.value))}</span>`).join('');
- const why=(sec.why||[]).slice(0,3).map(w=>{const m=MECHANISMS[w.mechanism];return m?`<li><b>${esc(m.name)}</b><span class="tag tag-${esc(m.strength)}">${m.strength==='strong'?'Proven':'Good evidence'}</span><p>${esc(m.meaning)}</p></li>`:'';}).join('');
+ const avoidCard=avoid?`<article class="card avoid-card"><span class="tag tag-avoid">Their weakest reels do this more</span><h3>${esc(name(avoid.question,avoid.value))}</h3><p class="plain">${esc(plain(avoid.question,avoid.value))}</p>${compareRow(avoid)}</article>`:'';
+ // What every reel has, minus anything already shown as a difference (no saying the same thing twice).
+ const shown=new Set([...doMore,avoid].filter(Boolean).map(d=>`${d.question}.${d.value}`));
+ const every=(st.house||[]).filter(h=>!shown.has(`${h.question}.${h.value}`)).slice(0,6).map(h=>`<span class="chip">${esc(name(h.question,h.value))}</span>`).join('');
+ // Why it works: only the plain sentence, with a small tag for how solid the science is.
+ const why=(sec.why||[]).slice(0,3).map(w=>{const m=MECHANISMS[w.mechanism];return m?`<li><p class="why-kid">${esc(m.kid||m.meaning)}</p><span class="tag tag-${esc(m.strength)}">${m.strength==='strong'?'Proven by research':'Backed by research'}</span></li>`:'';}).join('');
  const risk=(sec.critique||[]).find(c=>c.kind==='risk');
- const formula=['person','setting','format'].filter(k=>sec[k]).map(k=>`<div class="seen"><img src="${esc(imageFor(sec[k].evidence[0]))}" alt="" onerror="this.hidden=true"><div><span class="cmp-label">${{person:'Who',setting:'Where',format:'What happens'}[k]}</span><p>${esc(sec[k].text)}</p></div></div>`).join('');
+ // What the system understood, in its own short labels with a picture: who, where, what happens.
+ const labelOf=(q)=>{const h=(st.house||[]).find(x=>x.question===q);return h?name(q,h.value):null;};
+ const seenRows=[['Who',[labelOf('presenter'),labelOf('look')].filter(Boolean).join(' · '),sec.person],['Where',labelOf('setting')||'',sec.setting],['What happens',[labelOf('format'),labelOf('angle')].filter(Boolean).join(' · '),sec.format]];
+ const formula=seenRows.filter(([,label,part])=>label||part).map(([title,label,part])=>`<div class="seen">${part?.evidence?.[0]?`<img src="${esc(imageFor(part.evidence[0]))}" alt="" onerror="this.hidden=true">`:''}<div><span class="cmp-label">${title}</span><p>${esc(label||part?.text||'')}</p></div></div>`).join('');
  const check=feedback?`<p class="hint">${feedback==='yes'?'Thanks. The ideas will follow this.':'Noted. Tell Claude what is off and it will rebuild the Secret.'}</p>`:`<div class="check-row"><button type="button" class="btn" data-feedback="yes">Yes, that's it</button><button type="button" class="btn btn-ghost" data-feedback="no">Not quite</button></div>`;
  return `${head(sec.headline||`Why @${account} wins`,'What their best reels do more than their weakest ones.')}
 <section class="block"><h2 class="sub-title">Do these</h2><div class="do-grid">${dos||'<p class="hint">No clear difference found.</p>'}</div></section>
