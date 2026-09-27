@@ -12,3 +12,4 @@ test-results/
 *.log
 .DS_Store
 dist/
+render/public/jobs/

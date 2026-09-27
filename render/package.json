@@ -1,0 +1,13 @@
+{
+  "name": "social-scraper-render",
+  "private": true,
+  "description": "Renders finished reels (clips, voiceover, word-timed captions, end card) for Social Scraper with Remotion.",
+  "type": "module",
+  "dependencies": {
+    "@remotion/cli": "4.0.521",
+    "@remotion/google-fonts": "4.0.521",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.521"
+  }
+}
