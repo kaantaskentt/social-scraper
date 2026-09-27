@@ -39,6 +39,7 @@ progress{width:100%;height:8px;accent-color:var(--ink);margin:10px 0 6px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .next-row{display:flex;justify-content:flex-end;padding-top:6px}
 .next-row .btn{padding:12px 22px;font-size:15px}
+.next-row.left{justify-content:flex-start;margin-top:10px}.next-row.left .btn{padding:8px 14px;font-size:14px}
 /* scan */
 .scan-form label{font-weight:600;font-size:14px}
 .scan-row{display:flex;align-items:center;gap:8px;margin:10px 0 8px;flex-wrap:wrap}
@@ -130,6 +131,10 @@ dialog::backdrop{background:rgba(20,18,14,.45)}
 .confirm h2{margin:0;font-size:20px}.confirm p{margin:0;color:var(--muted)}
 .confirm-row{display:flex;justify-content:flex-end;gap:8px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;z-index:20}
+.parts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}.part{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--paper)}
+.beats{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}.beats li{display:grid;grid-template-columns:62px 1fr;gap:8px}.beats p{margin:0}
+.price-kit{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+@media(max-width:600px){.parts{grid-template-columns:1fr}}
 /* Kit: the host, the place, the sound */
 .kit-format h3{font-size:22px;margin:4px 0 6px}
 .switch-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}

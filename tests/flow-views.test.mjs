@@ -57,7 +57,7 @@ test('every answer Jev can give has a plain sentence, and the cards show it',()=
  const html=renderSecret({account:'ken',status:{state:'done',saved},imageFor:img});assert.match(html,/It goes step by step, like a recipe\./);assert.match(html,/The action is already happening in the first second\./);
 });
 
-import {latestRuns,madeIdeas} from '../public/flow-views.mjs';
+import {latestRuns,madeIdeas,renderKitScript} from '../public/flow-views.mjs';
 test('one card per account (the fullest scan); made ideas are marked and show their video instead of a price',()=>{
  assert.deepEqual(latestRuns([{id:'a',creator:'ken',count:20,createdAt:'1'},{id:'b',creator:'ken',count:100,createdAt:'0'},{id:'c',creator:'nude',count:5,createdAt:'2'}]).map(r=>r.id),['b','c']);
  assert.deepEqual([...madeIdeas([{id:'0-celery'},{id:'2-eggs'}])],[0,2]);
@@ -110,4 +110,32 @@ test('kit: once used, it says so and leads on to Make; hands-only kits have no h
  assert.match(used,/In use ✓/);assert.match(used,/data-step="make"[^>]*>Make a reel with this look/);
  const hands=renderKit({account:'ken',status:{state:'done',saved:kitSaved({format:'hands_pov',kit:{...kitSaved().kit,cast:[],hands:'slim hands, grey sleeves'},pictures:[pic('hands','The hands'),pic('place','The place'),pic('scene','A frame from a reel')]}),estimate:{usd:0.3}}});
  assert.doesNotMatch(hands,/kit-character/);assert.match(hands,/The hands<\/h3>/);assert.doesNotMatch(hands,/flagged/);
+});
+
+const kbeat=(from,to,who,does,says='')=>({from,to,who,does,says});
+const kitPlan=(o={})=>({mode:'kit',kitAt:'K1',createdAt:'P1',chosen:0,picked:[{idea:{title:'Revive celery',hook_line:'Floppy?'},scores:{fit:3,ai_ready:3,hook:2}}],rejected:[],
+ script:{hook_title:'Floppy celery?',keyword:'CRISP',caption:'c',parts:[{beats:[kbeat(0,3,'Leo','holds celery','Floppy?'),kbeat(3,10,'Mia','drops it in ice water')]},{beats:[kbeat(0,10,'Mia','smiles','Comment CRISP.')]}]},
+ check:{pass:true,problems:[]},price:{usd:2.08,maxUsd:4.16,parts:2,partSeconds:10},...o});
+const usedKit={approved:true,createdAt:'K1',kit:{cast:[{name:'Leo'},{name:'Mia'}]}};
+
+test('make with a look: the script shows two timed parts, the price is in dollars on the Gemini key',()=>{
+ const html=renderMake({account:'ken',plan:{state:'ready',plan:kitPlan()},make:{reels:[]},kit:usedKit});
+ assert.match(html,/Made from your look: Leo and Mia/);assert.match(html,/Part 1 · 0–10 s/);assert.match(html,/Part 2 · 10–20 s/);assert.match(html,/<b>Mia<\/b> drops it in ice water/);
+ assert.match(html,/13–20 s|10–20 s/);assert.match(html,/data-act="make" data-usd="2.08" data-max="4.16"/);assert.match(html,/Make the reel · \$2\.08/);assert.doesNotMatch(html,/credits/);
+ assert.match(html,/✓ True/);
+});
+
+test('make with a look: an old hands-only plan asks for new ideas; made badges only count this plan\'s reels',()=>{
+ const old=renderMake({account:'ken',plan:{state:'ready',plan:{...kitPlan(),mode:undefined,script:null}},make:{reels:[]},kit:usedKit});
+ assert.match(old,/data-act="ideas"/);assert.match(old,/ideas for your look/);
+ const reels=[{id:'0-revive-limp-celery',url:'/a.mp4'},{id:'0-revive-celery-abc123',idea:0,planAt:'P1',url:'/b.mp4',title:'Revive celery'}];
+ assert.deepEqual([...madeIdeas(reels,kitPlan())],[0]);assert.deepEqual([...madeIdeas([reels[0]],kitPlan())],[]);assert.deepEqual([...madeIdeas([reels[0]],null)],[0]);
+ const done=renderMake({account:'ken',plan:{state:'ready',plan:kitPlan()},make:{reels},kit:usedKit});assert.match(done,/src="\/b\.mp4#t=0\.5"/);
+ const flagged=renderKitScript(kitPlan({check:{pass:false,problems:['Part 2 is risky for AI video','Says something that may not be true']}}));
+ assert.match(flagged,/! True/);assert.match(flagged,/! Easy for AI video/);
+});
+
+test('ready: kit reels show dollars, older reels show credits',()=>{
+ const html=renderReady({reels:[{id:'a',url:'/a.mp4',seconds:22.4,spentUsd:2.07,caption:'x'},{id:'b',url:'/b.mp4',seconds:30,spent:76,caption:'y'}]});
+ assert.match(html,/22 s · \$2\.07/);assert.match(html,/30 s · 76 credits/);
 });

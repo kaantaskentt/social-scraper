@@ -42,3 +42,10 @@ After each step is built: run it in the browser, compare with this file, and wri
   for word, native sound, 10 s for $1.03; flaw: tripod in view (prompt fixed). Higgsfield credits are out; Gemini covers
   pictures and video. 281 tests pass. Next: make reels from the kit with Omni (ideas and script per format, clips,
   captions, render).
+- 02:05 Reels from the kit, end to end in the browser on Ken: New hosts (Felix and Stella, $0.57) → Use this look →
+  ideas (Jev rejected 5 of 6 "real vs fake food" myths; ideas now must state why they are true; next batch: egg float,
+  saffron, yeast, baking powder) → script passed all checks first try → Make ($2.15) → Omni part 1 + extension part 2,
+  each checked (brief, same hosts, no text or logos, no gear) → captions from the real audio → 22.5 s reel, AI
+  disclosed in the caption. Price was quoted $2.08 but part 2 costs more (it re-reads part 1): now priced from the
+  measured cost ($2.17). Safe job runner: Google job id saved before waiting, resumed after a restart, never paid twice.
+  297 tests pass.

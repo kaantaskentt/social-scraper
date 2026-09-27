@@ -46,7 +46,7 @@ function render(){
  if(S.step==='winners')html=renderWinners({account,...winners()});
  if(S.step==='secret')html=renderSecret({account,status:S.secret,imageFor,feedback:S.feedback});
  if(S.step==='kit')html=renderKit({account,status:S.kit,busy:S.busy,error:S.error});
- if(S.step==='make')html=renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing});
+ if(S.step==='make')html=renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing,kit:S.kit?.saved});
  if(S.step==='ready')html=renderReady({reels:S.make?.reels||[]});
  $('#view').innerHTML=html;
 }
@@ -80,8 +80,12 @@ async function refresh(){
 async function act(fn){if(S.busy)return;S.busy=true;S.error='';render();try{await fn();}catch(e){S.error=e.message;toast(e.message);}finally{S.busy=false;render();poll();}}
 // The Make step needs a current price and the balance; both are free to check.
 async function prepareMake(){
+ // With a look in use, reels are made on the Gemini key: no Higgsfield balance, and an old hands-only plan is not re-priced.
+ const p=S.plan?.plan;if(p?.mode==='kit'||S.kit?.saved?.approved){if(p?.mode==='kit'&&p.script&&!Number.isFinite(p.price?.usd)&&!S.pricing)await reprice();return;}
  if(S.balance===null)loadBalance();
- const p=S.plan?.plan;if(!p?.script||(p.price&&p.price.kit!==undefined)||S.pricing)return;
+ if(!p?.script||(p.price&&p.price.kit!==undefined)||S.pricing)return;await reprice();
+}
+async function reprice(){
  S.pricing=true;render();try{S.plan=await api(`/api/runs/${encodeURIComponent(S.runId)}/reel-plan/price`,{confirm:true});}catch(e){S.error=e.message;}finally{S.pricing=false;render();}
 }
 async function loadBalance(){try{S.balance=(await api('/api/higgsfield/balance')).credits;}catch(e){S.balance=null;S.error=e.message;}render();}
@@ -106,8 +110,8 @@ document.addEventListener('click',async e=>{
  if(a==='secret-build')act(async()=>{S.secret={...(await api(`${base}/secret`,{confirm:true})),plan:S.secret?.plan};});
  if(a==='ideas')act(async()=>{S.plan=await api(`${base}/reel-plan/ideas`,{confirm:true});});
  if(a==='make'){
-  const credits=Number(t.dataset.credits),max=Number(t.dataset.max);
-  $('#confirm-text').textContent=`This spends ${credits} Higgsfield credits (up to ${max} if shots need their one retry). You have ${S.balance??'?'} credits. Each shot is checked before the next one is paid for.`;
+  const usd=t.dataset.usd!==undefined,credits=Number(usd?t.dataset.usd:t.dataset.credits),max=Number(t.dataset.max);
+  $('#confirm-text').textContent=usd?`This spends about $${credits.toFixed(2)} on your Gemini key (up to $${max.toFixed(2)} if a part needs its one retry). Each part is checked before the next one is paid for.`:`This spends ${credits} Higgsfield credits (up to ${max} if shots need their one retry). You have ${S.balance??'?'} credits. Each shot is checked before the next one is paid for.`;
   $('#confirm').returnValue='';$('#confirm').showModal();
   $('#confirm').addEventListener('close',()=>{if($('#confirm').returnValue!=='ok')return;act(async()=>{S.make={...(await api(`${base}/reel-make`,{confirm:true,mode:S.mode,confirmCredits:credits})),reels:S.make?.reels||[]};});},{once:true});
  }
