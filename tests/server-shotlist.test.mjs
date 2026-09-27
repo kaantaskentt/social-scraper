@@ -1,0 +1,29 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {spawn,execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+const exec=promisify(execFile);
+test('server: shot list opens from a saved video, frames are served, lines need the lab token and are kept',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'cl-srv-s-'));const port=5400+Math.floor(Math.random()*400);
+ await mkdir(join(root,'runs'),{recursive:true});await mkdir(join(root,'videos','run1'),{recursive:true});
+ await exec('ffmpeg',['-v','error','-y','-f','lavfi','-i','color=c=red:s=90x160:d=1','-f','lavfi','-i','color=c=blue:s=90x160:d=1','-filter_complex','[0][1]concat=n=2:v=1:a=0','-pix_fmt','yuv420p',join(root,'videos','run1','a.mp4')]);
+ const run={id:'run1',creator:'tester',status:'complete',createdAt:'2026-09-25T00:00:00Z',posts:[{id:'a',url:'https://www.instagram.com/reel/a/',publishedAt:'2026-09-01T00:00:00Z',plays:1000,caption:'',videoUrl:'',analysis:{anatomy:[{start:0,end:0.9,text:'Stop doing this.',value:'hook'}]}}],events:[]};
+ await writeFile(join(root,'runs','run1.json'),JSON.stringify(run));
+ const child=spawn(process.execPath,['server.mjs'],{cwd:new URL('..',import.meta.url),env:{PATH:process.env.PATH,PORT:String(port),LAB_DATA_DIR:root},stdio:['ignore','pipe','pipe']});
+ try{await new Promise((ok,fail)=>{child.stdout.on('data',d=>String(d).includes('ready')&&ok());child.on('exit',c=>fail(new Error('server exited '+c)));setTimeout(()=>fail(new Error('timeout')),8000);});
+  const base=`http://127.0.0.1:${port}`;
+  const list=await (await fetch(`${base}/api/runs/run1/shotlist/a`)).json();
+  assert.equal(list.pace.shots,2);assert.equal(list.parts[0].role,'hook');assert.equal(list.parts[0].said,'Stop doing this.');
+  const frame=await fetch(`${base}${list.frames[1]}`);assert.equal(frame.status,200);assert.equal(frame.headers.get('content-type'),'image/jpeg');
+  assert.equal((await fetch(`${base}/shotlists/run1/a/shot-9.jpg`)).status,404);assert.equal((await fetch(`${base}/shotlists/run1/..%2Fx/shot-0.jpg`)).status,404);
+  const post=(token,lines)=>fetch(`${base}/api/runs/run1/shotlist/a/lines`,{method:'POST',headers:{'X-Lab-Token':token,'Content-Type':'application/json'},body:JSON.stringify({lines})});
+  assert.equal((await post('wrong',['x'])).status,403);
+  const {token}=await (await fetch(`${base}/api/bootstrap`)).json();
+  assert.equal((await post(token,['My hook'])).status,200);
+  assert.deepEqual((await (await fetch(`${base}/api/runs/run1/shotlist/a`)).json()).lines,['My hook']);
+  assert.equal((await fetch(`${base}/api/runs/nope/shotlist/a`)).status,404);
+ }finally{child.kill();await rm(root,{recursive:true,force:true});}
+});

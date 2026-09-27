@@ -3,7 +3,9 @@ import {renderMoneyView,renderMoneyInspector} from './money-view.mjs';
 import {segmentAt,partRow,barPart} from './anatomy-view.mjs';
 import {parseHandles} from './handles.mjs';
 import {renderReplicatePanel} from './replicate-view.mjs';
-import {pickWinners,renderPicks,renderJobs} from './studio-view.mjs';
+import {pickWinners,renderPicks,renderJobs,renderModeSwitch,renderShotList,renderShotSide} from './studio-view.mjs';
+import {shotListText} from './shotlist-text.mjs';
+import {createLineStore} from './shot-lines.mjs';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const openingLine=p=>{const text=p.analysis?.opening||p.transcript?.text||'';const sentence=text.match(/^.*?[.!?](?:\s|$)/s)?.[0]?.trim();return sentence||((text.length>180?text.slice(0,177)+'…':text));};
@@ -262,7 +264,38 @@ function renderStudio(){if(currentView!=='studio')return;const real=job&&!job.sy
  paint($('#studio-picks'),real?renderPicks(winners,selected,{loading:!money?.report&&(money?.loading||money?.inFlight),error:money?.report?'':money?.error}):'<p class="studio-empty">Pick a real account under Your research to start.</p>');
  const p=job?.posts.find(x=>x.id===selected),src=real&&videoSource(p);
  if($('#studio-reel').dataset.post!==`${job?.id}/${selected}/${src}`){$('#studio-reel').dataset.post=`${job?.id}/${selected}/${src}`;$('#studio-reel').innerHTML=src?`<video src="${escape(src)}" poster="${escape(imageURL(p))}" controls playsinline preload="metadata"></video>`:'';}
- renderReplicate();if(!studioTimer||studioFor!==job?.id)loadStudioJobs();}
+ const film=studioMode==='film';paint($('#studio-mode'),real&&p?renderModeSwitch(studioMode):'');
+ $('#studio-form').hidden=film;$('#studio-film-side').hidden=!film||!real;$('#studio-film').hidden=!film||!real||!p;$('#studio-tray').hidden=film;
+ renderReplicate();if(film&&real&&p)loadShotList();if(!studioTimer||studioFor!==job?.id)loadStudioJobs();}
+// Film it yourself: the shot list for the picked winner. Built by the server on first open, then read from disk.
+const MODE_KEY='socialScraper.studioMode';let studioMode=(()=>{try{return localStorage.getItem(MODE_KEY)==='ai'?'ai':'film';}catch{return 'film';}})();
+const shot={key:'',gen:0,list:null,loading:false,error:'',timer:null};
+// Saves go through the line store: in order per reel, and what you typed this session beats a slower server copy.
+const lineStore=createLineStore({post:async(key,lines,{keepalive})=>{const [runId,postId]=key.split('/');
+ const r=await fetch(`/api/runs/${encodeURIComponent(runId)}/shotlist/${encodeURIComponent(postId)}/lines`,{method:'POST',keepalive,headers:{'Content-Type':'application/json','X-Lab-Token':boot.token},body:JSON.stringify({lines})});
+ if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||`Request failed (${r.status})`);}});
+function paintShots(){paint($('#studio-shotlist'),renderShotList(shot.list,{loading:shot.loading,error:shot.error}));paint($('#studio-film-side'),renderShotSide(shot.list));}
+async function loadShotList(){const key=`${job.id}/${selected}`;if(shot.key===key){paintShots();return;}
+ flushLines();const gen=++shot.gen;Object.assign(shot,{key,list:null,loading:true,error:''});paintShots();
+ try{const list=await api(`/api/runs/${encodeURIComponent(job.id)}/shotlist/${encodeURIComponent(selected)}`);if(shot.gen!==gen)return;list.lines=lineStore.merge(key,list.lines);shot.list=list;}
+ catch(e){if(shot.gen===gen)shot.error=`Could not make the shot list: ${e.message}`;}
+ finally{if(shot.gen===gen){shot.loading=false;paintShots();}}}
+function savedNote(text){const el=$('#studio-film-side .shot-saved');if(el)el.textContent=text;}
+function saveLinesNow({keepalive=false}={}){clearTimeout(shot.timer);shot.timer=null;if(!shot.list)return;const key=shot.key,gen=shot.gen;
+ savedNote('Saving…');lineStore.save(key,{keepalive}).then(()=>{if(shot.gen===gen)savedNote('Saved');},e=>{if(shot.gen===gen)savedNote(`Not saved: ${e.message}`);});}
+function flushLines(options){if(shot.timer)saveLinesNow(options);}
+$('#studio-shotlist').addEventListener('input',e=>{const i=e.target.dataset.shotLine;if(i===undefined||!shot.list)return;shot.list.lines[+i]=e.target.value;lineStore.edit(shot.key,shot.list.lines);
+ const copy=$(`#studio-shotlist [data-shot-print="${i}"]`);if(copy)copy.textContent=e.target.value;
+ $('#studio-shotlist').dataset.painted=renderShotList(shot.list); // typing is already on screen: never repaint over it
+ savedNote('Typing…');clearTimeout(shot.timer);shot.timer=setTimeout(saveLinesNow,700);});
+$('#studio-shotlist').addEventListener('click',e=>{if(e.target.closest('[data-shot="retry"]')){shot.key='';loadShotList();}});
+$('#studio-shotlist').addEventListener('focusout',e=>{if(e.target.dataset.shotLine!==undefined)flushLines();});
+$('#studio-film-side').addEventListener('click',async e=>{const b=e.target.closest('[data-shot]');if(!b||!shot.list)return;
+ if(b.dataset.shot==='copy'){try{await navigator.clipboard.writeText(shotListText(shot.list,shot.list.lines));savedNote('Copied. Paste it into Notes on your phone.');}catch{toast('Could not copy. Use Print / save PDF instead.');}}
+ if(b.dataset.shot==='print'){flushLines();document.body.classList.add('printing-shots');window.print();}});
+addEventListener('afterprint',()=>document.body.classList.remove('printing-shots'));
+addEventListener('pagehide',()=>flushLines({keepalive:true}));
+$('#studio-mode').addEventListener('click',e=>{const b=e.target.closest('[data-studio-mode]');if(!b||b.dataset.studioMode===studioMode)return;studioMode=b.dataset.studioMode;try{localStorage.setItem(MODE_KEY,studioMode);}catch{}renderStudio();});
 let studioFor=null;async function loadStudioJobs(){clearTimeout(studioTimer);studioTimer=null;studioFor=job?.id;if(currentView!=='studio'||!job||job.synthetic||job.id==='demo'){$('#studio-jobs').innerHTML=renderJobs([],()=>'');return;}const id=job.id;
  try{const list=await api(`/api/replicas?runId=${encodeURIComponent(id)}`);if(job.id!==id||currentView!=='studio')return;paint($('#studio-jobs'),renderJobs(list,postId=>{const p=job.posts.find(x=>x.id===postId);return p?imageURL(p):'';}));
   if(list.some(r=>['submitting','generating','finishing'].includes(r.status)))studioTimer=setTimeout(loadStudioJobs,10000);}

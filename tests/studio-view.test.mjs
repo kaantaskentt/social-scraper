@@ -32,3 +32,23 @@ test('picks: loading and error say what is happening instead of "no winners"; br
  assert.doesNotMatch(renderJobs([{id:'1',postId:'x',status:'generating'}],()=>''),/src=""/);
  assert.match(renderJobs([{id:'1',postId:'x',status:'uncertain',jobId:'job-9',error:'Lost'}],()=>''),/job-9[\s\S]*data-dismiss-rep="1"/);
 });
+
+import {renderShotList,renderModeSwitch,renderShotSide} from '../public/studio-view.mjs';
+const list={account:'ken.remedie',duration:16.2,pace:{shots:4,cuts:3,secondsPerShot:4},frames:['/f0.jpg','/f1.jpg','/f2.jpg','/f3.jpg'],
+ parts:[{role:'hook',start:0,end:3.9,said:'Your socks <b>',tip:'First 2 seconds.',shots:[0,1]},{role:'cta',start:14,end:16,said:'',tip:'Ask for one action only.',shots:[3]},{role:'visual',start:0,end:1,said:'',tip:'Copy the shot.',shots:[]}],
+ lines:['My hook "quoted"','','']};
+test('shot list: summary, numbered parts with frames, what they said (escaped), tip, and an editable line per part',()=>{
+ const html=renderShotList(list),side=renderShotSide(list);
+ assert.match(side,/Copy it to your phone and film/);assert.match(side,/16 s<\/strong> · 4 shots · a new shot every 4 s · 3 parts/);assert.match(side,/data-shot="copy"/);assert.match(side,/data-shot="print"/);assert.equal(renderShotSide(null),'');assert.match(renderShotSide({...list,unplaced:['old <i>line</i>']}),/earlier version[\s\S]*old &lt;i&gt;line/);
+ assert.equal((html.match(/data-shot-line="/g)||[]).length,3);
+ assert.match(html,/Hook<\/strong>/);assert.match(html,/Call to action<\/strong>/);assert.match(html,/0–4 s/);
+ assert.match(html,/src="\/f0\.jpg"[\s\S]*src="\/f1\.jpg"/);assert.match(html,/Your socks &lt;b&gt;/);assert.doesNotMatch(html,/<b>/);
+ assert.match(html,/>My hook &quot;quoted&quot;<\/textarea>/);
+ assert.match(html,/data-shot-print="0">My hook &quot;quoted&quot;</);assert.match(html,/Shot list · @ken\.remedie · 16 s · 3 parts/);
+ assert.match(renderShotList(null,{loading:true}),/Cutting the reel/);assert.match(renderShotList(null,{error:'no <video>'}),/no &lt;video&gt;[\s\S]*data-shot="retry"/);
+});
+test('mode switch: free filming first, AI recreation second, the current one pressed',()=>{
+ const html=renderModeSwitch('film');
+ assert.match(html,/data-studio-mode="film"[^>]*aria-pressed="true"[^>]*>[\s\S]*Film it yourself/);assert.match(html,/data-studio-mode="ai"[^>]*aria-pressed="false"/);
+ assert.ok(html.indexOf('film')<html.indexOf('"ai"'));
+});

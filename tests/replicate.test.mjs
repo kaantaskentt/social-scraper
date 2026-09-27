@@ -146,7 +146,8 @@ test('odd status answers never crash the app; a job we lose touch with becomes "
   const run=async args=>{if(args[1]==='cost')return '{"credits":84}';if(args[1]==='create')return '["job-3"]';return answer;};
   const {root,r,input}=await setup({run});
   try{r.maxPollFailures=3;const rep=await r.start({...input,confirmCredits:84});const x=await settle(r,rep.id);
-   assert.equal(x.status,'uncertain',answer);assert.match(x.error,/job-3/);
+   assert.equal(x.status,'uncertain',`${answer}: ${JSON.stringify(x)}`);assert.match(x.error,/job-3/,JSON.stringify(x));
+   await r.saved(rep.id); // let the last write land before the folder is removed
   }finally{await rm(root,{recursive:true,force:true});}
  }
 });
