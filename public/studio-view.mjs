@@ -30,10 +30,10 @@ export function renderJobs(jobs,imageFor){
 <p class="studio-job-status">${escape(STATUS[j.status]||j.status)}${j.credits?` · ${escape(j.credits)} cr`:''}</p>${j.error?`<p class="replica-error">${escape(j.error)}</p>`:''}${j.status==='uncertain'?`${j.jobId?`<p class="studio-empty">Higgsfield job: ${escape(j.jobId)}</p>`:''}<button type="button" class="quiet" data-dismiss-rep="${escape(j.id)}">I checked Higgsfield</button>`:''}${j.status==='done'&&j.video?`<a class="quiet" href="${escape(j.video)}" download>Download ↓</a>`:''}</article>`).join('')}</div>`;
 }
 
-// Step 2 has two ways to make your version: film it yourself from a shot list (free), or recreate it with AI (credits).
+// The original reel uses the whole channel; the other modes use a picked winner.
 export function renderModeSwitch(mode){
  const b=(id,title,note)=>`<button type="button" class="studio-mode" data-studio-mode="${id}" aria-pressed="${mode===id}"><strong>${title}</strong><span>${note}</span></button>`;
- return `<div class="studio-modes" role="group" aria-label="How to make your version">${b('film','Film it yourself','Free · a shot list for your phone')}${b('ai','Recreate with AI','Uses Higgsfield credits')}</div>`;
+ return `<div class="studio-modes" role="group" aria-label="How to make your version">${b('film','Film it yourself','Free · a shot list for your phone')}${b('ai','Recreate with AI','Uses Higgsfield credits')}${b('new','New faceless reel',"An original reel in this channel's style · AI makes it")}</div>`;
 }
 
 const ROLE={hook:'Hook',setup:'Setup',problem:'Problem',example:'Example',advice:'Advice',payoff:'Payoff',cta:'Call to action',other:'Other',unclear:'Other',visual:'Scene'};

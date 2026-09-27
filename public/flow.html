@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Social Scraper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/flow.css">
+</head>
+<body>
+<header class="top"><a class="brand" href="/"><span class="brand-mark"></span>Social Scraper</a><span class="acct-now" id="acct-now"></span><a class="top-link" href="/lab">Research view</a></header>
+<div id="stepper"></div>
+<main id="view" class="view" aria-live="polite"></main>
+<dialog id="player" class="player"><button type="button" class="x" data-close aria-label="Close">×</button><video controls playsinline></video></dialog>
+<dialog id="confirm" class="confirm"><form method="dialog"><h2>Make this reel?</h2><p id="confirm-text"></p><div class="confirm-row"><button value="cancel" class="btn">Cancel</button><button value="ok" class="btn btn-primary" id="confirm-ok">Make it</button></div></form></dialog>
+<div id="toast" class="toast" hidden></div>
+<script type="module" src="/flow.js"></script>
+</body>
+</html>

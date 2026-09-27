@@ -7,6 +7,7 @@ import {pickWinners,renderPicks,renderJobs,renderModeSwitch,renderShotList,rende
 import {shotListText} from './shotlist-text.mjs';
 import {createLineStore} from './shot-lines.mjs';
 import {renderSecret} from './secret-view.mjs';
+import {renderReelPlan} from './reel-plan-view.mjs';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const openingLine=p=>{const text=p.analysis?.opening||p.transcript?.text||'';const sentence=text.match(/^.*?[.!?](?:\s|$)/s)?.[0]?.trim();return sentence||((text.length>180?text.slice(0,177)+'…':text));};
@@ -187,7 +188,7 @@ async function fetchMoney(state){
 function setView(view){
  stopReplay();currentView=view;const money=view==='money',studio=view==='studio',explorer=view==='explorer',secret=view==='secret';
  $('#explorer-controls').hidden=!explorer;$('#explorer-canvas').hidden=!explorer;$('#findings').hidden=!explorer;$('#money-view').hidden=!money;$('#studio-view').hidden=!studio;$('#secret-view').hidden=!secret;$('.inspector').hidden=studio||secret;$('.explorer').classList.toggle('money-active',money);$('.explorer').classList.toggle('studio-active',studio||secret);if(secret)loadSecret();else{clearTimeout(secretState.timer);secretState.timer=null;}
- if(studio)renderStudio();else{clearTimeout(studioTimer);studioTimer=null;}
+ if(studio)renderStudio();else{clearTimeout(studioTimer);studioTimer=null;stopReelPlan();}
  for(const [id,active]of [['explorer-view-button',explorer],['money-view-button',money],['secret-view-button',secret],['studio-view-button',studio]]){$('#'+id).classList.toggle('active',active);$('#'+id).setAttribute('aria-pressed',String(active));}
  $('.inspector').classList.toggle('no-matches',!money&&!visible.length);$('#inspector-empty').hidden=money||visible.length>0;layout();
 }
@@ -279,16 +280,41 @@ panel.addEventListener('input',e=>{if(e.target.dataset.replicate!=='text')return
 let studioTimer=null;
 function renderStudio(){if(currentView!=='studio')return;const real=job&&!job.synthetic&&job.id!=='demo';
  const winners=real?pickWinners(job.posts,moneyState?.runId===job.id?moneyState.report?.results:null,{hasVideo:p=>Boolean(videoSource(p))}).map(w=>({...w,image:imageURL(job.posts.find(p=>p.id===w.id))})):[];
- if(real&&winners.length&&!winners.some(w=>w.id===selected)){selectPost(winners[0].id);}
+ if(studioMode!=='new'&&real&&winners.length&&!winners.some(w=>w.id===selected)){selectPost(winners[0].id);}
  const money=moneyState?.runId===job?.id?moneyState:null;
  paint($('#studio-picks'),real?renderPicks(winners,selected,{loading:!money?.report&&(money?.loading||money?.inFlight),error:money?.report?'':money?.error}):'<p class="studio-empty">Pick a real account under Your research to start.</p>');
  const p=job?.posts.find(x=>x.id===selected),src=real&&videoSource(p);
  if($('#studio-reel').dataset.post!==`${job?.id}/${selected}/${src}`){$('#studio-reel').dataset.post=`${job?.id}/${selected}/${src}`;$('#studio-reel').innerHTML=src?`<video src="${escape(src)}" poster="${escape(imageURL(p))}" controls playsinline preload="metadata"></video>`:'';}
- const film=studioMode==='film';paint($('#studio-mode'),real&&p?renderModeSwitch(studioMode):'');
- $('#studio-form').hidden=film;$('#studio-film-side').hidden=!film||!real;$('#studio-film').hidden=!film||!real||!p;$('#studio-tray').hidden=film;
- renderReplicate();if(film&&real&&p)loadShotList();if(!studioTimer||studioFor!==job?.id)loadStudioJobs();}
+ const film=studioMode==='film',fresh=studioMode==='new';paint($('#studio-mode'),real?renderModeSwitch(studioMode):'');
+ $('#studio-view').classList.toggle('studio-planning',fresh&&real);$('#studio-winners').hidden=fresh&&real;$('#studio-reel').hidden=fresh;
+ $('#studio-form').hidden=film||fresh;$('#studio-film-side').hidden=!film||!real||!p;$('#studio-film').hidden=!film||!real||!p;$('#studio-tray').hidden=film||fresh;$('#studio-new').hidden=!fresh||!real;
+ if(fresh&&real){$('#studio-reel video')?.pause();openReelPlan();}else stopReelPlan();
+ renderReplicate();if(film&&real&&p)loadShotList();if(!fresh&&(!studioTimer||studioFor!==job?.id))loadStudioJobs();else if(fresh){clearTimeout(studioTimer);studioTimer=null;}}
+const reelPlans=new Map();let planState=null;
+const planActive=s=>s===planState&&currentView==='studio'&&studioMode==='new'&&job?.id===s.runId;
+function stopReelPlan(){if(planState){clearTimeout(planState.timer);planState.timer=null;planState.gen++;planState.loading=false;planState=null;}}
+function openReelPlan(){if(planState?.runId!==job.id){stopReelPlan();if(!reelPlans.has(job.id))reelPlans.set(job.id,{runId:job.id,status:null,timer:null,gen:0,busy:false,loading:false,error:'',lastAction:null,quality:'standard'});planState=reelPlans.get(job.id);if(!planState.busy)loadReelPlan(planState);}paintReelPlan();}
+function paintReelPlan(){if(planState&&planActive(planState))paint($('#studio-new'),renderReelPlan(planState.status,{...planState,account:job.creator}));}
+async function loadReelPlan(s){if(!planActive(s)||s.busy||s.loading)return;clearTimeout(s.timer);s.timer=null;const gen=++s.gen;s.loading=true;s.error='';paintReelPlan();
+ try{const status=await api(`/api/runs/${encodeURIComponent(s.runId)}/reel-plan`);if(!planActive(s)||s.gen!==gen)return;s.status=status;
+  if(status.state==='failed'&&!s.lastAction&&/ideas/i.test(status.stage||''))s.lastAction={action:'ideas'};
+  if(status.state==='working')s.timer=setTimeout(()=>loadReelPlan(s),2000);}
+ catch(e){if(planActive(s)&&s.gen===gen)s.error=e.message;}
+ finally{if(planActive(s)&&s.gen===gen){s.loading=false;paintReelPlan();}}}
+$('#studio-new').addEventListener('change',e=>{const quality=e.target.dataset.planQuality;if(planState&&['standard','fast'].includes(quality)){planState.quality=quality;paintReelPlan();}});
+$('#studio-new').addEventListener('click',async e=>{const b=e.target.closest('[data-plan],[data-plan-pick]'),s=planState;if(!b||b.disabled||!s||!planActive(s))return;
+ if(b.dataset.plan==='secret'){$('#secret-view-button').click();return;}
+ if(s.busy||s.loading)return;
+ if(b.dataset.plan==='refresh'){loadReelPlan(s);return;}
+ if(s.status?.state==='working'||s.error)return;
+ const pick=b.dataset.planPick,action=pick!==undefined?{action:'script',index:Number(pick)}:b.dataset.plan==='ideas'?{action:'ideas'}:b.dataset.plan==='retry'?s.lastAction:null;
+ if(!action||action.action==='script'&&(!Number.isInteger(action.index)||!s.status?.plan?.picked?.[action.index]))return;
+ s.lastAction=action;s.busy=true;s.error='';s.gen++;clearTimeout(s.timer);s.timer=null;paintReelPlan();
+ try{const status=await api(`/api/runs/${encodeURIComponent(s.runId)}/reel-plan/${action.action}`,{confirm:true,...(action.action==='script'?{index:action.index}:{})});s.status={...status,plan:s.status?.plan||null};}
+ catch(e){s.status={...s.status,state:'failed',error:e.message};if(planActive(s))toast(e.message);}
+ finally{s.busy=false;if(planActive(s)){paintReelPlan();if(s.status?.state==='working')s.timer=setTimeout(()=>loadReelPlan(s),2000);}}});
 // Film it yourself: the shot list for the picked winner. Built by the server on first open, then read from disk.
-const MODE_KEY='socialScraper.studioMode';let studioMode=(()=>{try{return localStorage.getItem(MODE_KEY)==='ai'?'ai':'film';}catch{return 'film';}})();
+const MODE_KEY='socialScraper.studioMode';let studioMode=(()=>{try{const mode=localStorage.getItem(MODE_KEY);return ['ai','new'].includes(mode)?mode:'film';}catch{return 'film';}})();
 const shot={key:'',gen:0,list:null,loading:false,error:'',timer:null};
 // Saves go through the line store: in order per reel, and what you typed this session beats a slower server copy.
 const lineStore=createLineStore({post:async(key,lines,{keepalive})=>{const [runId,postId]=key.split('/');
@@ -316,8 +342,8 @@ $('#studio-film-side').addEventListener('click',async e=>{const b=e.target.close
 addEventListener('afterprint',()=>document.body.classList.remove('printing-shots'));
 addEventListener('pagehide',()=>flushLines({keepalive:true}));
 $('#studio-mode').addEventListener('click',e=>{const b=e.target.closest('[data-studio-mode]');if(!b||b.dataset.studioMode===studioMode)return;studioMode=b.dataset.studioMode;try{localStorage.setItem(MODE_KEY,studioMode);}catch{}renderStudio();});
-let studioFor=null;async function loadStudioJobs(){clearTimeout(studioTimer);studioTimer=null;studioFor=job?.id;if(currentView!=='studio'||!job||job.synthetic||job.id==='demo'){$('#studio-jobs').innerHTML=renderJobs([],()=>'');return;}const id=job.id;
- try{const list=await api(`/api/replicas?runId=${encodeURIComponent(id)}`);if(job.id!==id||currentView!=='studio')return;paint($('#studio-jobs'),renderJobs(list,postId=>{const p=job.posts.find(x=>x.id===postId);return p?imageURL(p):'';}));
+let studioFor=null;async function loadStudioJobs(){clearTimeout(studioTimer);studioTimer=null;studioFor=job?.id;if(currentView!=='studio'||studioMode==='new'||!job||job.synthetic||job.id==='demo'){$('#studio-jobs').innerHTML=renderJobs([],()=>'');return;}const id=job.id;
+ try{const list=await api(`/api/replicas?runId=${encodeURIComponent(id)}`);if(job.id!==id||currentView!=='studio'||studioMode==='new')return;paint($('#studio-jobs'),renderJobs(list,postId=>{const p=job.posts.find(x=>x.id===postId);return p?imageURL(p):'';}));
   if(list.some(r=>['submitting','generating','finishing'].includes(r.status)))studioTimer=setTimeout(loadStudioJobs,10000);}
  catch(e){$('#studio-jobs').innerHTML=`<p class="replica-error">${escape(e.message)}</p>`;}}
 $('#studio-picks').addEventListener('click',e=>{const b=e.target.closest('[data-studio-pick]');if(!b)return;selectPost(b.dataset.studioPick);renderStudio();});

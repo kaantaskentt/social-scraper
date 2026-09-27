@@ -98,3 +98,11 @@ test('money spent on an answer that failed is still recorded',async()=>{
   const ledger=JSON.parse(await readFile(join(root,'secret','run1','spend.json'),'utf8'));assert.ok(ledger.some(x=>x.usd===0.004&&x.step==='watch'));
  }finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('"did we get it right?" is stored with the Secret and only yes or no is accepted',async()=>{
+ const {root,b,job,results}=await setup();
+ try{await assert.rejects(b.feedback(job,'yes'),/Build the Secret first/);await b.start(job,results);await done(b,'run1');
+  assert.deepEqual(await b.feedback(job,'no'),{feedback:'no'});assert.equal(JSON.parse(await readFile(join(root,'secret','run1','secret.json'),'utf8')).feedback,'no');
+  await assert.rejects(b.feedback(job,'maybe'),/yes or no/);
+ }finally{await rm(root,{recursive:true,force:true});}
+});

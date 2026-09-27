@@ -49,3 +49,11 @@ test('refuses clearly: no Secret yet, no ideas yet, a pick that does not exist, 
   await assert.rejects(new ReelPlanner(root,()=>({jev:'j'})).startIdeas(job),/Gemini key/);
  }finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('the price is checked again for free, so the page never shows a price the maker would refuse',async()=>{
+ const {root,p}=await setup();
+ try{await p.startIdeas(job);await settle(p,'run1');await p.startScript(job,0);await settle(p,'run1');
+  let n=0;p.price=async()=>({total:61+(++n),fastTotal:61});const st=await p.reprice(job);assert.equal(st.plan.price.total,62);assert.ok(st.plan.pricedAt);
+  await rm(join(root,'channels','run1','plan.json'));await assert.rejects(p.reprice(job),/Write the script first/);
+ }finally{await rm(root,{recursive:true,force:true});}
+});

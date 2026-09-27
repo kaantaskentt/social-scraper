@@ -17,6 +17,7 @@ import {handleShotlist} from './lib/shotlist.mjs';
 import {SecretBuilder} from './lib/secret-run.mjs';
 import {ReelPlanner} from './lib/reel-plan-run.mjs';
 import {ReelMaker} from './lib/reel-make.mjs';
+import {higgsfieldBalance} from './lib/higgsfield-balance.mjs';
 import {score,LATEST} from './public/money/index.mjs';
 const ROOT=dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||5190),HOST='127.0.0.1';
@@ -53,16 +54,17 @@ const server=http.createServer(async(req,res)=>{
   if(path==='/api/connections'&&req.method==='POST'){const data=await body(req);for(const name of ['apify','groq','fireworks','jev','gemini'])if(typeof data[name]==='string'&&data[name].trim()){sessionKeys[name]=data[name].trim();verified[name]=false;}json(res,200,{saved:true});return;}
   if(path==='/api/connections/check'&&req.method==='POST'){const results=Object.fromEntries(await Promise.all(Object.entries(keys()).map(async([name,key])=>[name,await checkProvider(name,key)])));for(const [name,r]of Object.entries(results))verified[name]=r.verified;json(res,200,results);return;}
   if(path==='/api/events'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache',Connection:'keep-alive'});res.write(': connected\n\n');clients.add(res);req.on('close',()=>clients.delete(res));return;}
+  if(path==='/api/higgsfield/balance'){json(res,200,await higgsfieldBalance());return;}
   if(path==='/api/demo'){json(res,200,demo());return;}
   if(path==='/api/runs'&&req.method==='POST'){const data=await body(req);const job=await pipeline.create(data,data.rows);json(res,201,publicJob(job));return;}
   if(await handleReplicate({req,res,path,url,root:pipeline.root,jobs:pipeline.jobs,replicator,json,body}))return;
   if(await handleShotlist({req,res,path,root:pipeline.root,jobs:pipeline.jobs,json,body,streamFile}))return;
   // Make one original reel: GET the plan; POST ideas or a script (Gemini and Jev, a few cents; no video is made here).
-  const plan=path.match(/^\/api\/runs\/([\w-]+)\/reel-plan(?:\/(ideas|script))?$/);
+  const plan=path.match(/^\/api\/runs\/([\w-]+)\/reel-plan(?:\/(ideas|script|price))?$/);
   if(plan){const job=pipeline.jobs.get(plan[1]);if(!job){json(res,404,{error:'Run not found'});return;}
    if(req.method==='GET'&&!plan[2]){json(res,200,await planner.status(job));return;}
    if(req.method==='POST'&&plan[2]){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm first');
-    json(res,202,plan[2]==='ideas'?await planner.startIdeas(job):await planner.startScript(job,Number(data.index)));return;}
+    json(res,plan[2]==='price'?200:202,plan[2]==='ideas'?await planner.startIdeas(job):plan[2]==='price'?await planner.reprice(job):await planner.startScript(job,Number(data.index)));return;}
    json(res,405,{error:'Method not allowed'});return;}
   // Make the pilot reel (spends Higgsfield credits): POST needs {confirm:true, mode, confirmCredits} matching a fresh price.
   const make=path.match(/^\/api\/runs\/([\w-]+)\/reel-make$/);
@@ -70,16 +72,16 @@ const server=http.createServer(async(req,res)=>{
    if(req.method==='GET'){json(res,200,await maker.status(job));return;}
    if(req.method==='POST'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm the price first');json(res,202,await maker.start(job,{mode:data.mode,confirmCredits:Number(data.confirmCredits)}));return;}
    json(res,405,{error:'Method not allowed'});return;}
-  const made=path.match(/^\/channels\/([\w-]+)\/(reel\.mp4|kit\.png|shot-[\w]+\.mp4)$/);
-  if(made){const file=join(pipeline.root,'channels',made[1],'reel',made[2]);let info;try{info=await stat(file);}catch{res.writeHead(404);res.end();return;}
-   res.writeHead(200,{'Content-Type':made[2].endsWith('.png')?'image/png':'video/mp4','Content-Length':info.size,'Accept-Ranges':'bytes','Cache-Control':'no-cache'});streamFile(res,file);return;}
+  const made=path.match(/^\/channels\/([\w-]+)\/([\w-]+)\/(reel\.mp4|kit\.png|shot-[\w-]+\.mp4)$/);
+  if(made){const file=join(pipeline.root,'channels',made[1],'reels',made[2],made[3]);let info;try{info=await stat(file);}catch{res.writeHead(404);res.end();return;}
+   res.writeHead(200,{'Content-Type':made[3].endsWith('.png')?'image/png':'video/mp4','Content-Length':info.size,'Accept-Ranges':'bytes','Cache-Control':'no-cache'});streamFile(res,file);return;}
   const vids=path.match(/^\/api\/runs\/([\w-]+)\/videos(?:\/(save|delete))?$/);
   if(vids){const job=pipeline.jobs.get(vids[1]);if(!job){json(res,404,{error:'Run not found'});return;}const state=videoJobs.get(job.id);
    if(vids[2]==='save'&&req.method==='POST')startVideoSave(job);
    else if(vids[2]==='delete'&&req.method==='POST'){if(state?.running){json(res,409,{error:'Videos are still being saved. Try again when saving finishes.'});return;}videoJobs.delete(job.id);json(res,200,await deleteVideos(pipeline.root,job));return;}
    else if(vids[2]){json(res,405,{error:'Method not allowed'});return;}
    const now=videoJobs.get(job.id);json(res,200,{...await videoInfo(pipeline.root,job),saving:Boolean(now?.running),progress:now?.progress||null,lastResult:now?.result||null,error:now?.error||null});return;}
-  const match=path.match(/^\/api\/runs\/([\w-]+)(?:\/(run|pause|export|metrics|attach|money|secret))?$/);
+  const match=path.match(/^\/api\/runs\/([\w-]+)(?:\/(run|pause|export|metrics|attach|money|secret|secret-feedback))?$/);
   if(match){const [,id,action]=match;const job=pipeline.jobs.get(id);if(!job){json(res,404,{error:'Run not found'});return;}
    if(action==='run'&&req.method==='POST'){const settings=await body(req);if(settings.concurrency!==undefined){const n=Number(settings.concurrency);if(!Number.isInteger(n)||n<1||n>12)throw new Error('Concurrency must be 1 to 12');job.concurrency=n;}await pipeline.run(id);json(res,200,publicJob(job));return;}
    if(action==='pause'&&req.method==='POST'){await pipeline.pause(id);json(res,200,{paused:true});return;}
@@ -87,6 +89,7 @@ const server=http.createServer(async(req,res)=>{
    if(action==='metrics'){json(res,200,metrics(job.posts,{dimension:url.searchParams.get('dimension')||'mechanism',metric:url.searchParams.get('metric')||'views',minAgeDays:Number(url.searchParams.get('minAgeDays')??7)}));return;}
    if(action==='money'){json(res,200,await moneyReport(job,url.searchParams.get('version'),pipeline.root));return;}
    // Channel Secret: GET shows the saved page, the build in progress, or the estimate; POST starts a paid build.
+   if(action==='secret-feedback'&&req.method==='POST'){const {answer}=await body(req);json(res,200,await secrets.feedback(job,answer));return;}
    if(action==='secret'){const {results}=score(job,LATEST);
     if(req.method==='POST'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm the cost first');json(res,202,await secrets.start(job,results,{rewrite:data.rewrite===true}));return;}
     json(res,200,await secrets.status(job,results));return;}
@@ -99,7 +102,7 @@ const server=http.createServer(async(req,res)=>{
    res.writeHead(200,{'Content-Type':'video/mp4','Accept-Ranges':'bytes','Content-Length':info.size,'Cache-Control':'no-cache'});streamFile(res,file);return;}
   const art=path.match(/^\/demo-art\/(\d+)\.svg$/);if(art){res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'});res.end(artwork(Number(art[1])));return;}
   const thumb=path.match(/^\/media\/([\w-]+)\/([\w-]+)$/);if(thumb){const job=pipeline.jobs.get(thumb[1]),post=job?.posts.find(p=>p.id===thumb[2]);if(!post?.thumbnailUrl){res.writeHead(404);res.end();return;}const file=join(pipeline.root,'media',post.id+'.img');let bytes;try{bytes=await readFile(file);}catch{if(!mediaPending.has(file))mediaPending.set(file,mediaTask(async()=>{const result=await download(post.thumbnailUrl,8*1024*1024);if(!/^image\/(jpeg|png|webp)/.test(result.type))throw new Error('Unsupported thumbnail format');await writeFile(file,result.bytes);return result.bytes;}).finally(()=>mediaPending.delete(file)));bytes=await mediaPending.get(file);}const type=bytes[0]===0x89?'image/png':bytes.toString('ascii',8,12)==='WEBP'?'image/webp':'image/jpeg';res.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=86400'});res.end(bytes);return;}
-  const files={'/record':'record.html','/record.js':'record.js','/record.css':'record.css','/':'index.html','/app.js':'app.js','/research.mjs':'research.mjs','/money-view.mjs':'money-view.mjs','/anatomy-view.mjs':'anatomy-view.mjs','/replicate-view.mjs':'replicate-view.mjs','/studio-view.mjs':'studio-view.mjs','/reel-plan-view.mjs':'reel-plan-view.mjs','/shotlist-text.mjs':'shotlist-text.mjs','/shot-lines.mjs':'shot-lines.mjs','/secret-view.mjs':'secret-view.mjs','/secret-labels.mjs':'secret-labels.mjs','/secret-mechanisms.mjs':'secret-mechanisms.mjs','/handles.mjs':'handles.mjs','/styles.css':'styles.css','/theme.css':'theme.css','/money/index.mjs':'money/index.mjs','/money/1.0.mjs':'money/1.0.mjs'};
+  const files={'/record':'record.html','/record.js':'record.js','/record.css':'record.css','/':'flow.html','/lab':'index.html','/flow.js':'flow.js','/flow.css':'flow.css','/flow-views.mjs':'flow-views.mjs','/app.js':'app.js','/research.mjs':'research.mjs','/money-view.mjs':'money-view.mjs','/anatomy-view.mjs':'anatomy-view.mjs','/replicate-view.mjs':'replicate-view.mjs','/studio-view.mjs':'studio-view.mjs','/reel-plan-view.mjs':'reel-plan-view.mjs','/shotlist-text.mjs':'shotlist-text.mjs','/shot-lines.mjs':'shot-lines.mjs','/secret-view.mjs':'secret-view.mjs','/secret-labels.mjs':'secret-labels.mjs','/secret-mechanisms.mjs':'secret-mechanisms.mjs','/handles.mjs':'handles.mjs','/styles.css':'styles.css','/theme.css':'theme.css','/money/index.mjs':'money/index.mjs','/money/1.0.mjs':'money/1.0.mjs'};
   if(files[path]){const file=join(ROOT,'public',files[path]);const content=await readFile(file);res.writeHead(200,{'Content-Type':path.endsWith('.css')?'text/css':path.endsWith('.js')||path.endsWith('.mjs')?'text/javascript':'text/html','Cache-Control':'no-cache'});res.end(content);return;}
   json(res,404,{error:'Not found'});
  }catch(e){json(res,400,{error:e.message||'Request failed'});}

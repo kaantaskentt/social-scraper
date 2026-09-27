@@ -47,8 +47,10 @@ test('shot list: summary, numbered parts with frames, what they said (escaped), 
  assert.match(html,/data-shot-print="0">My hook &quot;quoted&quot;</);assert.match(html,/Shot list · @ken\.remedie · 16 s · 3 parts/);
  assert.match(renderShotList(null,{loading:true}),/Cutting the reel/);assert.match(renderShotList(null,{error:'no <video>'}),/no &lt;video&gt;[\s\S]*data-shot="retry"/);
 });
-test('mode switch: free filming first, AI recreation second, the current one pressed',()=>{
+test('mode switch: filming, AI recreation, and original faceless reel; only current mode pressed',()=>{
  const html=renderModeSwitch('film');
  assert.match(html,/data-studio-mode="film"[^>]*aria-pressed="true"[^>]*>[\s\S]*Film it yourself/);assert.match(html,/data-studio-mode="ai"[^>]*aria-pressed="false"/);
  assert.ok(html.indexOf('film')<html.indexOf('"ai"'));
+ assert.match(html,/data-studio-mode="new"[^>]*aria-pressed="false"/);assert.equal((html.match(/<button /g)||[]).length,3);
+ const fresh=renderModeSwitch('new');assert.match(fresh,/data-studio-mode="new"[^>]*aria-pressed="true"/);assert.equal((fresh.match(/aria-pressed="true"/g)||[]).length,1);assert.match(fresh,/New faceless reel/);assert.match(fresh,/An original reel in this channel's style · AI makes it/);
 });

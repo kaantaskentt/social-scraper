@@ -26,16 +26,17 @@ test('the pilot: price re-checked, reference image, voice, each shot once, check
  const {root,m,creates,renders}=await setup();
  try{const s=await m.start(job,{mode:'std',confirmCredits:51});assert.equal(s.ceiling,96);assert.equal((await done(m,'run1')).state,'done',m.state.get('run1').error);
   assert.deepEqual(creates,['gpt_image_2','seed_audio','seedance_2_0','seedance_2_0']);
-  const reel=JSON.parse(await readFile(join(root,'channels','run1','reel','reel.json'),'utf8'));assert.equal(reel.spent,51);assert.equal(reel.shots.s1.pass,true);
+  const reel=JSON.parse(await readFile(join(root,'channels','run1','reels','0-celery','reel.json'),'utf8'));assert.equal(reel.spent,51);assert.equal(reel.shots.s1.pass,true);
   assert.equal(renders.length,1);assert.equal(renders[0].clips.length,2);assert.equal(renders[0].endCard.title,'Comment CRISP');
-  assert.equal(String(await readFile(join(root,'channels','run1','reel','caption.txt'))),'Try it #kitchen\n');
+  assert.equal(String(await readFile(join(root,'channels','run1','reels','0-celery','caption.txt'))),'Try it #kitchen\n');
+  const st=await m.status(job);assert.equal(st.reels.length,1);assert.equal(st.reels[0].url,'/channels/run1/0-celery/reel.mp4');assert.deepEqual(st.progress,{done:5,total:5});
  }finally{await rm(root,{recursive:true,force:true});}
 });
 
 test('a shot that fails its check gets exactly one retry; a second failure stops before anything else is spent',async()=>{
  const one=await setup({qa:(clip,times)=>!(clip.includes('seedance')&&times===1&&!one?.retried&&(one.retried=true))});
  try{await one.m.start(job,{mode:'std',confirmCredits:51});assert.equal((await done(one.m,'run1')).state,'done',one.m.state.get('run1').error);
-  assert.equal(one.creates.filter(c=>c==='seedance_2_0').length,3);assert.equal(JSON.parse(await readFile(join(one.root,'channels','run1','reel','reel.json'),'utf8')).spent,78);
+  assert.equal(one.creates.filter(c=>c==='seedance_2_0').length,3);assert.equal(JSON.parse(await readFile(join(one.root,'channels','run1','reels','0-celery','reel.json'),'utf8')).spent,78);
  }finally{await rm(one.root,{recursive:true,force:true});}
  const two=await setup({qa:clip=>!clip.includes('seedance')});
  try{await two.m.start(job,{mode:'fast',confirmCredits:31});const r=await done(two.m,'run1');assert.equal(r.state,'failed');assert.match(r.error,/failed its check twice/);
@@ -64,7 +65,7 @@ test('the check fails on a face, text, broken hands, a missing main action, or a
 test('every attempt keeps its own file, so a retry never overwrites a clip that might be the better one',async()=>{
  const one=await setup({qa:(clip,times)=>!(clip.includes('seedance')&&!one?.retried&&(one.retried=true))});
  try{await one.m.start(job,{mode:'std',confirmCredits:51});await done(one.m,'run1');
-  const {readdir}=await import('node:fs/promises');const files=(await readdir(join(one.root,'channels','run1','reel'))).filter(f=>/^shot-s1-a\d\.mp4$/.test(f)).sort();
+  const {readdir}=await import('node:fs/promises');const files=(await readdir(join(one.root,'channels','run1','reels','0-celery'))).filter(f=>/^shot-s1-a\d\.mp4$/.test(f)).sort();
   assert.deepEqual(files,['shot-s1-a1.mp4','shot-s1-a2.mp4']);
  }finally{await rm(one.root,{recursive:true,force:true});}
 });
