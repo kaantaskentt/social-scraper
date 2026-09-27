@@ -36,6 +36,8 @@ test('parseCredits reads the CLI estimate (JSON or one plain line) and fails lou
 });
 
 const tick=()=>new Promise(r=>setTimeout(r,5));
+// Let every queued write land before a test removes its folder (a late write made rmdir fail now and then).
+const drain=async r=>{for(const id of r.items.keys())await r.saved(id).catch(()=>{});};
 async function setup(overrides={}){
  const root=await mkdtemp(join(tmpdir(),'cl-rep-'));await mkdir(join(root,'refs'),{recursive:true});
  await writeFile(join(root,'refs','a.png'),'png');await writeFile(join(root,'src.mp4'),'video');
@@ -57,7 +59,7 @@ test('estimate returns the prompt and the credits; start refuses without the con
  try{const est=await r.estimate(input);assert.equal(est.credits,84);assert.match(est.prompt,/@Video 1/);
   await assert.rejects(r.start({...input,confirmCredits:50}),/cost changed/);
   await assert.rejects(r.start({...input}),/Confirm the cost/);
- }finally{await rm(root,{recursive:true,force:true});}
+ }finally{await drain(r);await rm(root,{recursive:true,force:true});}
 });
 
 test('start submits once, polls until done, downloads, keeps the original sound, and persists every step',async()=>{
@@ -70,7 +72,7 @@ test('start submits once, polls until done, downloads, keeps the original sound,
   await r.saved(rep.id);const disk=JSON.parse(await readFile(join(root,'replicas',rep.id+'.json'),'utf8'));assert.equal(disk.status,'done');assert.equal(disk.jobId,'job-1');
   assert.equal(String(await readFile(join(root,'replicas',rep.id+'.mp4'))),'with-sound');
   assert.deepEqual(r.list({runId:'run1',postId:'reel1'}).map(x=>x.id),[rep.id]);
- }finally{await rm(root,{recursive:true,force:true});}
+ }finally{await drain(r);await rm(root,{recursive:true,force:true});}
 });
 
 test('a lost submit response is never retried automatically',async()=>{
@@ -78,7 +80,7 @@ test('a lost submit response is never retried automatically',async()=>{
  const {root,r,input}=await setup({run});
  try{const rep=await r.start({...input,confirmCredits:84});while(r.get(rep.id).status==='submitting')await tick();
   const x=r.get(rep.id);assert.equal(x.status,'uncertain');assert.match(x.error,/may have gone through/);
- }finally{await rm(root,{recursive:true,force:true});}
+ }finally{await drain(r);await rm(root,{recursive:true,force:true});}
 });
 
 test('polling survives short connection drops and resumes after a restart',async()=>{
@@ -89,14 +91,14 @@ test('polling survives short connection drops and resumes after a restart',async
   await r.saved(rep.id);const state=JSON.parse(await readFile(join(root,'replicas',rep.id+'.json'),'utf8'));state.status='generating';await writeFile(join(root,'replicas',rep.id+'.json'),JSON.stringify(state));
   const again=new Replicator(root,{run,download:async(u,f)=>writeFile(f,'g'),mux:async()=>{},pollMs:1,probeDuration:async()=>12,prepareSource:async p=>p});await again.init();
   while(again.get(rep.id).status!=='done')await tick();
- }finally{await rm(root,{recursive:true,force:true});}
+ }finally{await drain(r);await rm(root,{recursive:true,force:true});}
 });
 
 test('a failed Higgsfield job is reported, not retried',async()=>{
  const run=async args=>{if(args[1]==='cost')return '84 credits';if(args[1]==='create')return '[{"id":"job-2"}]';return '{"id":"job-2","status":"failed","error":"nsfw"}';};
  const {root,r,input}=await setup({run});
  try{const rep=await r.start({...input,confirmCredits:84});while(r.get(rep.id).status==='generating')await tick();assert.equal(r.get(rep.id).status,'failed');assert.match(r.get(rep.id).error,/failed/);
- }finally{await rm(root,{recursive:true,force:true});}
+ }finally{await drain(r);await rm(root,{recursive:true,force:true});}
 });
 
 test('saves of one replicate land in order even when the disk is slow',async()=>{
@@ -118,7 +120,7 @@ test('start keeps the job id when create answers with a bare id list',async()=>{
  const run=async args=>{if(args[1]==='cost')return '84 credits';if(args[1]==='create')return '["job-7"]';return '{"id":"job-7","status":"in_progress"}';};
  const {root,r,input}=await setup({run});
  try{const rep=await r.start({...input,confirmCredits:84});assert.equal(rep.status,'generating');assert.equal(rep.jobId,'job-7');r.items.get(rep.id).status='done';
- }finally{await rm(root,{recursive:true,force:true});}
+ }finally{await drain(r);await rm(root,{recursive:true,force:true});}
 });
 
 const settle=async(r,id,states=['submitting','generating','finishing'])=>{for(let i=0;i<5000&&states.includes(r.get(id).status);i++)await tick();return r.get(id);};
@@ -132,13 +134,13 @@ test('a double click pays once: a second start for the same reel is refused whil
   assert.equal(creates,1);
   const other=await r.start({...input,postId:'reel2',confirmCredits:84});assert.equal(other.status,'generating');
   for(const x of r.items.values())x.status='done';
- }finally{await rm(root,{recursive:true,force:true});}
+ }finally{await drain(r);await rm(root,{recursive:true,force:true});}
 });
 
 test('an unreadable price never reaches the paid step',async()=>{
  let creates=0;const run=async args=>{if(args[1]==='cost')return 'Cost. Credits: 90';if(args[1]==='create')creates++;return '[]';};
  const {root,r,input}=await setup({run});
- try{await assert.rejects(r.start({...input,confirmCredits:90}),/credit estimate/);assert.equal(creates,0);}finally{await rm(root,{recursive:true,force:true});}
+ try{await assert.rejects(r.start({...input,confirmCredits:90}),/credit estimate/);assert.equal(creates,0);}finally{await drain(r);await rm(root,{recursive:true,force:true});}
 });
 
 test('odd status answers never crash the app; a job we lose touch with becomes "uncertain" with its id, not "failed"',async()=>{
@@ -148,7 +150,7 @@ test('odd status answers never crash the app; a job we lose touch with becomes "
   try{r.maxPollFailures=3;const rep=await r.start({...input,confirmCredits:84});const x=await settle(r,rep.id);
    assert.equal(x.status,'uncertain',`${answer}: ${JSON.stringify(x)}`);assert.match(x.error,/job-3/,JSON.stringify(x));
    await r.saved(rep.id); // let the last write land before the folder is removed
-  }finally{await rm(root,{recursive:true,force:true});}
+  }finally{await drain(r);await rm(root,{recursive:true,force:true});}
  }
 });
 
@@ -156,13 +158,13 @@ test('a job that never finishes stops polling after the time limit and is marked
  const run=async args=>{if(args[1]==='cost')return '{"credits":84}';if(args[1]==='create')return '["job-4"]';return '{"id":"job-4","status":"weird_new_state"}';};
  const {root,r,input}=await setup({run});
  try{r.maxWaitMs=30;const rep=await r.start({...input,confirmCredits:84});const x=await settle(r,rep.id);assert.equal(x.status,'uncertain');assert.match(x.error,/job-4/);
- }finally{await rm(root,{recursive:true,force:true});}
+ }finally{await drain(r);await rm(root,{recursive:true,force:true});}
 });
 
 test('a disk error while polling is recorded, not thrown into the void',async()=>{
  const {root,r,input}=await setup({download:async()=>{throw new Error('disk full');}});
  try{const rep=await r.start({...input,confirmCredits:84});const x=await settle(r,rep.id);assert.equal(x.status,'failed');assert.match(x.error,/disk full/);assert.match(x.error,/cdn\.example/);
- }finally{await rm(root,{recursive:true,force:true});}
+ }finally{await drain(r);await rm(root,{recursive:true,force:true});}
 });
 
 test('after an uncertain submit, a new paid start waits until someone confirms they checked Higgsfield',async()=>{
@@ -173,5 +175,5 @@ test('after an uncertain submit, a new paid start waits until someone confirms t
   await assert.rejects(r.dismiss('00000000-0000-0000-0000-000000000000'),/not found/i);
   const cleared=await r.dismiss(first.id);assert.equal(cleared.status,'dismissed');
   await r.start({...input,confirmCredits:84});assert.equal(creates,2);
- }finally{await rm(root,{recursive:true,force:true});}
+ }finally{await drain(r);await rm(root,{recursive:true,force:true});}
 });

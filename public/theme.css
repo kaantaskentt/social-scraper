@@ -243,3 +243,57 @@ dialog .close{font-size:18px}
  body.printing-shots .shot-frames img{width:44px}
 }
 .shot-unplaced{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}.shot-unplaced p{margin:0 0 4px}.shot-unplaced ul{margin:0;padding-left:16px;color:var(--ink)}
+
+/* Channel Secret */
+.secret-view{padding:24px 23px 32px;max-width:1180px}
+.secret-intro{max-width:620px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.secret-intro h2,.secret-head h2{font-size:26px;line-height:1.2;font-weight:600;margin:0;text-wrap:balance}
+.secret-intro p{margin:0}
+.secret-what{margin:0;padding-left:18px;color:var(--muted);font-size:14px;line-height:1.7}
+.secret-note{margin:0;font-size:12.5px;color:var(--muted)}
+.secret-note .quiet{padding-left:0;margin-right:6px}
+.secret-stage{font-size:15px}
+.secret-intro progress{width:100%;max-width:420px;height:8px;accent-color:var(--ink)}
+.secret-page{display:flex;flex-direction:column;gap:28px}
+.secret-head{display:flex;flex-direction:column;gap:8px;max-width:820px}
+.secret-eyebrow{margin:0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.secret-h{font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.secret-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.secret-card{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:14px;display:flex;flex-direction:column;gap:8px}
+.secret-card h3{margin:0;font-size:14px;font-weight:600}
+.secret-card p{margin:0;font-size:14px;line-height:1.5}
+.secret-proof{display:flex;gap:6px;align-items:center;margin-top:auto}
+.secret-thumb{padding:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:40px;aspect-ratio:9/16;background:var(--line);cursor:pointer}
+.secret-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.secret-thumb:hover{outline:2px solid var(--ink)}
+.secret-more{font-size:12px;color:var(--muted)}
+.secret-claims,.secret-recipe{margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.secret-claims{list-style:none}
+.secret-claims li,.secret-recipe li{display:flex;gap:14px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:0 0 10px}
+.secret-claims p,.secret-recipe p{margin:0;font-size:15px;line-height:1.45}
+.secret-claims .secret-proof,.secret-recipe .secret-proof{margin:0;flex:none}
+.secret-recipe{padding-left:20px}
+.secret-recipe li{display:list-item}
+.secret-recipe li>*{display:inline-flex;vertical-align:middle}
+.secret-recipe li p{display:block;margin-bottom:6px}
+.secret-facts{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.secret-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.secret-list li{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:8px}
+.secret-list b{font-weight:600;font-variant-numeric:tabular-nums}
+.secret-bars{display:grid;grid-template-columns:90px auto;gap:4px 8px;align-items:center;font-size:12.5px}
+.secret-bars i{display:block;height:6px;border-radius:3px;background:var(--ink);width:calc(var(--w)*90px)}
+.secret-bars i.flop{background:var(--muted);opacity:.5}
+.secret-bars b{font-weight:500}
+.secret-player{padding:0;border:0;border-radius:16px;background:#000;max-width:min(420px,92vw)}
+.secret-player::backdrop{background:rgba(0,0,0,.6)}
+.secret-player video{display:block;width:100%;max-height:82vh}
+.secret-player .close{position:absolute;top:8px;right:8px;z-index:1;background:rgba(255,255,255,.9);border-radius:999px;width:30px;height:30px}
+@media(max-width:900px){.secret-cards{grid-template-columns:1fr 1fr}.secret-facts{grid-template-columns:1fr}}
+@media(max-width:560px){.secret-cards{grid-template-columns:1fr}.secret-claims li{flex-direction:column;align-items:flex-start}}
+.secret-list li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;align-items:baseline}
+.secret-list li>span:first-child{min-width:0}
+.secret-list li.secret-diff{grid-template-columns:1fr}
+.secret-bars{grid-template-columns:120px auto;justify-content:start}
+.secret-bars i{width:calc(var(--w)*120px)}
+.secret-list li.secret-num{grid-template-columns:minmax(0,1fr) 90px 110px}
+.secret-list li.secret-num b{text-align:right}

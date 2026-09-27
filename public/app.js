@@ -6,6 +6,7 @@ import {renderReplicatePanel} from './replicate-view.mjs';
 import {pickWinners,renderPicks,renderJobs,renderModeSwitch,renderShotList,renderShotSide} from './studio-view.mjs';
 import {shotListText} from './shotlist-text.mjs';
 import {createLineStore} from './shot-lines.mjs';
+import {renderSecret} from './secret-view.mjs';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const openingLine=p=>{const text=p.analysis?.opening||p.transcript?.text||'';const sentence=text.match(/^.*?[.!?](?:\s|$)/s)?.[0]?.trim();return sentence||((text.length>180?text.slice(0,177)+'…':text));};
@@ -143,7 +144,7 @@ function renderExamples(){
 }
 function render(){if(!metricsInitialized&&job.posts.length){if(!job.posts.some(p=>p.views>0)&&job.posts.some(p=>p.plays>0))$('#metric').value='plays';else $('#metric').value='views';if(job.posts.length<100||!job.posts.some(p=>p.publishedAt&&(Date.now()-Date.parse(p.publishedAt))/864e5>=7))$('#age').value='0';else $('#age').value='7';metricsInitialized=true;}readStats();calculate();$('.inspector').classList.toggle('no-matches',currentView==='explorer'&&!visible.length);$('#inspector-empty').hidden=currentView==='money'||visible.length>0;renderLegend();buildTiles();layout();renderGroups();if(!selected&&job.posts.length)selectPost((job.posts.find(p=>p.analysis&&!p.excludedReason)||job.posts[0]).id);}
 let loadGeneration=0; // a response for a run the user has left is dropped
-async function loadJob(id){stopReplay();const generation=++loadGeneration;const loaded=await api(id==='demo'?'/api/demo':`/api/runs/${id}`);if(generation!==loadGeneration)return;job=loaded;resetMoney();selected=(job.posts.find(p=>p.analysis&&!p.excludedReason)||job.posts[0])?.id;metricsInitialized=false;category='all';compareKeys.clear();comparisonOpen=false;examplePage=0;$('#topic-filter').value='all';$('#hook-filter').value='all';$('#tiles').innerHTML='';$('#map-tiles').innerHTML='';$('#comparison').hidden=true;render();renderMoney();scheduleMoney();refreshVideos();if(selected)selectPost(selected);else{$('#opening').textContent='Collecting the archive. The first spoken opening will appear here.';$('#post-creator').textContent=`@${job.creator}`;$('#preview-image').hidden=true;$('#preview-play').hidden=true;$('#original').hidden=true;$('#transcript').textContent='';$('#anatomy-bar').innerHTML='';$('#anatomy-legend').innerHTML='';$('#all-labels').innerHTML='';$('#post-tags').innerHTML='';$('#post-date').textContent='';$('#post-views').textContent='Unknown';$('#post-likes').textContent='Unknown';$('#post-rate').textContent='Unknown';$('#post-index').textContent='';const v=$('#preview-video');v.pause();v.removeAttribute('src');v.hidden=true;v.dataset.post='';$('.preview-media').classList.remove('playing');resetReplicate();}}
+async function loadJob(id){stopReplay();const generation=++loadGeneration;const loaded=await api(id==='demo'?'/api/demo':`/api/runs/${id}`);if(generation!==loadGeneration)return;job=loaded;resetMoney();selected=(job.posts.find(p=>p.analysis&&!p.excludedReason)||job.posts[0])?.id;metricsInitialized=false;category='all';compareKeys.clear();comparisonOpen=false;examplePage=0;$('#topic-filter').value='all';$('#hook-filter').value='all';$('#tiles').innerHTML='';$('#map-tiles').innerHTML='';$('#comparison').hidden=true;render();renderMoney();scheduleMoney();refreshVideos();if(currentView==='secret')loadSecret();if(selected)selectPost(selected);else{$('#opening').textContent='Collecting the archive. The first spoken opening will appear here.';$('#post-creator').textContent=`@${job.creator}`;$('#preview-image').hidden=true;$('#preview-play').hidden=true;$('#original').hidden=true;$('#transcript').textContent='';$('#anatomy-bar').innerHTML='';$('#anatomy-legend').innerHTML='';$('#all-labels').innerHTML='';$('#post-tags').innerHTML='';$('#post-date').textContent='';$('#post-views').textContent='Unknown';$('#post-likes').textContent='Unknown';$('#post-rate').textContent='Unknown';$('#post-index').textContent='';const v=$('#preview-video');v.pause();v.removeAttribute('src');v.hidden=true;v.dataset.post='';$('.preview-media').classList.remove('playing');resetReplicate();}}
 // A context belongs to one loaded run/version; late responses cannot replace another view.
 function resetMoney(version=''){
  if(moneyState)clearTimeout(moneyState.timer);if(!version)moneyExpanded.clear();
@@ -184,17 +185,36 @@ async function fetchMoney(state){
  finally{state.inFlight=false;state.loading=false;if(state===moneyState){renderMoney();if(state.pending)scheduleMoney();}}
 }
 function setView(view){
- stopReplay();currentView=view;const money=view==='money',studio=view==='studio',explorer=view==='explorer';
- $('#explorer-controls').hidden=!explorer;$('#explorer-canvas').hidden=!explorer;$('#findings').hidden=!explorer;$('#money-view').hidden=!money;$('#studio-view').hidden=!studio;$('.inspector').hidden=studio;$('.explorer').classList.toggle('money-active',money);$('.explorer').classList.toggle('studio-active',studio);
+ stopReplay();currentView=view;const money=view==='money',studio=view==='studio',explorer=view==='explorer',secret=view==='secret';
+ $('#explorer-controls').hidden=!explorer;$('#explorer-canvas').hidden=!explorer;$('#findings').hidden=!explorer;$('#money-view').hidden=!money;$('#studio-view').hidden=!studio;$('#secret-view').hidden=!secret;$('.inspector').hidden=studio||secret;$('.explorer').classList.toggle('money-active',money);$('.explorer').classList.toggle('studio-active',studio||secret);if(secret)loadSecret();else{clearTimeout(secretState.timer);secretState.timer=null;}
  if(studio)renderStudio();else{clearTimeout(studioTimer);studioTimer=null;}
- for(const [id,active]of [['explorer-view-button',explorer],['money-view-button',money],['studio-view-button',studio]]){$('#'+id).classList.toggle('active',active);$('#'+id).setAttribute('aria-pressed',String(active));}
+ for(const [id,active]of [['explorer-view-button',explorer],['money-view-button',money],['secret-view-button',secret],['studio-view-button',studio]]){$('#'+id).classList.toggle('active',active);$('#'+id).setAttribute('aria-pressed',String(active));}
  $('.inspector').classList.toggle('no-matches',!money&&!visible.length);$('#inspector-empty').hidden=money||visible.length>0;layout();
 }
 $('#explorer-view-button').onclick=()=>setView('explorer');
 $('#money-view-button').onclick=()=>setView('money');
 $('#studio-view-button').onclick=()=>setView('studio');
+$('#secret-view-button').onclick=()=>setView('secret');
+// Channel Secret: the saved page, the build in progress (checked every 2 s), or the price to build it.
+const secretState={runId:null,status:null,timer:null,busy:false,gen:0};
+async function loadSecret(){clearTimeout(secretState.timer);secretState.timer=null;if(currentView!=='secret')return;const gen=++secretState.gen;
+ if(!job||job.synthetic||job.id==='demo'){paint($('#secret-body'),'<p class="studio-empty">Pick a real account under Your research to see its Secret.</p>');return;}
+ const id=job.id;if(secretState.runId!==id){secretState.runId=id;secretState.status=null;paint($('#secret-body'),'<p class="studio-empty">Loading…</p>');}
+ try{const status=await api(`/api/runs/${encodeURIComponent(id)}/secret`);if(gen!==secretState.gen||job.id!==id||currentView!=='secret')return;secretState.status=status;paintSecret();
+  if(status.state==='building')secretState.timer=setTimeout(loadSecret,2000);}
+ catch(e){if(job.id===id)paint($('#secret-body'),`<p class="replica-error">${escape(e.message)}</p>`);}}
+function paintSecret(){paint($('#secret-body'),renderSecret(secretState.status,{account:job.creator,imageFor:id=>{const p=job.posts.find(x=>x.id===id);return p?imageURL(p):'';}}));}
+$('#secret-body').addEventListener('click',async e=>{
+ const play=e.target.closest('[data-secret-play]');
+ if(play){const p=job.posts.find(x=>x.id===play.dataset.secretPlay),src=p&&videoSource(p);if(!src){toast('No video for this reel.');return;}const v=$('#secret-player video');v.src=src;$('#secret-player').showModal();v.play().catch(()=>{});return;}
+ const b=e.target.closest('[data-secret="build"],[data-secret="rewrite"]');if(!b||secretState.busy)return;
+ secretState.busy=true;b.disabled=true;
+ try{await api(`/api/runs/${encodeURIComponent(job.id)}/secret`,{confirm:true,rewrite:b.dataset.secret==='rewrite'});}
+ catch(err){toast(err.message);delete $('#secret-body').dataset.painted;} // repaint so the button is usable again
+ finally{secretState.busy=false;}loadSecret();});
+$('#secret-player').addEventListener('close',()=>{const v=$('#secret-player video');v.pause();v.removeAttribute('src');v.load();});
 async function refresh(){boot=await api('/api/bootstrap');const current=job?.id||'demo';$('#run-select').innerHTML='<option value="demo">Demo · sample data</option>'+boot.runs.map(r=>`<option value="${r.id}">@${escape(r.creator)} · ${r.completed}/${r.count} · ${r.status}</option>`).join('');$('#run-select').value=current;renderConnections();}
-function renderConnections(){const active=['apify',boot.transcriptionProvider||'groq','jev'];const count=active.filter(k=>boot.connections[k]?.configured).length;$('#connection-status').textContent=`${count}/3 keys configured`;for(const k of ['apify','groq','fireworks','jev'])$(`#${k}-status`).textContent=boot.connections[k]?.verified?'· key verified':boot.connections[k]?.configured?'· configured':active.includes(k)?'· needed':'· optional';$('#transcription-provider').textContent=title(boot.transcriptionProvider||'groq');}
+function renderConnections(){const active=['apify',boot.transcriptionProvider||'groq','jev'];const count=active.filter(k=>boot.connections[k]?.configured).length;$('#connection-status').textContent=`${count}/3 keys configured`;for(const k of ['apify','groq','fireworks','jev','gemini'])$(`#${k}-status`).textContent=boot.connections[k]?.verified?'· key verified':boot.connections[k]?.configured?'· configured':active.includes(k)?'· needed':'· optional';$('#transcription-provider').textContent=title(boot.transcriptionProvider||'groq');}
 
 function stopReplay(){replayToken++;replaying=false;replayRevealed.clear();$('#replay').innerHTML='<span>▶</span> Replay analysis';$('#replay-status').textContent='';$$('.tile').forEach(t=>t.classList.remove('processing','unseen'));if(job)layout();}
 async function replay(){
