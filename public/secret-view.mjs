@@ -1,5 +1,5 @@
 // Channel Secret page: pure render (data in, HTML out), with playable proof.
-import {LABELS} from './secret-labels.mjs';
+import {LABELS,SHORT} from './secret-labels.mjs';
 import {MECHANISMS,STRENGTH_LABEL} from './secret-mechanisms.mjs';
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>`$${Number(n).toFixed(2)}`;
@@ -30,16 +30,19 @@ export function renderSecret(status,{account,imageFor}){
   return intro(account,status.plan);
  }
  const s=status.saved,sec=s.secret,st=s.stats,names=st.names||{};
- const labelText=(q,v)=>names[q]?.values?.[v]||LABELS[q]?.[1]?.[v]||v;
- const questionText=q=>names[q]?.title||LABELS[q]?.[0]||q;
+ const longText=(q,v)=>names[q]?.values?.[v]||LABELS[q]?.[1]?.[v]||v;const labelText=(q,v)=>SHORT[q]?.[v]||longText(q,v);
+ const questionText=q=>String(names[q]?.title||LABELS[q]?.[0]||q).replace(/^Words: /,'What they say · ');
  const winners=s.picked.filter(p=>p.group==='winner').length,flops=s.picked.length-winners;
  const differences=[...st.differences].sort((a,b)=>Math.abs(b.winners-b.flops)-Math.abs(a.winners-a.flops));
  const biggest=differences[0],common=[...st.house].sort((a,b)=>b.count-a.count)[0],n=st.numbers;
  const kpi=(label,value,detail,context)=>`<article class="secret-kpi"><h3>${escape(label)}</h3><p class="secret-kpi-value">${escape(value)}</p><p class="secret-kpi-detail">${escape(detail)}</p><p class="secret-note">${escape(context)}</p></article>`;
  const gapTile=biggest?kpi('Biggest difference',`${biggest.winners} vs ${biggest.flops}`,labelText(biggest.question,biggest.value),`of ${biggest.perSide} best / of ${biggest.perSide} weakest`):kpi('Biggest difference','No clear gap','No standout difference found','Across the reels watched');
+ // Third tile: the biggest thing the weakest reels do more, i.e. what to avoid.
+ const avoid=differences.find(d=>d.flops>d.winners);
+ const avoidTile=avoid?kpi('What the weakest do more',`${avoid.flops} vs ${avoid.winners}`,labelText(avoid.question,avoid.value),`of ${avoid.perSide} weakest / of ${avoid.perSide} best: avoid this`):kpi('Reels watched',`${winners} best + ${flops} weakest`,'reels watched','The sample behind this page');
  const likes=n.likesPer1k;
  const likesTile=likes?.clear&&Number.isFinite(likes.winners)&&Number.isFinite(likes.flops)?kpi('Likes per 1,000 views',`${likes.winners} vs ${likes.flops}`,'Best vs weakest','Typical likes for the same view count'):common?kpi('Most common pattern',`${common.count} of ${common.total}`,labelText(common.question,common.value),'reels share this house style'):kpi('House style','No shared pattern','No common house-style fact found','Across the reels watched');
- const kpis=`<div class="secret-kpis" aria-label="Channel at a glance">${gapTile}${likesTile}${kpi('Reels watched',`${winners} best + ${flops} weakest`,'reels watched','The sample behind this page')}</div>`;
+ const kpis=`<div class="secret-kpis" aria-label="Channel at a glance">${gapTile}${likesTile}${avoidTile}</div>`;
  const cards=CARDS.filter(([k])=>sec[k]?.evidence?.length).map(([k,t])=>`<article class="secret-card"><h4 class="secret-card-label">${t}</h4><p>${escape(sec[k].text)}</p>${proof(sec[k].evidence,imageFor)}</article>`).join('');
  const why=(sec.why||[]).filter(w=>MECHANISMS[w.mechanism]).map(w=>{const m=MECHANISMS[w.mechanism];return `<article class="secret-card secret-why"><div class="secret-mech"><h4>${escape(m.name)}</h4><span class="secret-strength secret-${escape(m.strength)}">${escape(STRENGTH_LABEL[m.strength])}</span></div><p>${escape(w.pattern)}</p><p class="secret-meaning">${escape(m.meaning)}</p>${proof(w.evidence,imageFor,3)}<p class="secret-source">${escape(m.source)}</p></article>`;}).join('');
  const critique=sec.critique||[],risks=critique.filter(c=>c.kind==='risk');
@@ -51,11 +54,11 @@ export function renderSecret(status,{account,imageFor}){
  };
  const diffs=differences.map(d=>{
   const gap=d.winners-d.flops;
-  return `<li class="secret-diff"><div class="secret-diff-label"><small>${escape(questionText(d.question))}</small><p>${escape(labelText(d.question,d.value))}</p></div><div class="secret-bars">${bar(d.winners,d.perSide,'best')}${bar(d.flops,d.perSide,'weakest')}</div><span class="secret-gap ${gap>0?'secret-gap-best':gap<0?'secret-gap-weakest':''}">${gap?`+${escape(Math.abs(gap))} ${gap>0?'best':'weakest'}`:'No gap'}</span></li>`;
+  return `<li class="secret-diff"><div class="secret-diff-label"><small>${escape(questionText(d.question))}</small><p title="${escape(longText(d.question,d.value))}">${escape(labelText(d.question,d.value))}</p></div><div class="secret-bars">${bar(d.winners,d.perSide,'best')}${bar(d.flops,d.perSide,'weakest')}</div><span class="secret-gap ${gap>0?'secret-gap-best':gap<0?'secret-gap-weakest':''}">${gap?`+${escape(Math.abs(gap))} ${gap>0?'best':'weakest'}`:'No gap'}</span></li>`;
  }).join('');
  const numbers=[['Length',n.seconds,' s'],['New shot every',n.secondsPerShot,' s'],['Likes per 1,000 views',likes,'']].filter(([,v])=>v&&Number.isFinite(v.winners)&&Number.isFinite(v.flops))
   .map(([t,v,u])=>`<li class="secret-num${v.clear===false?' unclear':''}"><span>${t}${v.clear===false?' <small>no clear gap</small>':''}</span><b>${escape(v.winners)}${u} best</b><b>${escape(v.flops)}${u} weakest</b></li>`).join('');
- const house=st.house.map(h=>`<li>${escape(labelText(h.question,h.value))}<span> · ${escape(h.count)} of ${escape(h.total)} reels</span></li>`).join('');
+ const house=st.house.map(h=>`<li title="${escape(longText(h.question,h.value))}">${escape(labelText(h.question,h.value))}<span> · ${escape(h.count)} of ${escape(h.total)} reels</span></li>`).join('');
  const comparison=`<div class="secret-comparison">${diffs?`<ul class="secret-diffs">${diffs}</ul>`:empty('No clear gap found.')}<div class="secret-numbers"><h4>Numbers</h4>${numbers?`<ul>${numbers}</ul>`:empty('No comparable numbers available.')}</div><div class="secret-house"><h4>What every reel has in common</h4><p class="secret-note">Recurring patterns across the sample, with counts showing how often.</p>${house?`<ul>${house}</ul>`:empty('Nothing shared by 70% of reels.')}</div></div>`;
  const recipe=(sec.recipe||[]).map((r,i)=>`<li><span class="secret-step-number" aria-hidden="true">${i+1}</span><div><p>${escape(r.step)}</p>${proof(r.evidence,imageFor,3)}</div></li>`).join('');
  const dropped=s.droppedWhy?.length?`<details class="secret-dropped"><summary>${s.droppedWhy.length} part${s.droppedWhy.length>1?'s':''} removed by the honesty check</summary><ul>${s.droppedWhy.map(d=>`<li><b>${escape(d.reason)}</b>: ${escape(d.text)}</li>`).join('')}</ul></details>`:s.dropped?.length?`<details class="secret-dropped"><summary>${s.dropped.length} part${s.dropped.length>1?'s':''} removed by the honesty check</summary><p>${s.dropped.length} part${s.dropped.length>1?'s':''} removed because ${s.dropped.length>1?'they':'it'} had no proof</p></details>`:'';

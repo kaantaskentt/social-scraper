@@ -49,15 +49,15 @@ test('why it works shows the mechanism, its evidence strength and source; the cr
 const render=value=>renderSecret({state:'done',saved:value},{account:'ken.remedie',imageFor:img});
 const block=(html,tag,className)=>html.match(new RegExp(`<${tag} class="${className}"[^>]*>[\\s\\S]*?</${tag}>`))?.[0];
 
-test('three KPI tiles show the largest absolute gap, clear likes and the actual watched sample',()=>{
+test('three KPI tiles show the largest absolute gap, clear likes and what the weakest do more',()=>{
  const differences=[...saved.stats.differences,{question:'opening',value:'question',winners:2,flops:12,perSide:15}];
  const snapshot=JSON.stringify(differences);
  const html=render({...saved,stats:{...saved.stats,differences,numbers:{...saved.stats.numbers,likesPer1k:{winners:30.6,flops:18.6,clear:true}}}});
  const tiles=[...html.matchAll(/<article class="secret-kpi">([\s\S]*?)<\/article>/g)].map(m=>m[1]);
  assert.equal(tiles.length,3);
- assert.match(tiles[0],/Biggest difference[\s\S]*2 vs 12[\s\S]*A question[\s\S]*of 15 best \/ of 15 weakest/);
+ assert.match(tiles[0],/Biggest difference[\s\S]*2 vs 12[\s\S]*Question first[\s\S]*of 15 best \/ of 15 weakest/);
  assert.match(tiles[1],/Likes per 1,000 views[\s\S]*30\.6 vs 18\.6[\s\S]*Best vs weakest/);
- assert.match(tiles[2],/15 best \+ 15 weakest[\s\S]*reels watched/);
+ assert.match(tiles[2],/What the weakest do more[\s\S]*12 vs 2[\s\S]*Question first[\s\S]*avoid this/);
  const comparison=block(html,'ul','secret-diffs');
  assert.ok(comparison.indexOf('A question')<comparison.indexOf('A bold or surprising statement'));
  assert.match(comparison,/2 of 15 best[\s\S]*12 of 15 weakest[\s\S]*\+10 weakest/);
@@ -68,7 +68,7 @@ test('three KPI tiles show the largest absolute gap, clear likes and the actual 
 test('KPI fallback picks the most common house-style fact when likes have no clear gap',()=>{
  const html=render({...saved,stats:{...saved.stats,house:[{question:'setting',value:'kitchen',count:22,total:30},...saved.stats.house],numbers:{...saved.stats.numbers,likesPer1k:{winners:20,flops:21,clear:false}}}});
  const tiles=[...html.matchAll(/<article class="secret-kpi">([\s\S]*?)<\/article>/g)];
- assert.match(tiles[1][1],/Most common pattern[\s\S]*27 of 30[\s\S]*Like a doctor/);
+ assert.match(tiles[1][1],/Most common pattern[\s\S]*27 of 30[\s\S]*Expert look/);
  assert.match(html,/Likes per 1,000 views <small>no clear gap<\/small>[\s\S]*20 best[\s\S]*21 weakest/);
  assert.match(render({...saved,stats:{...saved.stats,numbers:{seconds:{winners:40,flops:42,clear:false},secondsPerShot:{winners:6,flops:5,clear:false}}}}),/New shot every <small>no clear gap<\/small>/);
 });
@@ -116,4 +116,12 @@ test('missing comparison data has honest fallbacks and all navigation targets re
  assert.match(html,/Nothing shared by 70% of reels/);
  assert.doesNotMatch(html,/NaN|undefined/);
  for(const id of ['secret-formula','secret-why','secret-comparison','secret-recipe','secret-watchouts'])assert.ok(html.includes(`id="${id}"`));
+});
+
+test('plain short names with the long definition as a hint; the third tile shows what the weakest do more',()=>{
+ const st={...saved.stats,differences:[{question:'said_evidence',value:'reasoning',winners:7,flops:11,perSide:15,evidence:['r1']},{question:'said_structure',value:'steps',winners:12,flops:5,perSide:15,evidence:['r1']}],names:{said_evidence:{title:'Words: Evidence offered',values:{reasoning:'An explicit chain of reasoning without concrete evidence'}}}};
+ const html=renderSecret({state:'done',saved:{...saved,stats:st}},{account:'k',imageFor:img});
+ assert.match(html,/title="An explicit chain of reasoning without concrete evidence">Explains instead of showing</);
+ assert.match(html,/What they say · Evidence offered/);
+ assert.match(html,/What the weakest do more[\s\S]*11 vs 7[\s\S]*Explains instead of showing[\s\S]*avoid this/);
 });
