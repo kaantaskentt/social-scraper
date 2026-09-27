@@ -1,7 +1,7 @@
 // A finished 9:16 reel: clips back to back, the voiceover, music ducked under it, word-timed captions with the spoken
 // word highlighted, an optional hook title in the first seconds, and an end card with the call to action.
 import React from 'react';
-import {AbsoluteFill,Sequence,OffthreadVideo,Audio,staticFile,useCurrentFrame,useVideoConfig,interpolate} from 'remotion';
+import {AbsoluteFill,Sequence,OffthreadVideo,Audio,Freeze,staticFile,useCurrentFrame,useVideoConfig,interpolate} from 'remotion';
 import {loadFont} from '@remotion/google-fonts/Montserrat';
 const {fontFamily}=loadFont('normal',{weights:['800'],subsets:['latin']});
 const s=(fps,t)=>Math.round(t*fps);
@@ -30,8 +30,14 @@ function EndCard({title,subtitle}){
 export const Reel=({clips,voice,music,captions,hook,endCard})=>{
  const {fps}=useVideoConfig();
  return <AbsoluteFill style={{background:'#000'}}>
-  {clips.map((c,i)=><Sequence key={i} from={s(fps,c.start)} durationInFrames={Math.max(1,s(fps,c.duration))}>
-   <OffthreadVideo src={staticFile(c.src)} muted style={{width:'100%',height:'100%',objectFit:'cover'}}/></Sequence>)}
+  {clips.map((c,i)=>{
+   // Whole frames only: the slot is split into frames the clip can fill at its rate, and the rest holds the clip's last
+   // frame, so there is never a black gap (a rounding gap once left one black frame, 2026-09-27).
+   const rate=c.playbackRate||1,style={width:'100%',height:'100%',objectFit:'cover'};
+   const from=s(fps,c.start),slot=Math.max(1,s(fps,c.start+c.duration)-from),source=Math.floor((c.clipSeconds||c.duration)*fps)-1;
+   const plays=Math.min(slot,Math.floor(source/rate)),hold=slot-plays;
+   return <React.Fragment key={i}><Sequence from={from} durationInFrames={Math.max(1,plays)}><OffthreadVideo src={staticFile(c.src)} muted playbackRate={rate} style={style}/></Sequence>
+    {hold>0?<Sequence from={from+plays} durationInFrames={hold}><Freeze frame={Math.max(0,source-1)}><OffthreadVideo src={staticFile(c.src)} muted style={style}/></Freeze></Sequence>:null}</React.Fragment>;})}
   {voice?<Audio src={staticFile(voice.src)} volume={1}/>:null}
   {music?<Audio src={staticFile(music.src)} volume={music.volume??0.12}/>:null}
   {hook?<Sequence from={0} durationInFrames={s(fps,hook.until)}><Hook text={hook.text}/></Sequence>:null}

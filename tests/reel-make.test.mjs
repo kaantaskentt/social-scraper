@@ -13,7 +13,7 @@ async function setup({qa=()=>true}={}){
  const creates=[];let n=0;const checks={};
  const model={};const run=async args=>{if(args[1]==='create'){creates.push(args[2]);const id=`job-${++n}`;model[id]=args[2];return JSON.stringify([id]);}return JSON.stringify({status:'completed',result_url:`https://cdn.example/${model[args[2]]}/${args[2]}`});};
  const download=async(url,file)=>writeFile(file,url);
- const gemini=async({parts})=>{const clip=String(parts[0].video);checks[clip]=(checks[clip]||0)+1;return {json:{shows:'x',face_visible:false,text_visible:false,hands_look_wrong:!qa(clip,checks[clip])},costUsd:0.001};};
+ const gemini=async({parts})=>{const clip=String(parts[0].video);checks[clip]=(checks[clip]||0)+1;const ok=qa(clip,checks[clip]);assert.match(parts[1].text,/The brief for the shot was/,'the judge sees the brief');return {json:{shows:'x',match:ok?3:1,missing:'nothing',face_visible:false,text_visible:false,hands_look_wrong:false},costUsd:0.001};};
  const jev=async()=>({answers:{matches:{noul:0.9}}});
  const renders=[];const render=async o=>{renders.push(o);await writeFile(o.out,'mp4');return {out:o.out,seconds:12};};
  const m=new ReelMaker(root,()=>({gemini:'g',jev:'j',groq:'q'}),{run,download,gemini,jev,render,price:async()=>price,pollMs:1});
@@ -51,8 +51,20 @@ test('nothing is spent when the price changed, the mode is unknown, or the scrip
  }finally{await rm(root,{recursive:true,force:true});}
 });
 
-test('the check fails on a face, on text, on broken hands, or when the clip does not show the brief',()=>{
- assert.deepEqual(qaVerdict({face_visible:true,text_visible:false,hands_look_wrong:false},{answers:{matches:{noul:0.9}}}).problems,['a face is visible']);
- assert.deepEqual(qaVerdict({face_visible:false,text_visible:false,hands_look_wrong:false},{answers:{matches:{noul:0.2}}}).problems,['it does not show the brief']);
+test('the check fails on a face, text, broken hands, a missing main action, or a missing detail that matters; small differences pass',()=>{
+ const ok={match:3,missing:'nothing',face_visible:false,text_visible:false,hands_look_wrong:false};
+ assert.deepEqual(qaVerdict({...ok,face_visible:true},null).problems,['a face is visible']);
+ assert.deepEqual(qaVerdict({...ok,match:1},null).problems,['the right objects but the wrong action']);assert.deepEqual(qaVerdict({...ok,match:0},null).problems,['it shows something else']);assert.equal(qaVerdict({...ok,match:2},null).pass,true);
+ assert.equal(qaVerdict({...ok,missing:'the stalk is snapped rather than bent'},{answers:{matters:{noul:0.2}}}).pass,true,'a wording or order difference that does not matter passes');
+ assert.deepEqual(qaVerdict({...ok,missing:'no knife cut'},{answers:{matters:{noul:0.8}}}).problems,['it misses what matters: no knife cut']);
+ assert.equal(qaVerdict(ok,null).pass,true);
  const a=shotArgs({seconds:6,visual:'v',camera:'c'},'/k.png','fast');assert.equal(a[a.indexOf('--generate_audio')+1],'false');assert.equal(a[a.indexOf('--image-references')+1],'/k.png');
+});
+
+test('every attempt keeps its own file, so a retry never overwrites a clip that might be the better one',async()=>{
+ const one=await setup({qa:(clip,times)=>!(clip.includes('seedance')&&!one?.retried&&(one.retried=true))});
+ try{await one.m.start(job,{mode:'std',confirmCredits:51});await done(one.m,'run1');
+  const {readdir}=await import('node:fs/promises');const files=(await readdir(join(one.root,'channels','run1','reel'))).filter(f=>/^shot-s1-a\d\.mp4$/.test(f)).sort();
+  assert.deepEqual(files,['shot-s1-a1.mp4','shot-s1-a2.mp4']);
+ }finally{await rm(one.root,{recursive:true,force:true});}
 });
