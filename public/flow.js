@@ -1,10 +1,10 @@
 // Social Scraper, the five-step app: state, data loading and clicks. Rendering lives in flow-views.mjs.
-import {reachable,renderStepper,renderScan,renderWinners,renderSecret,renderMake,renderReady,esc} from './flow-views.mjs';
+import {reachable,renderStepper,renderScan,renderWinners,renderSecret,renderKit,renderMake,renderReady,esc} from './flow-views.mjs';
 import {pickWinners} from './studio-view.mjs';
 import {parseHandles} from './handles.mjs';
 
 const $=s=>document.querySelector(s);
-const S={pricing:false,runs:[],runId:null,job:null,results:null,saved:new Set(),secret:null,plan:null,make:null,balance:null,step:'scan',mode:'fast',busy:false,error:'',feedback:null,timer:null};
+const S={pricing:false,runs:[],runId:null,job:null,results:null,saved:new Set(),secret:null,kit:null,plan:null,make:null,balance:null,step:'scan',mode:'fast',busy:false,error:'',feedback:null,timer:null};
 let token='';
 const store={get:k=>{try{return localStorage.getItem(k);}catch{return null;}},set:(k,v)=>{try{localStorage.setItem(k,v);}catch{}}};
 async function api(path,data){
@@ -19,7 +19,7 @@ const scanned=()=>['complete','partial'].includes(S.job?.status);
 const scanning=()=>['running','scraping'].includes(S.job?.status);
 const scored=()=>Object.values(S.results||{}).some(r=>r.quadrant&&r.quadrant!=='insufficient');
 const flags=()=>({scanned:scanned(),scored:scored(),secret:S.secret?.state==='done',reels:S.make?.reels?.length||0});
-const doneSteps=()=>{const f=flags();return {scan:f.scanned,winners:f.scanned&&f.scored,secret:f.secret,make:f.reels>0,ready:false};};
+const doneSteps=()=>{const f=flags();return {scan:f.scanned,winners:f.scanned&&f.scored,secret:f.secret,kit:Boolean(S.kit?.saved?.approved),make:f.reels>0,ready:false};};
 const post=id=>S.job?.posts.find(p=>p.id===id);
 const imageFor=id=>`/media/${encodeURIComponent(S.runId)}/${encodeURIComponent(id)}`;
 const videoFor=id=>S.saved.has(id)?`/videos/${encodeURIComponent(S.runId)}/${encodeURIComponent(id)}`:post(id)?.videoUrl||'';
@@ -45,6 +45,7 @@ function render(){
  if(S.step==='scan')html=renderScan({runs:S.runs,run:S.job?{id:S.runId,creator:S.job.creator,count:S.job.posts.length}:null,progress:scanProgress(),error:S.error});
  if(S.step==='winners')html=renderWinners({account,...winners()});
  if(S.step==='secret')html=renderSecret({account,status:S.secret,imageFor,feedback:S.feedback});
+ if(S.step==='kit')html=renderKit({account,status:S.kit,busy:S.busy,error:S.error});
  if(S.step==='make')html=renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing});
  if(S.step==='ready')html=renderReady({reels:S.make?.reels||[]});
  $('#view').innerHTML=html;
@@ -54,15 +55,15 @@ function render(){
 async function loadRun(id,{keepStep=false}={}){
  S.runId=id;store.set('flow.run',id);S.error='';
  const base=`/api/runs/${encodeURIComponent(id)}`;
- const [job,videos,secret,plan,make,money]=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(()=>({results:{}}))]);
+ const [job,videos,secret,kit,plan,make,money]=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(()=>({results:{}}))]);
  if(S.runId!==id)return;
- Object.assign(S,{job,saved:new Set(videos.saved||[]),secret,plan,make,results:money.results||{},feedback:secret?.saved?.feedback||null});
- if(!keepStep){const d=doneSteps(),remembered=store.get(`flow.step.${id}`);S.step=remembered&&reachable(flags())[remembered]?remembered:d.secret?'make':d.winners?'winners':'scan';}
+ Object.assign(S,{job,saved:new Set(videos.saved||[]),secret,kit,plan,make,results:money.results||{},feedback:secret?.saved?.feedback||null});
+ if(!keepStep){const d=doneSteps(),remembered=store.get(`flow.step.${id}`);S.step=remembered&&reachable(flags())[remembered]?remembered:d.kit?'make':d.secret?'kit':d.winners?'winners':'scan';}
  render();poll();if(S.step==='make')prepareMake();
 }
 function poll(){
  clearTimeout(S.timer);
- const live=scanning()||S.secret?.state==='building'||S.plan?.state==='working'||S.make?.state==='working';
+ const live=scanning()||S.secret?.state==='building'||S.kit?.state==='working'||S.plan?.state==='working'||S.make?.state==='working';
  if(live)S.timer=setTimeout(refresh,3000);
 }
 async function refresh(){
@@ -70,6 +71,7 @@ async function refresh(){
  try{
   if(scanning()){S.job=await api(base);if(scanned()){await loadRun(id,{keepStep:true});return;}}
   if(S.secret?.state==='building')S.secret=await api(`${base}/secret`);
+  if(S.kit?.state==='working')S.kit=await api(`${base}/kit`);
   if(S.plan?.state==='working')S.plan=await api(`${base}/reel-plan`);
   if(S.make?.state==='working'){S.make=await api(`${base}/reel-make`);if(S.make.state!=='working')S.balance=null;}
  }catch(e){S.error=e.message;}
@@ -85,7 +87,7 @@ async function prepareMake(){
 async function loadBalance(){try{S.balance=(await api('/api/higgsfield/balance')).credits;}catch(e){S.balance=null;S.error=e.message;}render();}
 
 document.addEventListener('click',async e=>{
- const t=e.target.closest('[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close]');if(!t||t.disabled)return;
+ const t=e.target.closest('[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close],[data-kit-format]');if(!t||t.disabled)return;
  const base=`/api/runs/${encodeURIComponent(S.runId)}`;
  if(t.dataset.step){S.step=t.dataset.step;store.set(`flow.step.${S.runId}`,S.step);render();scrollTo({top:0,behavior:'smooth'});if(S.step==='make')prepareMake();return;}
  if(t.dataset.run){loadRun(t.dataset.run).catch(err=>toast(err.message));return;}
@@ -95,7 +97,12 @@ document.addEventListener('click',async e=>{
  if(t.dataset.mode){S.mode=t.dataset.mode;render();return;}
  if(t.dataset.feedback){act(async()=>{await api(`${base}/secret-feedback`,{answer:t.dataset.feedback});S.feedback=t.dataset.feedback;});return;}
  if(t.dataset.idea!==undefined){act(async()=>{S.plan=await api(`${base}/reel-plan/script`,{confirm:true,index:Number(t.dataset.idea)});});return;}
+ // The kit: build, new host, redraw flagged pictures, switch format (each shows its price on the button), use it.
+ const kitGo=body=>act(async()=>{await api(`${base}/kit`,{confirm:true,...body});S.kit=await api(`${base}/kit`);});
+ if(t.dataset.kitFormat){kitGo({redo:'format',format:t.dataset.kitFormat});return;}
  const a=t.dataset.act;
+ if(a==='kit-build')kitGo({});if(a==='kit-character')kitGo({redo:'character'});if(a==='kit-pictures')kitGo({redo:'pictures'});
+ if(a==='kit-approve')act(async()=>{await api(`${base}/kit/approve`,{confirm:true});S.kit=await api(`${base}/kit`);});
  if(a==='secret-build')act(async()=>{S.secret={...(await api(`${base}/secret`,{confirm:true})),plan:S.secret?.plan};});
  if(a==='ideas')act(async()=>{S.plan=await api(`${base}/reel-plan/ideas`,{confirm:true});});
  if(a==='make'){

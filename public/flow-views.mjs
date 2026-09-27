@@ -1,4 +1,4 @@
-// The five-step app: Scan → Winners → Secret → Make → Ready to post. Pure render functions (data in, HTML out) so
+// The six-step app: Scan → Winners → Secret → Kit → Make → Ready to post. Pure render functions (data in, HTML out) so
 // Node tests can check them. Short words, visuals first; the long research views live at /lab.
 import {SHORT,LABELS,PLAIN} from './secret-labels.mjs';
 import {MECHANISMS} from './secret-mechanisms.mjs';
@@ -8,10 +8,10 @@ const compact=n=>Number.isFinite(n)?new Intl.NumberFormat('en',{notation:'compac
 const name=(q,v)=>SHORT[q]?.[v]||LABELS[q]?.[1]?.[v]||v;
 const plain=(q,v)=>PLAIN[q]?.[v]||'';
 
-export const STEPS=[['scan','Scan'],['winners','Winners'],['secret','Secret'],['make','Make'],['ready','Ready to post']];
+export const STEPS=[['scan','Scan'],['winners','Winners'],['secret','Secret'],['kit','Kit'],['make','Make'],['ready','Ready to post']];
 // Which steps can be opened: each needs the one before it to be done.
 export function reachable({scanned=false,scored=false,secret=false,reels=0}){
- return {scan:true,winners:scanned&&scored,secret:scanned&&scored,make:secret,ready:reels>0};
+ return {scan:true,winners:scanned&&scored,secret:scanned&&scored,kit:secret,make:secret,ready:reels>0};
 }
 export function renderStepper(current,open,done){
  return `<nav class="steps" aria-label="Steps">${STEPS.map(([id,label],i)=>`<button type="button" class="step${id===current?' is-current':''}${done[id]?' is-done':''}" data-step="${id}"${open[id]?'':' disabled'} aria-current="${id===current?'step':'false'}"><span class="step-dot">${done[id]&&id!==current?'✓':i+1}</span><span class="step-label">${label}</span></button>`).join('<span class="step-line" aria-hidden="true"></span>')}</nav>`;
@@ -73,10 +73,45 @@ export function renderSecret({account,status,imageFor,feedback=null}){
 ${why?`<section class="block"><h2 class="sub-title">Why it works on people</h2><ul class="why-list card">${why}</ul></section>`:''}
 ${risk?`<div class="card risk"><b>Before you copy</b><p>${esc(risk.point)}</p></div>`:''}
 <section class="block"><h2 class="sub-title">Did we understand it right?</h2><div class="card"><div class="seen-grid">${formula}</div>${check}</div></section>
-${next('make','Make a reel like this')}`;
+${next('kit','Build the look')}`;
 }
 
-// 4 · Make: ideas → script and price → confirm → progress → video.
+// 4 · Kit: the brand memory. The host, the place and the sound every reel shares, drawn and checked.
+const FORMAT_NAMES={ai_host:'AI host',hands_pov:'Hands only',visuals:'No person',animated:'Animated'};
+const KIND={object:'Prop',colour:'Colour',action:'Move',sound:'Sound',words:'Words',effect:'Edit'};
+function kitPic(p,{big=false}={}){
+ if(!p)return '';const flag=p.check&&!p.check.pass;
+ return `<figure class="kit-pic${big?' is-big':''}${p.role.startsWith('turn')?' is-wide':''}"><a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="${esc(p.label)}" loading="lazy"></a><figcaption>${esc(p.label.replace(/^[^:]+: /,'').replace(/^./,c=>c.toUpperCase()))}${flag?`<span class="tag tag-avoid" title="${esc(p.check.problems.join('; '))}">Check: ${esc(p.check.problems[0])}</span>`:''}</figcaption></figure>`;
+}
+export function renderKit({account,status,busy=false,error=''}){
+ const err=error||status?.error?`<p class="err">${esc(error||status.error)}</p>`:'';
+ if(status?.state==='working'){const pr=status.progress||{};return `${head('Building your look…',status.stage||'')}<div class="card"><progress${pr.total>1?` value="${pr.done||0}" max="${pr.total}"`:''}></progress><p class="hint">${pr.total>1?`Picture ${Math.min((pr.done||0)+1,pr.total)} of ${pr.total}. `:''}About 2 minutes. Every picture is checked before the next one.</p></div>`;}
+ const k=status?.saved;
+ if(!k)return `${head(`Your look, in @${account}'s style`,'The face, the place and the sound every reel will share, so people recognise you in the first second.')}${err}
+<div class="card cta-card"><ul class="ticks"><li>Studies 3 of their best reels, with sound</li><li>Picks the format: AI host, hands only, no person or animated</li><li>Draws your host and your place, and checks every picture</li></ul><button type="button" class="btn btn-primary" data-act="kit-build"${busy?' disabled':''}>Build my look · up to $${esc((status?.estimate?.usd??0.7).toFixed(2))}</button></div>`;
+ const kit=k.kit,pics=Object.fromEntries(k.pictures.map(p=>[p.role,p])),flagged=k.pictures.filter(p=>!p.check.pass).length,hosts=kit.cast||[];
+ const switches=Object.keys(FORMAT_NAMES).filter(f=>f!==k.format).map(f=>`<button type="button" class="chip chip-btn" data-kit-format="${f}"${busy?' disabled':''}>${FORMAT_NAMES[f]}</button>`).join('');
+ const format=`<article class="card kit-format"><span class="cmp-label">The format${k.byJev?' · picked by Jev':' · your choice'}</span><h3>${esc(FORMAT_NAMES[k.format])}</h3><p class="plain">${esc(k.formatWhy)}</p><div class="switch-row"><span class="hint">Switch to</span>${switches}</div></article>`;
+ const cast=hosts.map((h,i)=>`<article class="card kit-host"><div class="kit-host-pics">${kitPic(pics[`face${i}`],{big:true})}${kitPic(pics[`body${i}`])}</div>${kitPic(pics[`turn${i}`])}<div class="kit-host-text"><h3>${esc(h.name)}</h3><p class="plain">${esc(h.role)}</p><dl class="kit-facts"><dt>Wears</dt><dd>${esc(h.outfit)}</dd><dt>Sounds</dt><dd>${esc(h.voice)}</dd></dl></div></article>`).join('');
+ const hands=pics.hands?`<article class="card kit-host"><div class="kit-host-pics">${kitPic(pics.hands,{big:true})}</div><div class="kit-host-text"><h3>The hands</h3><p class="plain">${esc(kit.hands)}</p></div></article>`:'';
+ const others=(kit.places||[]).filter(Boolean);
+ const place=`<div class="kit-place">${kitPic(pics.place)}${kitPic(pics.scene)}<article class="card"><dl class="kit-facts kit-facts-stack"><dt>Main place</dt><dd>${esc(kit.place)}</dd>${others.length?`<dt>Also films in</dt><dd>${others.map(esc).join('<br>')}</dd>`:''}<dt>Camera</dt><dd>${esc(kit.camera)}</dd><dt>Light</dt><dd>${esc(kit.light)}</dd></dl></article></div>`;
+ const assets=(kit.assets||[]).map(a=>`<li><span class="tag">${esc(KIND[a.kind]||a.kind)}</span><div><b>${esc(a.what)}</b><p class="hint">${esc(a.how)}</p></div></li>`).join('');
+ const palette=(kit.palette||[]).map(c=>`<span class="swatch"><i style="background:${/^#[0-9a-f]{6}$/i.test(c.hex)?c.hex:'#ccc'}"></i>${esc(c.name)}</span>`).join('');
+ const none=v=>!v||/^none$/i.test(v);
+ const sound=[['Voice',kit.sound?.voice],['Music',kit.sound?.music],['Real sounds',kit.sound?.natural]].filter(([,v])=>!none(v)).map(([t,v])=>`<dt>${t}</dt><dd>${esc(v)}</dd>`).join('');
+ const redo=[hosts.length?`<button type="button" class="btn" data-act="kit-character"${busy?' disabled':''}>New ${hosts.length>1?'hosts':'host'} · about $${esc(status.estimate.usd.toFixed(2))}</button>`:'',flagged?`<button type="button" class="btn" data-act="kit-pictures"${busy?' disabled':''}>Draw the ${flagged} flagged again · about $${(flagged*0.07).toFixed(2)}</button>`:''].join('');
+ const use=k.approved?`<span class="pill pill-ok">In use ✓</span>`:`<button type="button" class="btn btn-primary" data-act="kit-approve"${busy?' disabled':''}>Use this look</button>`;
+ return `<header class="step-head"><span class="eyebrow">Your new channel, in @${esc(account)}'s style</span><h1>${esc(kit.name)}</h1><p>${esc(kit.promise)}</p></header>${err}
+<section class="block">${format}</section>
+${hosts.length||hands?`<section class="block"><h2 class="sub-title">${hosts.length?`Your host${hosts.length>1?'s':''}`:'On camera'}</h2><div class="kit-cast">${cast}${hands}</div>${hosts.length?'<p class="hint">Made-up people, not the real creators. Every caption says they are AI.</p>':''}</section>`:''}
+<section class="block"><h2 class="sub-title">Where it happens</h2>${place}</section>
+<section class="block two-col"><article class="card"><h3 class="card-title">In every reel</h3><ul class="kit-assets">${assets}</ul><div class="palette">${palette}</div></article><article class="card"><h3 class="card-title">How it sounds</h3><dl class="kit-facts">${sound}</dl></article></section>
+<div class="card kit-actions">${use}${redo}<span class="hint">This look cost $${esc(k.costUsd.toFixed(2))}.</span></div>
+${k.approved?next('make','Make a reel with this look'):''}`;
+}
+
+// 5 · Make: ideas → script and price → confirm → progress → video.
 const meter=(label,v)=>`<div class="meter"><span>${label}</span><i><b style="width:${Math.round(Math.max(0,Math.min(3,v||0))/3*100)}%"></b></i></div>`;
 export function renderIdeas(plan,{busy,made=new Set()}){
  return `<div class="idea-grid">${plan.picked.slice(0,4).map((p,i)=>`<article class="card idea${plan.chosen===i?' is-on':''}">${made.has(i)?'<span class="pill pill-ok made">Made ✓</span>':''}<h3>${esc(p.idea.title)}</h3><p class="quote">“${esc(p.idea.hook_line)}”</p>${meter('Fits the winners',p.scores.fit)}${meter('Easy for AI',p.scores.ai_ready)}${meter('Strong start',p.scores.hook)}<button type="button" class="btn${plan.chosen===i?'':' btn-primary'}" data-idea="${i}"${busy?' disabled':''}>${plan.chosen===i?'Chosen':'Use this idea'}</button></article>`).join('')}</div>
@@ -115,7 +150,7 @@ export function renderMake({account,plan,make,balance,mode='fast',busy=false,err
 ${p.script?`<section class="block"><h2 class="sub-title">2 · Check the script</h2>${renderScript(p)}</section><section class="block"><h2 class="sub-title">3 · Make it</h2>${makeIt}</section>`:''}`;
 }
 
-// 5 · Ready to post
+// 6 · Ready to post
 export function renderReady({reels=[]}){
  if(!reels.length)return `${head('Nothing ready yet','Make a reel first.')}`;
  return `${head('Ready to post','Download the video, copy the caption, post it yourself.')}<div class="ready-grid">${reels.map(r=>`<article class="card ready"><video src="${esc(r.url)}#t=0.5" controls playsinline preload="metadata"></video><div class="ready-body"><h3>${esc(r.title||'Reel')}</h3><p class="caption" id="cap-${esc(r.id)}">${esc(r.caption||'')}</p><div class="ready-actions"><a class="btn btn-primary" href="${esc(r.url)}" download>Download</a><button type="button" class="btn" data-copy="cap-${esc(r.id)}">Copy caption</button></div><span class="hint">${esc(Math.round(r.seconds||0))} s · ${esc(r.spent??'')} credits</span></div></article>`).join('')}</div>`;

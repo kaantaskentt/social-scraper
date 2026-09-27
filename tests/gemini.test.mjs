@@ -35,3 +35,10 @@ test('a key on the free tier (no billing) gets a plain message and is not retrie
  let calls=0;const freeTier=async()=>{calls++;return Response.json({error:{message:'Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-3.1-pro'}},{status:429});};
  await assert.rejects(generate({key:'k',model:'gemini-3.1-pro-preview',parts:[],fetchImpl:freeTier,sleep:async()=>{}}),/free tier.*billing/i);assert.equal(calls,1);
 });
+
+test('generate sends pictures inline with their type',async()=>{
+ let sent;const fetchImpl=async(url,opts)=>{sent=JSON.parse(opts.body);return ok({a:1})();};
+ await generate({key:'k',model:'gemini-3.8-flash',parts:[{image:Buffer.from('img'),mime:'image/png'},{image:Buffer.from('j')},{text:'look'}],fetchImpl});
+ assert.deepEqual(sent.contents[0].parts[0],{inline_data:{mime_type:'image/png',data:Buffer.from('img').toString('base64')}});
+ assert.equal(sent.contents[0].parts[1].inline_data.mime_type,'image/jpeg');
+});

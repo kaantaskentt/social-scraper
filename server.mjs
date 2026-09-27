@@ -17,6 +17,7 @@ import {handleShotlist} from './lib/shotlist.mjs';
 import {SecretBuilder} from './lib/secret-run.mjs';
 import {ReelPlanner} from './lib/reel-plan-run.mjs';
 import {ReelMaker} from './lib/reel-make.mjs';
+import {KitBuilder} from './lib/kit-run.mjs';
 import {higgsfieldBalance} from './lib/higgsfield-balance.mjs';
 import {score,LATEST} from './public/money/index.mjs';
 const ROOT=dirname(fileURLToPath(import.meta.url));
@@ -38,6 +39,7 @@ const replicator=await new Replicator(pipeline.root).init();
 const secrets=new SecretBuilder(pipeline.root,keys);
 const planner=new ReelPlanner(pipeline.root,keys);
 const maker=new ReelMaker(pipeline.root,keys);
+const kits=new KitBuilder(pipeline.root,keys);
 const clients=new Set();pipeline.listeners.add(id=>{for(const res of clients)res.write(`data: ${JSON.stringify({id})}\n\n`);});
 const publicJob=j=>{const copy=structuredClone(j);for(const p of copy.posts){if(p.transcript)delete p.transcript.raw;if(p.analysis)delete p.analysis.raw;}return copy;};
 const summary=j=>({id:j.id,creator:j.creator,status:j.status,createdAt:j.createdAt,count:j.posts.length,completed:j.posts.filter(p=>p.analysis).length});
@@ -72,6 +74,16 @@ const server=http.createServer(async(req,res)=>{
    if(req.method==='GET'){json(res,200,await maker.status(job));return;}
    if(req.method==='POST'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm the price first');json(res,202,await maker.start(job,{mode:data.mode,confirmCredits:Number(data.confirmCredits)}));return;}
    json(res,405,{error:'Method not allowed'});return;}
+  // The channel kit (costs a few cents per picture): POST {confirm:true, redo?, format?} builds it; /approve marks it used.
+  const kitRoute=path.match(/^\/api\/runs\/([\w-]+)\/kit(?:\/(approve))?$/);
+  if(kitRoute){const job=pipeline.jobs.get(kitRoute[1]);if(!job){json(res,404,{error:'Run not found'});return;}
+   if(req.method==='GET'&&!kitRoute[2]){json(res,200,await kits.status(job));return;}
+   if(req.method==='POST'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm the price first');
+    if(kitRoute[2]){json(res,200,await kits.approve(job));return;}json(res,202,await kits.start(job,{redo:data.redo,format:data.format}));return;}
+   json(res,405,{error:'Method not allowed'});return;}
+  const kitFile=path.match(/^\/channels\/([\w-]+)\/kit\/((?:face|turn|body)\d-[0-9a-f]{12}\.jpg|(?:hands|place|scene)-[0-9a-f]{12}\.jpg)$/);
+  if(kitFile){const file=join(kits.dir(kitFile[1]),kitFile[2]);let bytes;try{bytes=await readFile(file);}catch{res.writeHead(404);res.end();return;}
+   res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=31536000, immutable'});res.end(bytes);return;}
   const made=path.match(/^\/channels\/([\w-]+)\/([\w-]+)\/(reel\.mp4|kit\.png|shot-[\w-]+\.mp4)$/);
   if(made){const file=join(pipeline.root,'channels',made[1],'reels',made[2],made[3]);let info;try{info=await stat(file);}catch{res.writeHead(404);res.end();return;}
    res.writeHead(200,{'Content-Type':made[3].endsWith('.png')?'image/png':'video/mp4','Content-Length':info.size,'Accept-Ranges':'bytes','Cache-Control':'no-cache'});streamFile(res,file);return;}

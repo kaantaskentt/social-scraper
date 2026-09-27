@@ -34,3 +34,11 @@ After each step is built: run it in the browser, compare with this file, and wri
   away."), plain sentence per label, stale price (auto re-price, free), made ideas marked with their video, preview
   frame on finished reels, one card per account. Old research app moved to `/lab`. 255 tests pass.
   Next: Secret on a second, different account (nudeproject) to prove it generalises; scan flow end to end; e2e script.
+- 01:20 Channel kit (brand memory) built: study 3 winners → Jev picks the format → kit written → Nano Banana 2 draws
+  host face, every angle, full outfit, place, a reel frame → Gemini checks each (brief, same person, no text, not the
+  real creator) → Kit step at /. Real kits: Ken ($0.57) and nudeproject ($0.60), all pictures pass, checked by eye.
+  Fixed from looking: text in scenes (signature "words" kept out of pictures), unsent-reference answers ignored, "AI"
+  leaking into looks, outfits without colours. First Omni Flash test clip from the kit: same faces, script spoken word
+  for word, native sound, 10 s for $1.03; flaw: tripod in view (prompt fixed). Higgsfield credits are out; Gemini covers
+  pictures and video. 281 tests pass. Next: make reels from the kit with Omni (ideas and script per format, clips,
+  captions, render).
