@@ -68,7 +68,7 @@ test('spoken text for captions, AI disclosure in the caption, part verdicts',()=
  assert.equal(spokenText(script()),'Floppy celery? Wait. Ice water, fifteen minutes. Crunchy again. Follow for the next test.');
  assert.match(kitScriptPrompt({title:'t'},kit,'ai_host',{},craft),/Never ask viewers to comment a keyword.*The winners' craft, follow it/s);
  const rp=remakePrompt({first_second:'pour'},kit,'ai_host',craft);assert.match(rp,/Remake this proven reel/);assert.match(rp,/never copy sentences/);assert.match(rp,/myth.*replace it with a TRUE test/);
- assert.equal(discloseCaption('Save it. #x','ai_host'),'Save it. #x\n\nOur hosts are AI.');assert.equal(discloseCaption('Our AI hosts. #x','ai_host'),'Our AI hosts. #x');assert.equal(discloseCaption('Hands. #x','hands_pov'),'Hands. #x');
+ assert.equal(discloseCaption('Save it. #x','ai_host'),'Save it. #x\n\nOur hosts are AI.');assert.equal(discloseCaption('Our AI hosts. #x','ai_host'),'Our AI hosts. #x');assert.equal(discloseCaption('Hands. #x','hands_pov'),'Hands. #x\n\nMade with AI.');assert.equal(discloseCaption('Old reel. #x',undefined),'Old reel. #x\n\nMade with AI.');
  const ok={match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false};
  assert.deepEqual(partVerdict(ok),{pass:true,problems:[]});
  assert.deepEqual(partVerdict({...ok,match:1,same_people:'no',text_or_logos:true,gear_visible:true}).problems,['only partly follows the script','the hosts look different from the kit','text or a logo is visible','filming gear is visible']);
@@ -271,4 +271,21 @@ test('talking hosts: the script rule, a lower close-up bar, a lip-sync check, an
  s=await planner.setVoice(job,'talking');assert.equal(s.plan.voiceMode,'native');assert.equal(s.plan.voice.why,'In 63 of 79...');
  await assert.rejects(planner.setVoice(job,'singing'),/talking or voice-over/);
  await rm(root,{recursive:true});
+});
+
+test('Jev checks the method, not only each line: a wrong ingredient blocks the script',()=>{
+ const req=checkKitScriptRequest(script());assert.match(req.questions.method_correct.instructions,/baking soda needs an acid/);
+ const a={starts_mid_action:{noul:0.9},clear_action:{noul:0.8},health_fact:{noul:0.1},true_claim:{noul:0.9},emotion:{choice:'satisfaction'},gripping:{score:2.4},part_1_risky:{noul:0.1},part_2_risky:{noul:0.1},method_correct:{noul:0.2}};
+ assert.deepEqual(readKitScriptCheck({answers:a},script(),kit,'ai_host').problems,['The method or an ingredient is wrong: the result shown would not really happen']);
+});
+
+test('a clip whose result differs from the script always fails, whatever else is fine',()=>{
+ const ok={shows:'x',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing',lips_match:'yes'};
+ assert.equal(partVerdict({...ok,result_as_written:'yes'}).pass,true);assert.equal(partVerdict({...ok,result_as_written:'no_result_in_beats'}).pass,true);
+ assert.deepEqual(partVerdict({...ok,result_as_written:'no'}).problems,['the result is not what the script says']);
+});
+
+test('lip sync is judged only when the hosts talk on camera',()=>{
+ const ok={shows:'x',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing',lips_match:'no',result_as_written:'yes'};
+ assert.deepEqual(partVerdict(ok).problems,['the lips do not match the words']);assert.equal(partVerdict(ok,{talking:false}).pass,true);
 });
