@@ -20,6 +20,7 @@ import {ReelMaker} from './lib/reel-make.mjs';
 import {KitBuilder} from './lib/kit-run.mjs';
 import {DnaBuilder} from './lib/dna-run.mjs';
 import {ResultsTracker} from './lib/results.mjs';
+import {CopyStudio} from './lib/copy-run.mjs';
 import {higgsfieldBalance} from './lib/higgsfield-balance.mjs';
 import {score,LATEST} from './public/money/index.mjs';
 const ROOT=dirname(fileURLToPath(import.meta.url));
@@ -44,6 +45,7 @@ const maker=new ReelMaker(pipeline.root,keys);
 const kits=new KitBuilder(pipeline.root,keys);
 const dnas=new DnaBuilder(pipeline.root,keys);
 const results=new ResultsTracker(pipeline.root,keys);
+const copies=new CopyStudio(pipeline.root,keys,{planner,maker});
 const clients=new Set();pipeline.listeners.add(id=>{for(const res of clients)res.write(`data: ${JSON.stringify({id})}\n\n`);});
 const publicJob=j=>{const copy=structuredClone(j);for(const p of copy.posts){if(p.transcript)delete p.transcript.raw;if(p.analysis)delete p.analysis.raw;}return copy;};
 const summary=j=>({id:j.id,creator:j.creator,status:j.status,createdAt:j.createdAt,count:j.posts.length,completed:j.posts.filter(p=>p.analysis).length});
@@ -93,6 +95,14 @@ const server=http.createServer(async(req,res)=>{
   if(kitFile){const file=join(kits.dir(kitFile[1]),kitFile[2]);let bytes;try{bytes=await readFile(file);}catch{res.writeHead(404);res.end();return;}
    res.writeHead(200,{'Content-Type':kitFile[2].endsWith('.wav')?'audio/wav':'image/jpeg','Cache-Control':kitFile[2].endsWith('.wav')?'no-cache':'public, max-age=31536000, immutable'});res.end(bytes);return;}
   // Winner DNA (about half a cent a reel): every detail of every scored reel tested against the creator's own normal.
+  // The copy studio: pick the five most copyable winners (cents), then make the chosen copies (the confirmed price).
+  const copyRoute=path.match(/^\/api\/runs\/([\w-]+)\/copy(?:\/(pick|start|retry))?$/);
+  if(copyRoute){const job=pipeline.jobs.get(copyRoute[1]);if(!job){json(res,404,{error:'Run not found'});return;}
+   if(req.method==='GET'&&!copyRoute[2]){json(res,200,await copies.status(job));return;}
+   if(req.method==='POST'&&copyRoute[2]==='pick'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm first');await copies.pickStart(job);json(res,202,await copies.status(job));return;}
+   if(req.method==='POST'&&copyRoute[2]==='retry'){const data=await body(req);json(res,202,await copies.retry(job,{ids:data.ids,confirmUsd:Number(data.confirmUsd)}));return;}
+   if(req.method==='POST'&&copyRoute[2]==='start'){const data=await body(req);json(res,202,await copies.start(job,{ids:data.ids,confirmUsd:Number(data.confirmUsd)}));return;}
+  }
   // Real results: Kaan's handle, then a check scans his account (public, about 3 cents) and matches our reels.
   const resRoute=path.match(/^\/api\/runs\/([\w-]+)\/results(?:\/(handle|check))?$/);
   if(resRoute){const job=pipeline.jobs.get(resRoute[1]);if(!job){json(res,404,{error:'Run not found'});return;}
@@ -141,7 +151,7 @@ const server=http.createServer(async(req,res)=>{
    res.writeHead(200,{'Content-Type':'video/mp4','Accept-Ranges':'bytes','Content-Length':info.size,'Cache-Control':'no-cache'});streamFile(res,file);return;}
   const art=path.match(/^\/demo-art\/(\d+)\.svg$/);if(art){res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'});res.end(artwork(Number(art[1])));return;}
   const thumb=path.match(/^\/media\/([\w-]+)\/([\w-]+)$/);if(thumb){const job=pipeline.jobs.get(thumb[1]),post=job?.posts.find(p=>p.id===thumb[2]);if(!post?.thumbnailUrl){res.writeHead(404);res.end();return;}const file=join(pipeline.root,'media',post.id+'.img');let bytes;try{bytes=await readFile(file);}catch{if(!mediaPending.has(file))mediaPending.set(file,mediaTask(async()=>{const result=await download(post.thumbnailUrl,8*1024*1024);if(!/^image\/(jpeg|png|webp)/.test(result.type))throw new Error('Unsupported thumbnail format');await writeFile(file,result.bytes);return result.bytes;}).finally(()=>mediaPending.delete(file)));bytes=await mediaPending.get(file);}const type=bytes[0]===0x89?'image/png':bytes.toString('ascii',8,12)==='WEBP'?'image/webp':'image/jpeg';res.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=86400'});res.end(bytes);return;}
-  const files={'/record':'record.html','/record.js':'record.js','/record.css':'record.css','/':'flow.html','/lab':'index.html','/flow.js':'flow.js','/flow.css':'flow.css','/flow-views.mjs':'flow-views.mjs','/scan-map.mjs':'scan-map.mjs','/app.js':'app.js','/research.mjs':'research.mjs','/money-view.mjs':'money-view.mjs','/anatomy-view.mjs':'anatomy-view.mjs','/replicate-view.mjs':'replicate-view.mjs','/studio-view.mjs':'studio-view.mjs','/reel-plan-view.mjs':'reel-plan-view.mjs','/shotlist-text.mjs':'shotlist-text.mjs','/shot-lines.mjs':'shot-lines.mjs','/secret-view.mjs':'secret-view.mjs','/secret-labels.mjs':'secret-labels.mjs','/secret-mechanisms.mjs':'secret-mechanisms.mjs','/handles.mjs':'handles.mjs','/styles.css':'styles.css','/theme.css':'theme.css','/money/index.mjs':'money/index.mjs','/money/1.0.mjs':'money/1.0.mjs'};
+  const files={'/record':'record.html','/record.js':'record.js','/record.css':'record.css','/':'flow.html','/lab':'index.html','/flow.js':'flow.js','/flow.css':'flow.css','/flow-views.mjs':'flow-views.mjs','/scan-map.mjs':'scan-map.mjs','/copy-view.mjs':'copy-view.mjs','/app.js':'app.js','/research.mjs':'research.mjs','/money-view.mjs':'money-view.mjs','/anatomy-view.mjs':'anatomy-view.mjs','/replicate-view.mjs':'replicate-view.mjs','/studio-view.mjs':'studio-view.mjs','/reel-plan-view.mjs':'reel-plan-view.mjs','/shotlist-text.mjs':'shotlist-text.mjs','/shot-lines.mjs':'shot-lines.mjs','/secret-view.mjs':'secret-view.mjs','/secret-labels.mjs':'secret-labels.mjs','/secret-mechanisms.mjs':'secret-mechanisms.mjs','/handles.mjs':'handles.mjs','/styles.css':'styles.css','/theme.css':'theme.css','/money/index.mjs':'money/index.mjs','/money/1.0.mjs':'money/1.0.mjs'};
   if(files[path]){const file=join(ROOT,'public',files[path]);const content=await readFile(file);res.writeHead(200,{'Content-Type':path.endsWith('.css')?'text/css':path.endsWith('.js')||path.endsWith('.mjs')?'text/javascript':'text/html','Cache-Control':'no-cache'});res.end(content);return;}
   json(res,404,{error:'Not found'});
  }catch(e){json(res,400,{error:e.message||'Request failed'});}

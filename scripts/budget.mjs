@@ -8,5 +8,6 @@ const b=await readJson(join(ROOT,'experiments','budget.json'));let logs=0;
 for(const c of await readdir(join(ROOT,'channels')))for(const e of await readJson(join(ROOT,'channels',c,'spend.json'))||[])logs+=e.usd||0;
 const since=b.setAt||'2026-09-28T21:40:00Z',pair=(await lines(join(ROOT,'experiments','pairwise.jsonl'))).filter(r=>r.at>=since).reduce((a,r)=>a+(r.usd||0),0);
 const exam=(await lines(join(ROOT,'experiments','checker-eval.jsonl'))).filter(r=>r.at>=since).reduce((a,r)=>a+((r.usage?.input||0)*2+(r.usage?.output||0)*10)/1e6,0); // Sonnet 5 prices
-const spent=logs-b.baselineUsd+pair+exam;
-console.log(`Spent $${spent.toFixed(2)} of $${b.capUsd} (channels $${(logs-b.baselineUsd).toFixed(2)}, pairwise tests $${pair.toFixed(2)}, checker exams $${exam.toFixed(2)}). Left $${(b.capUsd-spent).toFixed(2)}.`);
+const fid=(await lines(join(ROOT,'experiments','fidelity-eval.jsonl'))).filter(r=>r.at>=since).reduce((a,r)=>a+(r.usd||0),0);
+const spent=logs-b.baselineUsd+pair+exam+fid;
+console.log(`Spent $${spent.toFixed(2)} of $${b.capUsd} (channels $${(logs-b.baselineUsd).toFixed(2)}, pairwise tests $${pair.toFixed(2)}, checker exams $${exam.toFixed(2)}, copy exams $${fid.toFixed(2)}). Left $${(b.capUsd-spent).toFixed(2)}.`);

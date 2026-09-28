@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {freePort} from './free-port.mjs';
 import {spawn} from 'node:child_process';
 import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 test('server: the kit needs a confirm and a Secret, serves only kit pictures, and says what it costs',async()=>{
- const root=await mkdtemp(join(tmpdir(),'cl-srv-kit-'));const port=5400+Math.floor(Math.random()*400);
+ const root=await mkdtemp(join(tmpdir(),'cl-srv-kit-'));const port=await freePort();
  await mkdir(join(root,'runs'),{recursive:true});await writeFile(join(root,'runs','run1.json'),JSON.stringify({id:'run1',creator:'tester',status:'complete',createdAt:'2026-09-25T00:00:00Z',posts:[],events:[]}));
  await mkdir(join(root,'channels','run1','kit'),{recursive:true});await writeFile(join(root,'channels','run1','kit','face0-0123456789ab.jpg'),'JPEG');await writeFile(join(root,'channels','run1','kit','study.json'),'{}');
  const child=spawn(process.execPath,['server.mjs'],{cwd:new URL('..',import.meta.url),env:{PATH:process.env.PATH,PORT:String(port),LAB_DATA_DIR:root,GEMINI_API_KEY:'g',TYPESAFE_API_KEY:'j'},stdio:['ignore','pipe','pipe']});

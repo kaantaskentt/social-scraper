@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {freePort} from './free-port.mjs';
 import {spawn} from 'node:child_process';
 import {mkdtemp,rm,mkdir,writeFile,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 test('server streams saved videos with seeking, reports them, and deletes only videos',async()=>{
- const root=await mkdtemp(join(tmpdir(),'cl-srv-v-'));const port=5400+Math.floor(Math.random()*400);
+ const root=await mkdtemp(join(tmpdir(),'cl-srv-v-'));const port=await freePort();
  await mkdir(join(root,'runs'),{recursive:true});await mkdir(join(root,'videos','run1'),{recursive:true});
  const run={id:'run1',creator:'tester',status:'complete',createdAt:'2026-09-25T00:00:00Z',posts:[{id:'a',publishedAt:'2026-09-01T00:00:00Z',plays:1000,comments:2,caption:'',videoUrl:''}],events:[]};
  await writeFile(join(root,'runs','run1.json'),JSON.stringify(run));await writeFile(join(root,'videos','run1','a.mp4'),'0123456789');

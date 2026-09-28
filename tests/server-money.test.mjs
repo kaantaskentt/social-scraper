@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {freePort} from './free-port.mjs';
 import {spawn} from 'node:child_process';
 import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 test('server serves the money report and the money modules',async()=>{
- const root=await mkdtemp(join(tmpdir(),'cl-srv-'));const port=5400+Math.floor(Math.random()*400);
+ const root=await mkdtemp(join(tmpdir(),'cl-srv-'));const port=await freePort();
  await mkdir(join(root,'runs'),{recursive:true});
  await writeFile(join(root,'runs','run1.json'),JSON.stringify({id:'run1',creator:'tester',status:'complete',createdAt:'2026-09-25T00:00:00Z',scrape:{finishedAt:'2026-09-25T00:00:00Z'},posts:[{id:'a',publishedAt:'2026-09-01T00:00:00Z',plays:1000,comments:2,caption:'Comment "YES"'}],events:[]}));
  const child=spawn(process.execPath,['server.mjs'],{cwd:new URL('..',import.meta.url),env:{PATH:process.env.PATH,PORT:String(port),LAB_DATA_DIR:root},stdio:['ignore','pipe','pipe']});

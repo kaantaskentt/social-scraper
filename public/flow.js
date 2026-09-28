@@ -3,6 +3,7 @@ import {reachable,renderStepper,renderScan,renderWinners,renderSecret,renderKit,
 import {pickWinners} from './studio-view.mjs';
 import {parseHandles} from './handles.mjs';
 import {mountScanMap,reach} from './scan-map.mjs';
+import {renderCopyStudio,copyLive,copyShape} from './copy-view.mjs';
 
 const $=s=>document.querySelector(s);
 const S={pricing:false,runs:[],runId:null,job:null,results:null,saved:new Set(),secret:null,kit:null,plan:null,make:null,balance:null,step:'scan',mode:'fast',busy:false,error:'',feedback:null,timer:null};
@@ -49,7 +50,15 @@ function render(){
  if(S.step==='winners')html=renderWinners({account,...winners()});
  if(S.step==='secret')html=renderSecret({account,status:S.secret,imageFor,feedback:S.feedback,dna:S.dna});
  if(S.step==='kit')html=renderKit({account,status:S.kit,busy:S.busy,error:S.error,pick:S.kitPick,reels:(S.make?.reels||[]).filter(r=>r.mode==='kit'&&r.kitAt===S.kit?.saved?.createdAt)});
- if(S.step==='make')html=renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing,kit:S.kit?.saved,fbOpen:S.fbOpen,showAll:S.showAllIdeas});
+ // Make: the copy studio first (copy their proven winners, Kaan 2026-09-29); new ideas one tap away.
+ if(S.step==='make'&&S.makeView!=='ideas'&&S.kit?.saved?.approved){
+  const shape=`copy:${S.runId}:${copyShape(S.copy)}:${S.copyCompare}:${[...(S.copyUnpicked||[])].join()}:${S.busy}:${S.error}`;
+  // Only the numbers move while copies are made, so a playing video is never reset by the once-a-second refresh.
+  if(shape===S.viewKey&&$('#view .copy-grid')){patchCopy(copyLive(S.copy));return;}
+  S.viewKey=shape;S.lastHtml=null;
+  $('#view').innerHTML=`<header class="step-head"><h1>Copy @${esc(account)}'s winners</h1><p>Same shots, words and sounds as their proven reels, with your hosts. <button type="button" class="link-btn" data-act="make-ideas">Or make a new idea instead</button></p></header>${S.error?`<p class="err">${esc(S.error)}</p>`:''}${renderCopyStudio({copy:S.copy,kit:S.kit?.saved,busy:S.busy,unpicked:S.copyUnpicked||new Set(),compareOpen:S.copyCompare})}`;return;
+ }
+ if(S.step==='make')html=`${S.kit?.saved?.approved?'<p class="hint back-row"><button type="button" class="link-btn" data-act="make-copy">← Back to copying their winners</button></p>':''}${renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing,kit:S.kit?.saved,fbOpen:S.fbOpen,showAll:S.showAllIdeas})}`;
  if(S.step==='ready')html=renderReady({reels:S.make?.reels||[],fbOpen:S.fbOpen,judge:S.make?.judge,results:S.results2,busy:S.busy});
  // The scan map keeps its tiles between refreshes (so they fly from the wall to the map); the rest redraws.
  const key=S.step==='scan'?`scan:${S.runId}:${scanProgress()?.state}:${S.error}:${S.runs.length}`:null;
@@ -59,25 +68,33 @@ function render(){
   mountScanMap($('#view'),{posts:S.job.posts,imageFor,videoFor,selected:S.scanSel,onSelect:id=>{S.scanSel=id;render();}});}
 }
 addEventListener('resize',()=>{if(S.step==='scan')render();});
+// The live numbers of the copy studio, written into the page in place.
+function patchCopy(live){
+ if(!live)return;const set=(el,v)=>{if(el&&el.textContent!==v)el.textContent=v;};
+ for(const i of live.items){const t=$(`#view [data-tile="${CSS.escape(i.postId)}"]`);if(!t)continue;t.style.setProperty('--p',i.pct);set(t.querySelector('[data-live="pct"]'),`${i.pct}%`);set(t.querySelector('[data-live="stage"]'),i.stage);set(t.querySelector('[data-live="eta"]'),i.eta);}
+ const bar=$('#view [data-live="batch-bar"]');if(bar)bar.style.width=`${live.pct}%`;set($('#view [data-live="batch-eta"]'),live.eta);
+}
 
 // Loads everything for one account; later refreshes only fetch what is still running.
 async function loadRun(id,{keepStep=false}={}){
  const switching=S.runId!==id;S.runId=id;store.set('flow.run',id);S.error='';S.scanSel=null;if(switching){S.job=null;render();}
  const base=`/api/runs/${encodeURIComponent(id)}`;
- let loaded;try{loaded=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(()=>({results:{}})),api(`${base}/dna`).catch(e=>({state:'none',error:e.message})),api(`${base}/results`).catch(()=>null)]);}
+ let loaded;try{loaded=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(()=>({results:{}})),api(`${base}/dna`).catch(e=>({state:'none',error:e.message})),api(`${base}/results`).catch(()=>null),api(`${base}/copy`).catch(()=>null)]);}
  // A channel that cannot load goes back to the account list with the reason, never a spinner forever.
  catch(e){if(S.runId===id){S.runId=null;S.step='scan';S.error=e.message;render();}throw e;}
- const [job,videos,secret,kit,plan,make,money,dna,results2]=loaded;
+ const [job,videos,secret,kit,plan,make,money,dna,results2,copy]=loaded;
 
  if(S.runId!==id)return;
- Object.assign(S,{job,dna,results2,saved:new Set(videos.saved||[]),secret,kit,plan,make,results:money.results||{},feedback:secret?.saved?.feedback||null});
+ Object.assign(S,{job,dna,results2,copy,copyUnpicked:new Set(),saved:new Set(videos.saved||[]),secret,kit,plan,make,results:money.results||{},feedback:secret?.saved?.feedback||null});
  if(!keepStep){const d=doneSteps(),remembered=store.get(`flow.step.${id}`);S.step=remembered&&reachable(flags())[remembered]?remembered:d.kit?'make':d.secret?'kit':d.winners?'winners':'scan';}
  render();poll();if(S.step==='make')prepareMake();
 }
 function poll(){
  clearTimeout(S.timer);
- const live=scanning()||S.secret?.state==='building'||S.kit?.state==='working'||S.dna?.state==='working'||S.plan?.state==='working'||S.make?.state==='working';
- if(live)S.timer=setTimeout(refresh,3000);
+ const copying=S.copy?.picking?.state==='working'||S.copy?.batch?.items.some(i=>['working','waiting'].includes(i.state));
+ const live=copying||scanning()||S.secret?.state==='building'||S.kit?.state==='working'||S.dna?.state==='working'||S.plan?.state==='working'||S.make?.state==='working';
+ // The copy studio refreshes every second: its rings and bar show real progress.
+ if(live)S.timer=setTimeout(refresh,copying?1000:3000);
 }
 async function refresh(){
  const id=S.runId,base=`/api/runs/${encodeURIComponent(id)}`;
@@ -89,6 +106,7 @@ async function refresh(){
   // When the script is ready the answer is at the top of the page: bring it into view.
   if(S.plan?.state==='working'){S.plan=await api(`${base}/reel-plan`);if(S.plan.state!=='working')scrollTo({top:0,behavior:'smooth'});}
   if(S.make?.state==='working'){S.make=await api(`${base}/reel-make`);if(S.make.state!=='working')S.balance=null;}
+  if(S.copy?.picking?.state==='working'||S.copy?.batch?.items.some(i=>['working','waiting'].includes(i.state))){const was=S.copy;S.copy=await api(`${base}/copy`);if(was?.picking?.state==='working'&&S.copy.picking?.state==='done')S.copyUnpicked=new Set();if(S.copy.batch&&!S.copy.batch.items.some(i=>['working','waiting'].includes(i.state)))S.make=await api(`${base}/reel-make`);}
  }catch(e){S.error=e.message;}
  if(S.runId===id){render();poll();}
 }
@@ -106,7 +124,7 @@ async function reprice(){
 async function loadBalance(){try{S.balance=(await api('/api/higgsfield/balance')).credits;}catch(e){S.balance=null;S.error=e.message;}render();}
 
 document.addEventListener('click',async e=>{
- const t=e.target.closest('[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close],[data-kit-format],[data-kit-cast],[data-kit-place],[data-voice],[data-fb],[data-fb-reason],[data-voice-mode]');if(!t||t.disabled)return;
+ const t=e.target.closest('[data-copy-pick],[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close],[data-kit-format],[data-kit-cast],[data-kit-place],[data-voice],[data-fb],[data-fb-reason],[data-voice-mode]');if(!t||t.disabled)return;
  const base=`/api/runs/${encodeURIComponent(S.runId)}`;
  if(t.dataset.step){S.step=t.dataset.step;store.set(`flow.step.${S.runId}`,S.step);render();scrollTo({top:0,behavior:'smooth'});if(S.step==='make')prepareMake();return;}
  if(t.dataset.run){loadRun(t.dataset.run).catch(err=>toast(err.message));return;}
@@ -134,6 +152,23 @@ document.addEventListener('click',async e=>{
  if(t.dataset.act==='make-cover'){const id=t.dataset.reel;act(async()=>{const saved=await api(`${base}/reel-cover`,{reelId:id});S.make.reels=S.make.reels.map(x=>x.id===id?saved:x);});return;}
  if(t.dataset.act==='dna-build'){act(async()=>{S.dna=await api(`${base}/dna`,{confirm:true});});return;}
  if(t.dataset.act==='results-check'){act(async()=>{S.results2={...S.results2,state:'working'};render();try{S.results2={...(await api(`${base}/results/check`,{confirm:true})),state:'done'};}catch(e){S.results2={...S.results2,state:'failed',error:e.message};throw e;}});return;}
+ // The copy studio.
+ if(t.dataset.act==='make-ideas'||t.dataset.act==='make-copy'){S.makeView=t.dataset.act==='make-ideas'?'ideas':'copy';S.viewKey=null;render();if(S.makeView==='ideas')prepareMake();scrollTo({top:0,behavior:'smooth'});return;}
+ if(t.dataset.copyPick){const u=S.copyUnpicked||(S.copyUnpicked=new Set());u.has(t.dataset.copyPick)?u.delete(t.dataset.copyPick):u.add(t.dataset.copyPick);render();return;}
+ if(t.dataset.act==='copy-pick'){act(async()=>{S.copy=await api(`${base}/copy/pick`,{confirm:true});S.copyUnpicked=new Set();S.copyCompare=false;});return;}
+ if(t.dataset.act==='copy-compare'){S.copyCompare=!S.copyCompare;render();if(S.copyCompare)setTimeout(()=>$('#view .cmp-grid')?.scrollIntoView({behavior:'smooth',block:'start'}),50);return;}
+ if(t.dataset.act==='copy-new'){act(async()=>{S.copy=await api(`${base}/copy/pick`,{confirm:true});S.copyUnpicked=new Set();S.copyCompare=false;});return;}
+ if(t.dataset.act==='copy-sync'){const id=t.dataset.post,a=$(`#view [data-orig="${CSS.escape(id)}"]`),b=$(`#view [data-tile="${CSS.escape(id)}"] video`);if(!a||!b)return;
+  // Both from the start, together; pausing either pauses both.
+  for(const v of [a,b]){v.pause();v.currentTime=0;v.muted=v===a;}const stop=()=>{a.pause();b.pause();};a.onpause=b.onpause=stop;Promise.all([a.play(),b.play()]).catch(()=>toast('Press play on each video once, then try again.'));return;}
+ if(t.dataset.act==='copy-retry'){const usd=Number(t.dataset.usd),ids=[t.dataset.post];
+  $('#confirm-title').textContent='Try this copy again?';$('#confirm-look').innerHTML='';$('#confirm-text').textContent=usd?`Parts already made are kept. The parts still to film cost about $${usd.toFixed(2)} (up to twice that with a retry).`:'Every part is already made: this only edits and compares it (a few cents).';
+  $('#confirm').returnValue='';$('#confirm').showModal();
+  $('#confirm').addEventListener('close',()=>{if($('#confirm').returnValue!=='ok')return;act(async()=>{S.copy=await api(`${base}/copy/retry`,{ids,confirmUsd:usd});});},{once:true});return;}
+ if(t.dataset.act==='copy-start'){const usd=Number(t.dataset.usd),ids=t.dataset.ids.split(',').filter(Boolean);
+  $('#confirm-title').textContent=ids.length>1?`Make these ${ids.length} copies?`:'Make this copy?';  $('#confirm-look').innerHTML=renderConfirmLook(S.kit?.saved);$('#confirm-text').textContent=`This makes ${ids.length} cop${ids.length>1?'ies':'y'} at once for about $${usd.toFixed(2)} on your Gemini key (up to twice that if parts need their one retry). Copies are word for word from their originals: internal tests, check claims before posting.`;
+  $('#confirm').returnValue='';$('#confirm').showModal();
+  $('#confirm').addEventListener('close',()=>{if($('#confirm').returnValue!=='ok')return;act(async()=>{S.copy=await api(`${base}/copy/start`,{ids,confirmUsd:usd});S.copyCompare=false;});},{once:true});return;}
  if(t.dataset.act==='ideas-all'){S.showAllIdeas=true;render();return;}
  const a=t.dataset.act;
  if(a==='kit-build')kitGo({});if(a==='kit-character')kitGo({redo:'character'});if(a==='kit-pictures')kitGo({redo:'pictures'});
@@ -143,7 +178,7 @@ document.addEventListener('click',async e=>{
  if(a==='ideas')act(async()=>{S.plan=await api(`${base}/reel-plan/ideas`,{confirm:true});});
  if(a==='make'){
   const usd=t.dataset.usd!==undefined,credits=Number(usd?t.dataset.usd:t.dataset.credits),max=Number(t.dataset.max);
-  $('#confirm-look').innerHTML=usd?renderConfirmLook(S.kit?.saved):'';
+  $('#confirm-title').textContent='Make this reel?';  $('#confirm-look').innerHTML=usd?renderConfirmLook(S.kit?.saved):'';
   $('#confirm-text').textContent=usd?`This spends about $${credits.toFixed(2)} on your Gemini key (up to $${max.toFixed(2)} if a part needs its one retry). Each part is checked before the next one is paid for.`:`This spends ${credits} Higgsfield credits (up to ${max} if shots need their one retry). You have ${S.balance??'?'} credits. Each shot is checked before the next one is paid for.`;
   $('#confirm').returnValue='';$('#confirm').showModal();
   $('#confirm').addEventListener('close',()=>{if($('#confirm').returnValue!=='ok')return;act(async()=>{S.make={...(await api(`${base}/reel-make`,{confirm:true,mode:S.mode,confirmCredits:credits})),reels:S.make?.reels||[]};});},{once:true});

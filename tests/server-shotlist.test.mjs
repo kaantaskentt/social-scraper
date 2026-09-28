@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {freePort} from './free-port.mjs';
 import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';
@@ -7,7 +8,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 const exec=promisify(execFile);
 test('server: shot list opens from a saved video, frames are served, lines need the lab token and are kept',async()=>{
- const root=await mkdtemp(join(tmpdir(),'cl-srv-s-'));const port=5400+Math.floor(Math.random()*400);
+ const root=await mkdtemp(join(tmpdir(),'cl-srv-s-'));const port=await freePort();
  await mkdir(join(root,'runs'),{recursive:true});await mkdir(join(root,'videos','run1'),{recursive:true});
  await exec('ffmpeg',['-v','error','-y','-f','lavfi','-i','color=c=red:s=90x160:d=1','-f','lavfi','-i','color=c=blue:s=90x160:d=1','-filter_complex','[0][1]concat=n=2:v=1:a=0','-pix_fmt','yuv420p',join(root,'videos','run1','a.mp4')]);
  const run={id:'run1',creator:'tester',status:'complete',createdAt:'2026-09-25T00:00:00Z',posts:[{id:'a',url:'https://www.instagram.com/reel/a/',publishedAt:'2026-09-01T00:00:00Z',plays:1000,caption:'',videoUrl:'',analysis:{anatomy:[{start:0,end:0.9,text:'Stop doing this.',value:'hook'}]}}],events:[]};

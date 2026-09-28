@@ -46,14 +46,15 @@ test('after a restart a saved id is picked up again, not paid twice; a job cut o
  await rm(dir,{recursive:true});
 });
 
-test('a retry is a new attempt; a failed job is saved as failed with its cost; a job without id fails loudly',async()=>{
+test('a retry is a new attempt; a failed job is saved as failed with its cost; a job without id fails loudly and is held as uncertain',async()=>{
  const dir=await setup(),g=google(),jobs=new VideoJobs(dir,opts(g));
  await jobs.run('part-1',{input:[]});const g2=google();const retry=await new VideoJobs(dir,opts(g2)).run('part-1',{attempt:2,input:[]});
  assert.equal(g2.calls.post.length,1);assert.match(retry.file,/part-1-a2\.mp4$/);
  const bad=google({fail:true});await assert.rejects(new VideoJobs(dir,opts(bad)).run('part-3',{input:[]}),/stopped \(failed\)/);
  assert.equal(JSON.parse(await readFile(join(dir,'jobs','part-3.json'),'utf8')).status,'failed');
  const noId=google({noId:true});await assert.rejects(new VideoJobs(dir,opts(noId)).run('part-4',{input:[]}),/no job id|did not return a job id/);
- assert.equal(JSON.parse(await readFile(join(dir,'jobs','part-4.json'),'utf8')).status,'failed');
+ // Google answered 200 without an id: a job may exist and be billed, so it is held as uncertain, never resent blindly.
+ assert.equal(JSON.parse(await readFile(join(dir,'jobs','part-4.json'),'utf8')).status,'submitting');
  await rm(dir,{recursive:true});
 });
 
@@ -82,4 +83,30 @@ test('a refused prompt keeps its words (not the pictures) for diagnosis',async()
   await assert.rejects(jobs.run('part-1',{input:[{type:'image',data:'xx'},{type:'text',text:'Vance holds a plank'}]}));
   const rec=JSON.parse(await readFile(join(dir,'jobs','part-1.json'),'utf8'));assert.equal(rec.status,'failed');assert.equal(rec.prompt,'Vance holds a plank');
  }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test('too many requests (429) is "not now": the submission is sent again, a busy poll asks again; nothing fails',async()=>{
+ const dir=await setup(),g=google();let posts=0,gets=0;const waits=[];
+ const fetchImpl=async(url,o={})=>{
+  const busy=()=>new Response(JSON.stringify({error:{message:'Rate limit exceeded for model gemini-omni-1.1-flash (limit: 8 requests per minute)'}}),{status:429});
+  if(o.method==='POST'&&posts++<2)return busy();
+  if(!o.method&&!url.includes(':download')&&gets++<1)return busy();
+  return g.fetchImpl(url,o);};
+ const jobs=new VideoJobs(dir,{...opts(g),fetchImpl,sleep:async ms=>{waits.push(ms);}});
+ const r=await jobs.run('part-2',{input:[{type:'text',text:'hi'}],responseFormat:{type:'video'}});
+ assert.equal(r.status,'done');assert.equal(posts,3);assert.ok(waits.some(ms=>ms>=10000),'it waited before asking again');
+ assert.equal(g.calls.post.length,1); // only the accepted submission reached the fake Google
+ await rm(dir,{recursive:true});
+});
+
+test('a lost reply when sending stays "uncertain" (never resent); an earlier attempt is never sent after a later one',async()=>{
+ const dir=await setup();const g=google();let hang=true;
+ const fetchImpl=async(url,o={})=>{if(o.method==='POST'&&hang){hang=false;throw new Error('socket hang up');}return g.fetchImpl(url,o);};
+ const jobs=new VideoJobs(dir,{...opts(g),fetchImpl});
+ await assert.rejects(jobs.run('part-1',{input:[{type:'text',text:'hi'}]}),/socket hang up/);
+ assert.equal((await jobs.record('part-1')).status,'submitting');
+ await assert.rejects(jobs.run('part-1',{input:[{type:'text',text:'hi'}]}),/may already be paid/);assert.equal(g.calls.post.length,0);
+ const d2=await setup(),g2=google(),j2=new VideoJobs(d2,opts(g2));await j2.run('part-1',{attempt:2,input:[]});
+ await assert.rejects(j2.run('part-1',{attempt:1,input:[]}),/already on attempt 2/);assert.equal(g2.calls.post.length,1);
+ await rm(dir,{recursive:true});await rm(d2,{recursive:true});
 });

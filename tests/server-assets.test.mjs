@@ -1,6 +1,7 @@
 // Every module the page imports must be served: a missing one breaks the whole app (it happened on 2026-09-27).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {freePort} from './free-port.mjs';
 import {spawn} from 'node:child_process';
 import {mkdtemp,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -12,7 +13,7 @@ async function importsOf(file,seen=new Set()){
  return seen;
 }
 test('server: every module reachable from app.js is served',async()=>{
- const root=await mkdtemp(join(tmpdir(),'cl-srv-a-'));const port=5400+Math.floor(Math.random()*400);
+ const root=await mkdtemp(join(tmpdir(),'cl-srv-a-'));const port=await freePort();
  const child=spawn(process.execPath,['server.mjs'],{cwd:new URL('..',import.meta.url),env:{PATH:process.env.PATH,PORT:String(port),LAB_DATA_DIR:root},stdio:['ignore','pipe','pipe']});
  try{await new Promise((ok,fail)=>{child.stdout.on('data',d=>String(d).includes('ready')&&ok());child.on('exit',c=>fail(new Error('server exited '+c)));setTimeout(()=>fail(new Error('timeout')),8000);});
   const files=[...new Set([...await importsOf('app.js'),...await importsOf('flow.js'),'flow.css','flow.js'])];assert.ok(files.length>8,files.join(','));

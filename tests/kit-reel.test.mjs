@@ -308,3 +308,16 @@ test('a script that invents a pointless test is stopped (code: "Test Number" onl
  assert.ok(!scriptProblems(sc('Test your baking soda','Test Number One.'),kit,'ai_host').includes('It adds a pointless test the idea does not need'));
  assert.ok(!scriptProblems(sc('Carrot cake oatmeal','Grate them.'),kit,'ai_host').includes('It adds a pointless test the idea does not need'));
 });
+
+test('copy mode: a part Google refuses is softened once (only its words) and sent again; the copy is marked internal, not blocked',async()=>{
+ const {root,job,ch}=await setup();const keys=()=>({gemini:'g',jev:'j',groq:'q'});
+ await writeFile(join(ch,'plan.json'),JSON.stringify({mode:'kit',source:'copy',copyOf:'orig1',kitAt:kitSaved.createdAt,createdAt:'2026-09-29T01:00:00Z',chosen:0,picked:[{idea:{title:'Copy'}}],script:script(),check:{pass:true},price:{usd:2.17}}));
+ const g=fakeGoogle();let refused=0;const fetchImpl=async(url,o={})=>{if(o.method==='POST'&&JSON.parse(o.body).previous_interaction_id&&refused++===0)return new Response(JSON.stringify({error:{message:'Request blocked due to prohibited content guidelines.'}}),{status:400});return g.fetchImpl(url,o);};
+ const fine={shows:'x',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'};let softens=0;
+ const gemini=async({schema})=>{if(schema.properties.beats&&!schema.properties.shows){softens++;return {json:{beats:script().parts[1].beats.map(b=>({does:b.does,says:'softened words'}))},costUsd:0.001};}return {json:fine,costUsd:0};};
+ const maker=new ReelMaker(root,keys,{cover:fakeCover,gemini,jev:async()=>good,videoFetch:fetchImpl,pollMs:0,seconds:async()=>20,cut:async(i,o)=>{await writeFile(o,'c');return o;},render:async a=>{await writeFile(a.out,'R');return {seconds:22,spoken:[{text:'Comment'},{text:'EGG'}]};}});
+ await maker.start(job,{confirmCredits:2.17});const m=await until(()=>maker.status(job));assert.equal(m.state,'done',m.error);
+ assert.equal(softens,1);assert.equal(refused,2);const reel=m.reels[0];assert.deepEqual(reel.softened,[2]);assert.equal(reel.internal,true);assert.equal(reel.copyOf,'orig1');
+ assert.equal(reel.review,undefined); // a copied "comment" line is not a blocker in copy mode
+ assert.match(JSON.stringify(g.calls.post.at(-1)),/softened words/);assert.equal(reel.score,undefined); // no creative scores for a copy
+});
