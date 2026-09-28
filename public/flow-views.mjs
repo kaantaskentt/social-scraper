@@ -259,6 +259,6 @@ export function renderReady({reels=[],fbOpen=null}){
 <div class="ready-media"><video src="${esc(r.url)}#t=0.5" controls playsinline preload="metadata"></video>${r.cover?`<img class="ready-cover" src="${esc(r.cover)}" alt="Cover">`:`<button type="button" class="ready-cover is-empty" data-act="make-cover" data-reel="${esc(r.id)}">Make the cover · free</button>`}</div>
 <div class="ready-body"><h3>${esc(r.title||'Reel')}</h3><p class="caption" id="cap-${esc(r.id)}">${esc(r.caption||'')}</p>
 <div class="ready-actions"><a class="btn btn-primary" href="${esc(r.url)}" download>1 · Download the reel</a>${r.cover?`<a class="btn" href="${esc(r.cover)}" download>2 · Download the cover</a>`:''}<button type="button" class="btn" data-copy="cap-${esc(r.id)}">${r.cover?'3':'2'} · Copy the caption</button></div>
-<span class="hint">${esc(Math.round(r.seconds||0))} s · ${Number.isFinite(r.spentUsd)?`$${esc(r.spentUsd.toFixed(2))}`:`${esc(r.spent??'')} credits`}</span>${renderReelScore(r,{open:fbOpen===r.id})}</div></article>`).join('')}</div>`;
+<span class="hint">${esc(Math.round(r.seconds||0))} s · ${Number.isFinite(r.spentUsd)?`$${esc(r.spentUsd.toFixed(2))}`:`${esc(r.spent??'')} credits`}</span>${renderReelScore(r,{open:fbOpen===r.id})}</div></article>`).join('')}</div>${next('make','Make another reel')}`;
 }
 

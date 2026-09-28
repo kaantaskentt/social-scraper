@@ -230,3 +230,8 @@ test('a blocked script is never a dead end: try the next idea or write it again'
  assert.match(html,/Jev stopped this script before any money was spent: The method or an ingredient is wrong/);assert.match(html,/data-idea="1">Try the next idea: Egg float/);assert.match(html,/data-idea="0">Write this one again/);
  assert.match(html,/Write the script again/);assert.doesNotMatch(html,/data-act="make"/);
 });
+
+test('the Ready step leads straight to the next reel',()=>{
+ const html=renderReady({reels:[{id:'a',url:'/r.mp4',title:'T',caption:'c',seconds:20,spentUsd:2}]});
+ assert.match(html,/data-step="make">Make another reel →/);
+});
