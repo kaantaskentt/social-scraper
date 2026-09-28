@@ -232,3 +232,24 @@ test('the payoff must be shown up close, and objects named in every beat',()=>{
  assert.deepEqual(readKitScriptCheck({answers:a},script(),kit,'ai_host').problems,['The result is not shown in a close-up right after the action']);
  assert.match(kitScriptPrompt({title:'t'},kit,'ai_host',{}),/never just "curls"/);
 });
+
+test('the Winner DNA reaches the idea and script writers, Jev\'s check, and the voice direction',async()=>{
+ const {root,job,ch}=await setup();const keys=()=>({gemini:'g',jev:'j',groq:'q'});
+ await writeFile(join(ch,'dna.json'),JSON.stringify({validation:{verdict:'luck'},details:[{detail:'voice',value:'calm',plain:'A calm voice',rho:0.27,withX:3.28,withoutX:1.21,n:34,evidence:'hint'},{detail:'payoffs',value:'3+',plain:'Three or more payoffs',rho:0.33,withX:4.74,withoutX:1.2,n:11,evidence:'hint'}]}));
+ const prompts=[],jevStates=[];
+ const gemini=async({schema,parts})=>{prompts.push(parts[0].text);return schema.required.includes('ideas')?{json:{ideas:[{title:'T',hook_line:'h',demo:'d',steps:[],keyword:'K'}]},costUsd:0}:{json:script(),costUsd:0};};
+ const planner=new ReelPlanner(root,keys,{gemini,jev:async r=>{jevStates.push(r);return good;}});
+ await planner.startIdeas(job);await until(()=>planner.status(job));await planner.startScript(job,0);const s=await until(()=>planner.status(job));
+ assert.match(prompts[0],/Winner DNA of this channel.*tie-breakers, not rules.*Lean towards: A calm voice \(3\.28x.*Three or more payoffs/s);
+ assert.match(prompts.at(-1),/Winner DNA of this channel/);
+ const scriptCheck=jevStates.find(r=>r.questions.dna_match);assert.ok(scriptCheck);assert.match(scriptCheck.state.dna.do_more[0],/A calm voice/);
+ assert.equal(s.plan.check.pass,true); // DNA never blocks
+ // The voice direction follows the DNA.
+ const spoken=[];const g=fakeGoogle(),ok={shows:'ok',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'};
+ await writeFile(join(ch,'plan.json'),JSON.stringify({...s.plan,voiceMode:'designed'}));
+ const maker=new ReelMaker(root,keys,{gemini:async()=>({json:ok,costUsd:0}),jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async f=>/line-/.test(f)?1:20,cut:async(i,o)=>{await writeFile(o,'c');return o;},
+  voices:{design:async({name})=>({id:`v_${name}`,costUsd:0}),speak:async a=>{spoken.push(a.style);return {wav:Buffer.from('w'),costUsd:0};},mix:async a=>{await writeFile(a.out,'M');return a.out;},trim:async(i,o)=>{await writeFile(o,'t');return o;}},render:async a=>{await writeFile(a.out,'R');return {seconds:22};}});
+ await maker.start(job,{confirmCredits:s.plan.price.usd});const m=await until(()=>maker.status(job));assert.equal(m.state,'done',m.error);
+ assert.match(spoken[0],/^calm, warm and steady, at a natural pace/);
+ await rm(root,{recursive:true});
+});

@@ -45,7 +45,7 @@ function render(){
  const account=S.job?.creator||'';let html='';
  if(S.step==='scan')html=renderScan({runs:S.runs,run:S.job?{id:S.runId,creator:S.job.creator,count:S.job.posts.length}:null,progress:scanProgress(),error:S.error});
  if(S.step==='winners')html=renderWinners({account,...winners()});
- if(S.step==='secret')html=renderSecret({account,status:S.secret,imageFor,feedback:S.feedback});
+ if(S.step==='secret')html=renderSecret({account,status:S.secret,imageFor,feedback:S.feedback,dna:S.dna});
  if(S.step==='kit')html=renderKit({account,status:S.kit,busy:S.busy,error:S.error,pick:S.kitPick,reels:(S.make?.reels||[]).filter(r=>r.mode==='kit'&&r.kitAt===S.kit?.saved?.createdAt)});
  if(S.step==='make')html=renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing,kit:S.kit?.saved,fbOpen:S.fbOpen,showAll:S.showAllIdeas});
  if(S.step==='ready')html=renderReady({reels:S.make?.reels||[],fbOpen:S.fbOpen});
@@ -61,15 +61,15 @@ addEventListener('resize',()=>{if(S.step==='scan')render();});
 async function loadRun(id,{keepStep=false}={}){
  S.runId=id;store.set('flow.run',id);S.error='';S.scanSel=null;
  const base=`/api/runs/${encodeURIComponent(id)}`;
- const [job,videos,secret,kit,plan,make,money]=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(()=>({results:{}}))]);
+ const [job,videos,secret,kit,plan,make,money,dna]=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(()=>({results:{}})),api(`${base}/dna`).catch(e=>({state:'none',error:e.message}))]);
  if(S.runId!==id)return;
- Object.assign(S,{job,saved:new Set(videos.saved||[]),secret,kit,plan,make,results:money.results||{},feedback:secret?.saved?.feedback||null});
+ Object.assign(S,{job,dna,saved:new Set(videos.saved||[]),secret,kit,plan,make,results:money.results||{},feedback:secret?.saved?.feedback||null});
  if(!keepStep){const d=doneSteps(),remembered=store.get(`flow.step.${id}`);S.step=remembered&&reachable(flags())[remembered]?remembered:d.kit?'make':d.secret?'kit':d.winners?'winners':'scan';}
  render();poll();if(S.step==='make')prepareMake();
 }
 function poll(){
  clearTimeout(S.timer);
- const live=scanning()||S.secret?.state==='building'||S.kit?.state==='working'||S.plan?.state==='working'||S.make?.state==='working';
+ const live=scanning()||S.secret?.state==='building'||S.kit?.state==='working'||S.dna?.state==='working'||S.plan?.state==='working'||S.make?.state==='working';
  if(live)S.timer=setTimeout(refresh,3000);
 }
 async function refresh(){
@@ -78,6 +78,7 @@ async function refresh(){
   if(scanning()){S.job=await api(base);if(scanned()){await loadRun(id,{keepStep:true});return;}}
   if(S.secret?.state==='building')S.secret=await api(`${base}/secret`);
   if(S.kit?.state==='working')S.kit=await api(`${base}/kit`);
+  if(S.dna?.state==='working')S.dna=await api(`${base}/dna`);
   if(S.plan?.state==='working')S.plan=await api(`${base}/reel-plan`);
   if(S.make?.state==='working'){S.make=await api(`${base}/reel-make`);if(S.make.state!=='working')S.balance=null;}
  }catch(e){S.error=e.message;}
@@ -121,6 +122,7 @@ document.addEventListener('click',async e=>{
  if(t.dataset.voice){const a=(S.audio??=new Audio());a.src=t.dataset.voice;a.play().catch(()=>toast('Could not play the voice.'));return;}
  if(t.dataset.act==='kit-voices'){act(async()=>{await api(`${base}/kit/voices`,{confirm:true});S.kit=await api(`${base}/kit`);});return;}
  if(t.dataset.act==='kit-choose'){act(async()=>{await api(`${base}/kit/choose`,{confirm:true,...(S.kitPick||{})});S.kitPick=null;S.kit=await api(`${base}/kit`);});return;}
+ if(t.dataset.act==='dna-build'){act(async()=>{S.dna=await api(`${base}/dna`,{confirm:true});});return;}
  if(t.dataset.act==='ideas-all'){S.showAllIdeas=true;render();return;}
  const a=t.dataset.act;
  if(a==='kit-build')kitGo({});if(a==='kit-character')kitGo({redo:'character'});if(a==='kit-pictures')kitGo({redo:'pictures'});

@@ -18,6 +18,7 @@ import {SecretBuilder} from './lib/secret-run.mjs';
 import {ReelPlanner} from './lib/reel-plan-run.mjs';
 import {ReelMaker} from './lib/reel-make.mjs';
 import {KitBuilder} from './lib/kit-run.mjs';
+import {DnaBuilder} from './lib/dna-run.mjs';
 import {higgsfieldBalance} from './lib/higgsfield-balance.mjs';
 import {score,LATEST} from './public/money/index.mjs';
 const ROOT=dirname(fileURLToPath(import.meta.url));
@@ -40,6 +41,7 @@ const secrets=new SecretBuilder(pipeline.root,keys);
 const planner=new ReelPlanner(pipeline.root,keys);
 const maker=new ReelMaker(pipeline.root,keys);
 const kits=new KitBuilder(pipeline.root,keys);
+const dnas=new DnaBuilder(pipeline.root,keys);
 const clients=new Set();pipeline.listeners.add(id=>{for(const res of clients)res.write(`data: ${JSON.stringify({id})}\n\n`);});
 const publicJob=j=>{const copy=structuredClone(j);for(const p of copy.posts){if(p.transcript)delete p.transcript.raw;if(p.analysis)delete p.analysis.raw;}return copy;};
 const summary=j=>({id:j.id,creator:j.creator,status:j.status,createdAt:j.createdAt,count:j.posts.length,completed:j.posts.filter(p=>p.analysis).length});
@@ -88,6 +90,12 @@ const server=http.createServer(async(req,res)=>{
   const kitFile=path.match(/^\/channels\/([\w-]+)\/kit\/((?:opt\d-)?(?:face|turn|body)\d-[0-9a-f]{12}\.jpg|(?:opt\d-)?(?:hands|place|scene)-[0-9a-f]{12}\.jpg|voice-[a-z0-9-]{1,40}\.wav)$/);
   if(kitFile){const file=join(kits.dir(kitFile[1]),kitFile[2]);let bytes;try{bytes=await readFile(file);}catch{res.writeHead(404);res.end();return;}
    res.writeHead(200,{'Content-Type':kitFile[2].endsWith('.wav')?'audio/wav':'image/jpeg','Cache-Control':kitFile[2].endsWith('.wav')?'no-cache':'public, max-age=31536000, immutable'});res.end(bytes);return;}
+  // Winner DNA (about half a cent a reel): every detail of every scored reel tested against the creator's own normal.
+  const dnaRoute=path.match(/^\/api\/runs\/([\w-]+)\/dna$/);
+  if(dnaRoute){const job=pipeline.jobs.get(dnaRoute[1]);if(!job){json(res,404,{error:'Run not found'});return;}
+   if(req.method==='GET'){json(res,200,await dnas.status(job));return;}
+   if(req.method==='POST'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm the price first');json(res,202,await dnas.start(job));return;}
+   json(res,405,{error:'Method not allowed'});return;}
   // The feedback loop: one tap on a finished reel (👍 or 👎 with reasons).
   const fb=path.match(/^\/api\/runs\/([\w-]+)\/reel-feedback$/);
   if(fb){const job=pipeline.jobs.get(fb[1]);if(!job){json(res,404,{error:'Run not found'});return;}if(req.method!=='POST'){json(res,405,{error:'Method not allowed'});return;}

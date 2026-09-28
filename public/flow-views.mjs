@@ -48,7 +48,27 @@ const dots=(n,of,cls)=>`<span class="dots ${cls}" aria-label="${n} of ${of}">${A
 export function compareSentence(d){const n=d.perSide;return d.winners>=d.flops?`${d.winners} of their ${n} best reels do this, but only ${d.flops} of their ${n} weakest.`:`Only ${d.winners} of their ${n} best reels do this, but ${d.flops} of their ${n} weakest do.`;}
 function compareRow(d){return `<div class="compare"><p class="cmp-say">${esc(compareSentence(d))}</p><div><span class="cmp-label">${d.perSide} best</span>${dots(d.winners,d.perSide,'best')}</div><div><span class="cmp-label">${d.perSide} weakest</span>${dots(d.flops,d.perSide,'weak')}</div></div>`;}
 const thumbs=(ids,imageFor,n=3)=>`<div class="proof">${ids.slice(0,n).map(id=>`<button type="button" class="proof-thumb" data-play="${esc(id)}" aria-label="Play a reel that does this"><img src="${esc(imageFor(id))}" alt="" loading="lazy" onerror="this.hidden=true"></button>`).join('')}</div>`;
-export function renderSecret({account,status,imageFor,feedback=null}){
+// Winner DNA on the Secret page: the honest verdict first, then each detail with evidence and its numbers, what showed
+// no effect, and a spot check of how the app read a few reels.
+const DETAIL_NAME={people:'number of people',pair:'who is on camera',age:'host age',glasses:'glasses',facial_hair:'beard',polish:'styling',first_frame:'first frame',first_expression:'first expression',gaze:'where the host looks',first_speaker:'who speaks first',reaction:'reaction shots',hook:'hook type',arc:'story or steps',payoffs:'number of payoffs',payoff_closeup:'result up close',humor:'humor',twist:'twist',emotion:'feeling',voice:'voice style',music:'music',real_sounds:'real sounds',text:'text on screen',intensity:'intensity',setting:'place',length:'length'};
+export function renderDna(dna,{imageFor}){
+ if(!dna)return '';
+ if(dna.state==='working')return `<section class="block"><h2 class="sub-title">Winner DNA</h2><div class="card"><b>${esc(dna.stage||'Working')}</b><progress value="${dna.done||0}" max="${dna.total||1}"></progress><p class="hint">Reel ${Math.min((dna.done||0)+1,dna.total||1)} of ${dna.total}. About 3 minutes.</p></div></section>`;
+ if(!dna.saved)return `<section class="block"><h2 class="sub-title">Winner DNA</h2><div class="card cta-card"><p class="plain">Do the small details matter here? Glasses, a second person, the voice, how many reveals, the sounds, the length.</p><ul class="ticks"><li>Checks about 25 details on all ${esc(dna.estimate?.reels||0)} scored reels</li><li>Tests each against their own normal, not against other channels</li><li>Checks whether it predicts reels it has not seen, and says so if not</li></ul>${dna.error?`<p class="err">${esc(dna.error)}</p>`:''}<button type="button" class="btn btn-primary" data-act="dna-build">Find the Winner DNA · about $${esc((dna.estimate?.usd??0.5).toFixed(2))}</button></div></section>`;
+ const d=dna.saved,v=d.validation||{},shown=dna.view?.shown||[],none=dna.view?.noEffect||[];
+ const verdict=v.verdict==='predictable'?['good','Their wins follow a pattern',`These details predicted reels the test had not seen (rank correlation ${v.rho}). Follow them.`]
+  :v.verdict==='weak'?['warn','A weak pattern',`The details predicted unseen reels only a little (rank correlation ${v.rho}). Use them as tie-breakers.`]
+  :['warn','Their wins look mostly like luck and timing',`No set of details predicted reels the test had not seen (rank correlation ${v.rho??'–'}). The hints below lean one way, but they are tie-breakers, not rules.`];
+ const bar=(x,max)=>`<i class="dna-bar"><b style="width:${Math.round(Math.min(1,x/max)*100)}%"></b></i>`;
+ const rows=shown.map(r=>{const max=Math.max(r.withX,r.withoutX,0.01);return `<li class="dna-row"><span class="dna-dir ${r.rho>0?'up':'down'}">${r.rho>0?'▲':'▼'}</span><div><b>${esc(r.plain)}</b><div class="dna-cmp"><span>with it</span>${bar(r.withX,max)}<b>${esc(r.withX)}×</b><span>without</span>${bar(r.withoutX,max)}<b>${esc(r.withoutX)}×</b></div><span class="hint">${esc(r.n)} of ${esc(d.reels)} reels · ${r.evidence==='signal'?'proven for this channel':'a hint'}</span></div></li>`;}).join('');
+ const spot=(d.labels||[]).slice().sort((a,b)=>b.xNormal-a.xNormal).slice(0,4).map(x=>`<figure class="dna-spot"><img src="${esc(imageFor(x.id))}" alt="" loading="lazy" onerror="this.hidden=true"><figcaption><b>${esc(x.xNormal)}× normal</b><br>${esc([x.labels.pair,x.labels.glasses==='yes'?'glasses':null,x.labels.hook,x.labels.voice+' voice',x.labels.payoffs+' payoffs'].filter(Boolean).join(' · ').replace(/_/g,' '))}</figcaption></figure>`).join('');
+ return `<section class="block"><h2 class="sub-title">Winner DNA · ${esc(d.reels)} reels tested</h2>
+<div class="card dna-verdict is-${verdict[0]}"><b>${esc(verdict[1])}</b><p>${esc(verdict[2])}</p></div>
+${rows?`<ul class="card dna-list">${rows}</ul>`:''}
+${none.length?`<p class="hint dna-none">No effect either way: ${esc(none.map(k=>DETAIL_NAME[k]||k).join(', '))}.</p>`:''}
+<details class="card dna-check"><summary>Check how the app read their top reels</summary><div class="dna-spots">${spot}</div><p class="hint">If a label is wrong, tell Claude: the test is only as good as these readings.</p></details></section>`;
+}
+export function renderSecret({account,status,imageFor,feedback=null,dna=null}){
  if(!status||status.state==='none'||!status.saved){
   if(status?.state==='building')return `${head('Reading the channel…',status.stage||'')}<div class="card"><progress value="${status.done||0}" max="${status.total||30}"></progress><p class="hint">Watching ${status.done||0} of ${status.total||30} reels. About 3 minutes.</p></div>`;
   const plan=status?.plan;
@@ -73,6 +93,7 @@ export function renderSecret({account,status,imageFor,feedback=null}){
  const check=feedback?`<p class="hint">${feedback==='yes'?'Thanks. The ideas will follow this.':'Noted. Tell Claude what is off and it will rebuild the Secret.'}</p>`:`<div class="check-row"><button type="button" class="btn" data-feedback="yes">Yes, that's it</button><button type="button" class="btn btn-ghost" data-feedback="no">Not quite</button></div>`;
  return `${head(sec.headline||`Why @${account} wins`,'What their best reels do more than their weakest ones.')}
 <section class="block"><h2 class="sub-title">Do these</h2><div class="do-grid">${dos||'<p class="hint">No clear difference found.</p>'}</div></section>
+${renderDna(dna,{imageFor})}
 <section class="block two-col">${avoidCard}<article class="card"><h3 class="card-title">Every reel has</h3><div class="chips">${every}</div></article></section>
 ${why?`<section class="block"><h2 class="sub-title">Why it works on people</h2><ul class="why-list card">${why}</ul></section>`:''}
 ${risk?`<div class="card risk"><b>Before you copy</b><p>${esc(risk.point)}</p></div>`:''}

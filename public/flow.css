@@ -141,6 +141,15 @@ dialog::backdrop{background:rgba(20,18,14,.45)}
 .learned{margin-bottom:14px;background:var(--goodsoft);border-color:#cfe8d9}.learned p{margin:4px 0 0}
 .confirm-look{display:flex;gap:10px;margin:6px 0 10px}.confirm-look figure{margin:0;flex:1;min-width:0}.confirm-look img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:12px;background:var(--soft)}.confirm-look figcaption{font-size:12.5px;margin-top:4px;display:flex;align-items:center;gap:6px}
 .why-true{font-size:13px;color:var(--muted);margin:0 0 8px}.why-true b{color:var(--ink);font-weight:500}
+/* Winner DNA */
+.dna-verdict{margin-bottom:12px}.dna-verdict.is-good{background:var(--goodsoft);border-color:#cfe8d9}.dna-verdict.is-warn{background:var(--warnsoft);border-color:#eedbb8}.dna-verdict p{margin:4px 0 0}
+.dna-list{list-style:none;margin:0 0 10px;padding:6px 18px;display:flex;flex-direction:column}.dna-row{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.dna-row:last-child{border-bottom:0}
+.dna-dir{font-size:13px;margin-top:3px}.dna-dir.up{color:var(--good)}.dna-dir.down{color:var(--bad)}
+.dna-cmp{display:grid;grid-template-columns:56px minmax(60px,180px) 44px;gap:4px 8px;align-items:center;font-size:12.5px;color:var(--muted);margin:6px 0 4px}.dna-cmp b{color:var(--ink);font-size:13px}
+.dna-bar{height:7px;border-radius:9px;background:var(--line);overflow:hidden}.dna-bar b{display:block;height:100%;background:var(--ink)}
+.dna-none{margin:0 0 10px}.dna-check summary{cursor:pointer;font-weight:500}.dna-spots{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0 8px}
+.dna-spot{margin:0}.dna-spot img{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:10px;background:var(--soft)}.dna-spot figcaption{font-size:12px;margin-top:4px;color:var(--muted)}.dna-spot b{color:var(--ink)}
+@media(max-width:600px){.dna-spots{grid-template-columns:1fr 1fr}}
 /* Kit: the channel as an Instagram profile */
 .ig{max-width:430px;padding:16px}.ig-head{display:flex;align-items:center;gap:16px}.ig-avatar{width:76px;height:76px;border-radius:50%;object-fit:cover;background:var(--soft);padding:3px;border:2px solid transparent;background-image:linear-gradient(var(--card),var(--card)),var(--prism);background-origin:border-box;background-clip:content-box,border-box;flex:none}
 .ig-handle{font-size:16px}.ig-stats{display:flex;gap:14px;font-size:13.5px;margin-top:4px}.ig-bio{font-size:14px;margin:12px 0 10px;line-height:1.45}

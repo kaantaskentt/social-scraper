@@ -57,7 +57,7 @@ test('every answer Jev can give has a plain sentence, and the cards show it',()=
  const html=renderSecret({account:'ken',status:{state:'done',saved},imageFor:img});assert.match(html,/It goes step by step, like a recipe\./);assert.match(html,/The action is already happening in the first second\./);
 });
 
-import {latestRuns,madeIdeas,renderKitScript,compareSentence,renderChannelPreview,handleOf,renderReelScore,renderLearned,FB_REASONS,renderConfirmLook} from '../public/flow-views.mjs';
+import {latestRuns,madeIdeas,renderKitScript,compareSentence,renderChannelPreview,handleOf,renderReelScore,renderLearned,FB_REASONS,renderConfirmLook,renderDna} from '../public/flow-views.mjs';
 import {REASONS} from '../lib/feedback.mjs';
 test('one card per account (the fullest scan); made ideas are marked and show their video instead of a price',()=>{
  assert.deepEqual(latestRuns([{id:'a',creator:'ken',count:20,createdAt:'1'},{id:'b',creator:'ken',count:100,createdAt:'0'},{id:'c',creator:'nude',count:5,createdAt:'2'}]).map(r=>r.id),['b','c']);
@@ -194,4 +194,18 @@ test('ideas: 6 shown with why each is true and how big its payoff is; the rest o
  const plan={picked,rejected:[],chosen:null};
  const html=renderIdeas(plan,{busy:false});assert.equal((html.match(/class="card idea/g)||[]).length,6);assert.match(html,/Why it's true:<\/b> Reason 0/);assert.match(html,/Big payoff/);assert.match(html,/data-act="ideas-all">Show all 12 ideas/);
  const all=renderIdeas(plan,{busy:false,showAll:true});assert.equal((all.match(/class="card idea/g)||[]).length,12);assert.doesNotMatch(all,/ideas-all/);
+});
+
+test('Winner DNA on the Secret page: the honest verdict first, details with numbers, no-effect list, spot check',()=>{
+ const imageFor=id=>`/media/r/${id}`;
+ assert.match(renderDna({state:'none',estimate:{reels:79,usd:0.47}},{imageFor}),/data-act="dna-build">Find the Winner DNA · about \$0\.47/);
+ assert.match(renderDna({state:'working',stage:'Watching the reels',done:10,total:79},{imageFor}),/value="10" max="79"/);
+ const saved={reels:79,validation:{verdict:'luck',rho:0.02},labels:[{id:'a',xNormal:9.1,labels:{pair:'one_man',glasses:'no',hook:'mid_action',voice:'calm',payoffs:'3+'}}]};
+ const view={shown:[{plain:'Three or more payoffs',rho:0.33,withX:4.74,withoutX:1.2,n:11,evidence:'hint'},{plain:'An energetic voice',rho:-0.28,withX:1.2,withoutX:2.89,n:37,evidence:'hint'}],noEffect:['glasses','humor']};
+ const html=renderDna({state:'done',saved,view},{imageFor});
+ assert.match(html,/Winner DNA · 79 reels tested/);assert.match(html,/Their wins look mostly like luck and timing/);assert.match(html,/tie-breakers, not rules/);
+ assert.match(html,/▲<\/span><div><b>Three or more payoffs<\/b>.*<b>4\.74×<\/b>.*<b>1\.2×<\/b>.*11 of 79 reels · a hint/s);assert.match(html,/▼<\/span><div><b>An energetic voice/);
+ assert.match(html,/No effect either way: glasses, humor\./);assert.match(html,/src="\/media\/r\/a".*9\.1× normal.*one man · mid action · calm voice · 3\+ payoffs/s);
+ assert.match(renderDna({state:'done',saved:{...saved,validation:{verdict:'predictable',rho:0.34}},view},{imageFor}),/Their wins follow a pattern.*Follow them/s);
+ assert.equal(renderDna(null,{imageFor}),'');
 });
