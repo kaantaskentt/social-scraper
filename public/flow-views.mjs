@@ -298,11 +298,24 @@ export function renderLearned(reels){
 }
 // 6 · Ready to post
 // Everything needed to post on Instagram: the cover picture, the reel and the caption, each with one button.
-export function renderReady({reels=[],fbOpen=null,judge=null}){
+// Real results, from Kaan's own account after he posts: the handle, one check button, and each reel's latest numbers.
+const n0=v=>Number.isFinite(v)?v.toLocaleString('en-US'):'?';
+const ago=h=>h<48?`${Math.round(h)} h`:`${Math.round(h/24)} days`;
+export function renderResultsCard(res,{busy=false}={}){
+ if(!res)return '';
+ if(!res.handle)return `<form class="card results-card rise" data-form="track"><div><b>Track real results</b><p class="hint">After you post, the app reads your public numbers (plays, likes, comments, shares) and puts them on each reel. Real views are the only score that counts.</p></div><div class="track-row"><span class="at">@</span><input name="handle" placeholder="your.account" autocomplete="off" required><button class="btn btn-primary"${busy?' disabled':''}>Track</button></div></form>`;
+ const last=res.checks?.at(-1),working=res.state==='working';
+ return `<div class="card results-card rise"><div><b>Real results · @${esc(res.handle)}</b><p class="hint">${working?'Reading your account…':last?`Last checked ${esc(new Date(last.at).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}))}: ${esc(last.matched)} of our reels found in your last ${esc(last.posts)} posts.`:'Not checked yet. Check after you post.'}${res.error?` <span class="err">${esc(res.error)}</span>`:''}</p></div><button type="button" class="btn${last?'':' btn-primary'}" data-act="results-check"${busy||working?' disabled':''}>${working?'Checking…':'Check now · about 3 cents'}</button></div>`;
+}
+export function renderReelResult(t){
+ const s=t?.snapshots?.at(-1);if(!s)return '';
+ return `<div class="reel-result"><span>▶ <b>${n0(s.plays)}</b> plays</span><span>♥ ${n0(s.likes)}</span><span>💬 ${n0(s.comments)}</span>${Number.isFinite(s.shares)?`<span>↗ ${n0(s.shares)}</span>`:''}<span class="hint">${Number.isFinite(s.ageHours)?`${ago(s.ageHours)} after posting`:''} · <a href="${esc(t.url)}" target="_blank" rel="noopener">open</a></span></div>`;
+}
+export function renderReady({reels=[],fbOpen=null,judge=null,results=null,busy=false}){
  if(!reels.length)return `${head('Nothing ready yet','Make a reel first.')}`;
- return `${head('Ready to post','For each reel: download the video and the cover, copy the caption, post it on Instagram.')}<p class="ready-tip">When you post: pick the cover, then Advanced settings, turn on <b>Label as made with AI</b>. Meta asks for it on realistic AI video.</p>${''}<div class="ready-grid">${reels.map(r=>`<article class="card ready">
+ return `${head('Ready to post','For each reel: download the video and the cover, copy the caption, post it on Instagram.')}<p class="ready-tip">When you post: pick the cover, then Advanced settings, turn on <b>Label as made with AI</b>. Meta asks for it on realistic AI video.</p>${''}${renderResultsCard(results,{busy})}<div class="ready-grid">${reels.map(r=>`<article class="card ready">
 <div class="ready-media"><video src="${esc(r.url)}#t=0.5" controls playsinline preload="metadata"></video>${r.cover?`<img class="ready-cover" src="${esc(r.cover)}" alt="Cover">`:`<button type="button" class="ready-cover is-empty" data-act="make-cover" data-reel="${esc(r.id)}">Make the cover · free</button>`}</div>
-<div class="ready-body"><h3>${esc(r.title||'Reel')}</h3>${r.review?.postable===false?`<p class="ready-warn">Not ready: ${esc(r.review.why)}</p>`:r.heard&&!r.heard.all?`<p class="ready-warn">Not ready: this line is cut off or never heard: “${esc(r.heard.missing[0])}”${r.heard.missing.length>1?` and ${r.heard.missing.length-1} more`:''}</p>`:''}<p class="caption" id="cap-${esc(r.id)}">${esc(r.caption||'')}</p>
+<div class="ready-body"><h3>${esc(r.title||'Reel')}</h3>${renderReelResult(results?.reels?.[r.id])}${r.review?.postable===false?`<p class="ready-warn">Not ready: ${esc(r.review.why)}</p>`:r.heard&&!r.heard.all?`<p class="ready-warn">Not ready: this line is cut off or never heard: “${esc(r.heard.missing[0])}”${r.heard.missing.length>1?` and ${r.heard.missing.length-1} more`:''}</p>`:''}<p class="caption" id="cap-${esc(r.id)}">${esc(r.caption||'')}</p>
 <div class="ready-actions"><a class="btn btn-primary" href="${esc(r.url)}" download>1 · Download the reel</a>${r.cover?`<a class="btn" href="${esc(r.cover)}" download>2 · Download the cover</a>`:''}<button type="button" class="btn" data-copy="cap-${esc(r.id)}">${r.cover?'3':'2'} · Copy the caption</button></div>
 <span class="hint">${esc(Math.round(r.seconds||0))} s · ${Number.isFinite(r.spentUsd)?`$${esc(r.spentUsd.toFixed(2))}`:`${esc(r.spent??'')} credits`}</span>${renderReelScore(r,{open:fbOpen===r.id,judge})}</div></article>`).join('')}</div>${next('make','Make another reel')}`;
 }

@@ -249,3 +249,8 @@ details.why[open]>:not(summary){animation:rise .25s ease both}
 .blocked{display:flex;flex-direction:column;gap:10px;padding:24px}
 @media(prefers-reduced-motion:reduce){.rise,details.why[open]>:not(summary){animation:none}.shimmer{animation:none}}
 @media(max-width:600px){.say li{grid-template-columns:52px 1fr}.hero{padding:18px}}
+/* Real results */
+.results-card{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.results-card p{margin:2px 0 0}.track-row{display:flex;align-items:center;gap:8px}.track-row .at{color:var(--muted)}
+.track-row input{padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--soft);min-width:200px}
+.reel-result{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;margin:4px 0 8px;font-size:14px}.reel-result b{font-size:16px}

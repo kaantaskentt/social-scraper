@@ -252,3 +252,12 @@ test('ideas Jev stopped go last and say so; fresh ideas come first',()=>{
 test('a reel reviewed as not postable says why on its card',()=>{
  assert.match(renderReady({reels:[{id:'s',url:'/r.mp4',title:'Silver',caption:'c',seconds:20,spentUsd:2,review:{postable:false,why:'The spoon never turns shiny.'}}]}),/Not ready: The spoon never turns shiny\./);
 });
+
+test('real results: ask for the handle once, then one check button; each posted reel shows its real numbers',async()=>{
+ const {renderResultsCard,renderReelResult}=await import('../public/flow-views.mjs');
+ assert.match(renderResultsCard({handle:null,checks:[],reels:{}}),/data-form="track"/);
+ const card=renderResultsCard({handle:'kaan.tests',checks:[{at:'2026-09-30T10:00:00Z',posts:12,matched:2}],reels:{}});assert.match(card,/Real results · @kaan\.tests/);assert.match(card,/2 of our reels found in your last 12 posts/);assert.match(card,/data-act="results-check"/);
+ const row=renderReelResult({url:'https://www.instagram.com/reel/A/',snapshots:[{ageHours:24,plays:1500,likes:50,comments:4,shares:null}]});
+ assert.match(row,/<b>1,500<\/b> plays/);assert.match(row,/24 h after posting/);assert.doesNotMatch(row,/↗/); // unknown shares are not shown as 0
+ assert.equal(renderReelResult(undefined),'');
+});

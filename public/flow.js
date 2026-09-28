@@ -50,7 +50,7 @@ function render(){
  if(S.step==='secret')html=renderSecret({account,status:S.secret,imageFor,feedback:S.feedback,dna:S.dna});
  if(S.step==='kit')html=renderKit({account,status:S.kit,busy:S.busy,error:S.error,pick:S.kitPick,reels:(S.make?.reels||[]).filter(r=>r.mode==='kit'&&r.kitAt===S.kit?.saved?.createdAt)});
  if(S.step==='make')html=renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing,kit:S.kit?.saved,fbOpen:S.fbOpen,showAll:S.showAllIdeas});
- if(S.step==='ready')html=renderReady({reels:S.make?.reels||[],fbOpen:S.fbOpen,judge:S.make?.judge});
+ if(S.step==='ready')html=renderReady({reels:S.make?.reels||[],fbOpen:S.fbOpen,judge:S.make?.judge,results:S.results2,busy:S.busy});
  // The scan map keeps its tiles between refreshes (so they fly from the wall to the map); the rest redraws.
  const key=S.step==='scan'?`scan:${S.runId}:${scanProgress()?.state}:${S.error}:${S.runs.length}`:null;
  // Other steps redraw only when the page really changed: open "Why" panels stay open and nothing re-animates.
@@ -64,13 +64,13 @@ addEventListener('resize',()=>{if(S.step==='scan')render();});
 async function loadRun(id,{keepStep=false}={}){
  const switching=S.runId!==id;S.runId=id;store.set('flow.run',id);S.error='';S.scanSel=null;if(switching){S.job=null;render();}
  const base=`/api/runs/${encodeURIComponent(id)}`;
- let loaded;try{loaded=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(()=>({results:{}})),api(`${base}/dna`).catch(e=>({state:'none',error:e.message}))]);}
+ let loaded;try{loaded=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(()=>({results:{}})),api(`${base}/dna`).catch(e=>({state:'none',error:e.message})),api(`${base}/results`).catch(()=>null)]);}
  // A channel that cannot load goes back to the account list with the reason, never a spinner forever.
  catch(e){if(S.runId===id){S.runId=null;S.step='scan';S.error=e.message;render();}throw e;}
- const [job,videos,secret,kit,plan,make,money,dna]=loaded;
+ const [job,videos,secret,kit,plan,make,money,dna,results2]=loaded;
 
  if(S.runId!==id)return;
- Object.assign(S,{job,dna,saved:new Set(videos.saved||[]),secret,kit,plan,make,results:money.results||{},feedback:secret?.saved?.feedback||null});
+ Object.assign(S,{job,dna,results2,saved:new Set(videos.saved||[]),secret,kit,plan,make,results:money.results||{},feedback:secret?.saved?.feedback||null});
  if(!keepStep){const d=doneSteps(),remembered=store.get(`flow.step.${id}`);S.step=remembered&&reachable(flags())[remembered]?remembered:d.kit?'make':d.secret?'kit':d.winners?'winners':'scan';}
  render();poll();if(S.step==='make')prepareMake();
 }
@@ -133,6 +133,7 @@ document.addEventListener('click',async e=>{
  if(t.dataset.voiceMode){act(async()=>{S.plan=await api(`${base}/reel-plan/voice`,{confirm:true,mode:t.dataset.voiceMode});});return;}
  if(t.dataset.act==='make-cover'){const id=t.dataset.reel;act(async()=>{const saved=await api(`${base}/reel-cover`,{reelId:id});S.make.reels=S.make.reels.map(x=>x.id===id?saved:x);});return;}
  if(t.dataset.act==='dna-build'){act(async()=>{S.dna=await api(`${base}/dna`,{confirm:true});});return;}
+ if(t.dataset.act==='results-check'){act(async()=>{S.results2={...S.results2,state:'working'};render();try{S.results2={...(await api(`${base}/results/check`,{confirm:true})),state:'done'};}catch(e){S.results2={...S.results2,state:'failed',error:e.message};throw e;}});return;}
  if(t.dataset.act==='ideas-all'){S.showAllIdeas=true;render();return;}
  const a=t.dataset.act;
  if(a==='kit-build')kitGo({});if(a==='kit-character')kitGo({redo:'character'});if(a==='kit-pictures')kitGo({redo:'pictures'});
@@ -149,6 +150,7 @@ document.addEventListener('click',async e=>{
  }
 });
 document.addEventListener('submit',e=>{
+ if(e.target.dataset.form==='track'){e.preventDefault();const handle=new FormData(e.target).get('handle');act(async()=>{S.results2=await api(`/api/runs/${encodeURIComponent(S.runId)}/results/handle`,{handle});toast(`Tracking @${S.results2.handle}`);});return;}
  if(e.target.dataset.form!=='scan')return;e.preventDefault();
  const {handles,error}=parseHandles(new FormData(e.target).get('handle'));
  if(error||handles.length!==1){S.error=error||'Enter one account';render();return;}

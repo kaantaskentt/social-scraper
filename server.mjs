@@ -19,6 +19,7 @@ import {ReelPlanner} from './lib/reel-plan-run.mjs';
 import {ReelMaker} from './lib/reel-make.mjs';
 import {KitBuilder} from './lib/kit-run.mjs';
 import {DnaBuilder} from './lib/dna-run.mjs';
+import {ResultsTracker} from './lib/results.mjs';
 import {higgsfieldBalance} from './lib/higgsfield-balance.mjs';
 import {score,LATEST} from './public/money/index.mjs';
 const ROOT=dirname(fileURLToPath(import.meta.url));
@@ -42,6 +43,7 @@ const planner=new ReelPlanner(pipeline.root,keys);
 const maker=new ReelMaker(pipeline.root,keys);
 const kits=new KitBuilder(pipeline.root,keys);
 const dnas=new DnaBuilder(pipeline.root,keys);
+const results=new ResultsTracker(pipeline.root,keys);
 const clients=new Set();pipeline.listeners.add(id=>{for(const res of clients)res.write(`data: ${JSON.stringify({id})}\n\n`);});
 const publicJob=j=>{const copy=structuredClone(j);for(const p of copy.posts){if(p.transcript)delete p.transcript.raw;if(p.analysis)delete p.analysis.raw;}return copy;};
 const summary=j=>({id:j.id,creator:j.creator,status:j.status,createdAt:j.createdAt,count:j.posts.length,completed:j.posts.filter(p=>p.analysis).length});
@@ -91,6 +93,13 @@ const server=http.createServer(async(req,res)=>{
   if(kitFile){const file=join(kits.dir(kitFile[1]),kitFile[2]);let bytes;try{bytes=await readFile(file);}catch{res.writeHead(404);res.end();return;}
    res.writeHead(200,{'Content-Type':kitFile[2].endsWith('.wav')?'audio/wav':'image/jpeg','Cache-Control':kitFile[2].endsWith('.wav')?'no-cache':'public, max-age=31536000, immutable'});res.end(bytes);return;}
   // Winner DNA (about half a cent a reel): every detail of every scored reel tested against the creator's own normal.
+  // Real results: Kaan's handle, then a check scans his account (public, about 3 cents) and matches our reels.
+  const resRoute=path.match(/^\/api\/runs\/([\w-]+)\/results(?:\/(handle|check))?$/);
+  if(resRoute){const job=pipeline.jobs.get(resRoute[1]);if(!job){json(res,404,{error:'Run not found'});return;}
+   if(req.method==='GET'&&!resRoute[2]){json(res,200,await results.status(job.id));return;}
+   if(req.method==='POST'&&resRoute[2]==='handle'){const data=await body(req);json(res,200,await results.setHandle(job.id,data.handle));return;}
+   if(req.method==='POST'&&resRoute[2]==='check'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm the check first');json(res,200,await results.check(job.id,(await maker.status(job)).reels));return;}
+  }
   const dnaRoute=path.match(/^\/api\/runs\/([\w-]+)\/dna$/);
   if(dnaRoute){const job=pipeline.jobs.get(dnaRoute[1]);if(!job){json(res,404,{error:'Run not found'});return;}
    if(req.method==='GET'){json(res,200,await dnas.status(job));return;}
