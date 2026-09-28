@@ -28,7 +28,7 @@ async function setup({makeKit,gate}={}){
   calls.cast++;return {json:{beats:[{who:'Felix',does:'Felix pours boiling water on chicken'},{who:'Felix',does:'foam rises'},{who:'Mystery',does:'Stella reacts'}]},costUsd:0.002};};
  const jev=async req=>{calls.jev++;return {answers:{copyable:{score:2.5},roles_fit:{noul:0.9}}};};
  const studio=new CopyStudio(root,()=>({gemini:'g',jev:'j',groq:'q'}),{planner,maker,gemini,jev,tick:5});
- studio.reels=()=>[{id:'chk',xNormal:104,seconds:22,plays:5800000,text},{id:'bad',xNormal:40,seconds:30,plays:1,text:'x'}];
+ studio.reels=()=>[{id:'chk',xNormal:104,seconds:22,plays:5800000,text,timed:true},{id:'bad',xNormal:40,seconds:30,plays:1,text:'x',timed:true}];
  return {root,studio,ledger,calls};
 }
 const until=async(get,ok)=>{const end=Date.now()+10000;for(;;){const s=await get();if(ok(s)||Date.now()>end)return s;await new Promise(r=>setTimeout(r,10));}};
@@ -39,7 +39,7 @@ test('picking: winners with speech, their breakdowns and Jev\'s "can we copy it"
  const {root,studio,calls}=await setup();
  try{
   await studio.pickStart(job);const s=await until(()=>studio.status(job),s=>s.picking?.state!=='working');assert.equal(s.picking.state,'done',s.picking.error);
-  assert.deepEqual(s.picks.picks.map(p=>p.id),['chk']);assert.equal(s.picks.picks[0].parts,3);assert.equal(s.picks.picks[0].usd,3.3);assert.equal(s.picks.picks[0].why,'Jev: copies 2.5 of 3.');assert.equal(calls.jev,1);
+  assert.deepEqual(s.picks.picks.map(p=>p.id),['chk']);assert.equal(s.picks.picks[0].parts,3);assert.equal(s.picks.picks[0].usd,3.3);assert.equal(s.picks.picks[0].why,'Jev rates it 2.5 of 3 for copying.');assert.equal(calls.jev,1);
  }finally{await rm(root,{recursive:true,force:true});}
 });
 
@@ -56,9 +56,12 @@ test('making: the price must be confirmed; the script keeps the original words; 
   assert.equal(it.fidelity.faithful,true);assert.equal(it.fidelity.words,100);assert.equal(it.fidelity.shots,Math.round(8/9*100));assert.equal(calls.compare,1);
   const plan=JSON.parse(await readFile(join(root,'channels',RUN,'copies','chk.plan.json'),'utf8'));assert.equal(plan.source,'copy');assert.equal(plan.copyOf,'chk');
   assert.equal(wordsKept(text,plan.script.parts.flatMap(p=>p.beats.map(b=>b.says)).join(' ')),1);assert.equal(plan.script.parts[1].beats.find(b=>/foam/.test(b.does)).who,'Felix');
-  assert.ok(plan.script.parts.flatMap(p=>p.beats).every(b=>['Felix','Stella','voice'].includes(b.who)),'an unknown cast name falls back to our lead host');
+  const mystery=plan.script.parts.flatMap(p=>p.beats).filter(b=>b.does==='Stella reacts');assert.ok(mystery.length);
+  assert.ok(mystery.every(b=>b.who==='Felix'),'an unknown cast name falls back to our lead host'); // Felix: kit.kit.cast[0]
   assert.ok(ledger.some(e=>e.step==='copy compare'));assert.equal(it.original,`/videos/${RUN}/chk`);
-  const learned=JSON.parse(await readFile(join(root,'experiments','stage-times.json'),'utf8'));assert.ok(Number.isFinite(learned.film_first),'stage times are learned');
+  await studio.finished(RUN);const learned=JSON.parse(await readFile(join(root,'experiments','stage-times.json'),'utf8'));assert.ok(Number.isFinite(learned.film_first),'stage times are learned');
+  // Every stage is learned once per copy, comparing too (it was never learned; audit, 2026-09-29).
+  for(const k of ['study','script','film_first','edit','cover','compare'])assert.equal(learned.samples[k]?.length,1,k);
   // After a restart the finished copy is still there; a copy that was still working is shown as stopped.
   const again=new CopyStudio(root,()=>({}),{planner:{},maker:{dir:r=>join(root,'channels',r)}});assert.equal((await again.status(job)).batch.items[0].state,'done');
  }finally{await rm(root,{recursive:true,force:true});}
@@ -73,6 +76,7 @@ test('a copy that fails says why and does not stop the others',async()=>{
   // Try again: only unfilmed parts are priced, and the copy finishes in the same batch.
   await assert.rejects(studio.retry(job,{ids:['chk'],confirmUsd:1}),/Confirm the price first \(\$3\.30\)/);
   await studio.retry(job,{ids:['chk'],confirmUsd:3.3});const r=await until(()=>studio.status(job),s=>['done','failed'].includes(s.batch.items[0].state));assert.equal(r.batch.items[0].state,'done',r.batch.items[0].error);
+  await studio.finished(RUN);
  }finally{await rm(root,{recursive:true,force:true});}
 });
 
@@ -82,5 +86,100 @@ test('a copy with parts already filmed is priced for the rest only',async()=>{
  const {root,studio}=await setup();
  try{const dir=join(root,'channels',RUN,'reels','copy-x');await mkdir(dir,{recursive:true});await writeFile(join(dir,'reel.json'),JSON.stringify({parts:[{check:{pass:true}},{check:{pass:true}},{check:{pass:false}}]}));
   assert.equal(await studio.remainingUsd(RUN,{reelId:'copy-x',parts:4}),2.26);assert.equal(await studio.remainingUsd(RUN,{reelId:'none',parts:2}),2.17);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+const picked=async studio=>{await studio.pickStart(job);await until(()=>studio.status(job),s=>s.picking?.state!=='working');};
+const settled=s=>['done','failed'].includes(s.batch.items[0].state);
+
+test('two start requests close together make the copies once (audit, 2026-09-29)',async()=>{
+ let made=0;const {root,studio}=await setup();const real=studio.maker.makeKit;studio.maker.makeKit=async(...a)=>{made++;return real(...a);};
+ let open;const slow=new Promise(r=>{open=r;});studio.planner.voiceDecision=async()=>{await slow;return {mode:'talking',why:'w'};};
+ try{
+  await picked(studio);const a=studio.start(job,{ids:['chk'],confirmUsd:3.3}),b=studio.start(job,{ids:['chk'],confirmUsd:3.3});open();
+  const r=await Promise.allSettled([a,b]);assert.deepEqual(r.map(x=>x.status).sort(),['fulfilled','rejected']);
+  // While every copy is still waiting, a third request is refused too.
+  await assert.rejects(studio.start(job,{ids:['chk'],confirmUsd:3.3}),/already being made/);
+  const s=await until(()=>studio.status(job),settled);assert.equal(s.batch.items[0].state,'done',s.batch.items[0].error);await studio.finished(RUN);assert.equal(made,1);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('a failed voice design leaves no copy stuck on Waiting, and start works again (audit, 2026-09-29)',async()=>{
+ const {root,studio}=await setup();studio.planner.voiceDecision=async()=>({mode:'voiceover',why:'w'});let n=0;studio.maker.channelVoices=async()=>{if(++n===1)throw new Error('Gemini: HTTP 400. bad voice');};
+ try{
+  await picked(studio);await assert.rejects(studio.start(job,{ids:['chk'],confirmUsd:3.3}),/bad voice/);
+  const s=await studio.status(job);assert.ok(!s.batch?.items.some(i=>['waiting','working'].includes(i.state)),'nothing waits forever');
+  await studio.start(job,{ids:['chk'],confirmUsd:3.3});const d=await until(()=>studio.status(job),settled);assert.equal(d.batch.items[0].state,'done',d.batch.items[0].error);await studio.finished(RUN);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('after a restart, Try again keeps the paid parts: same reel, only the rest priced, limit covers what was spent (audit, 2026-09-29)',async()=>{
+ const {root,studio}=await setup();const reelIds=[],prices=[];let hold;const held=new Promise(r=>{hold=r;});
+ studio.maker.makeKit=async(j,plan,k,{price},live)=>{reelIds.push(live.reelId);prices.push(price);
+  const dir=join(root,'channels',RUN,'reels',live.reelId),f=join(dir,'reel.json');await mkdir(dir,{recursive:true});
+  if(reelIds.length===1){await writeFile(f,JSON.stringify({parts:[{check:{pass:true}},{check:{pass:true}}],spentUsd:2.17,paid:{}}));live.stage='Filming part 3 of 3';await held;throw new Error('the app went away');}
+  // The maker's own limit check: part 3 costs 1.13 on top of the 2.17 already spent.
+  const reel=JSON.parse(await readFile(f,'utf8'));if(reel.spentUsd+1.13>price.maxUsd+1e-9)throw new Error(`Stopped: the next part would pass the confirmed limit of $${price.maxUsd.toFixed(2)}`);
+  await writeFile(join(dir,'reel.mp4'),'ours');await writeFile(f,JSON.stringify({...reel,video:join(dir,'reel.mp4'),url:`/channels/${RUN}/${live.reelId}/reel.mp4`,seconds:24.5,said:plan.script.parts.flatMap(p=>p.beats.map(b=>b.says)).join(' '),spentUsd:3.3}));};
+ try{
+  await picked(studio);await studio.start(job,{ids:['chk'],confirmUsd:3.3});await until(()=>studio.status(job),s=>s.batch.items[0].stage==='Filming part 3 of 3');
+  // The restart: a new studio on the same folder.
+  const again=new CopyStudio(root,studio.keys,{planner:studio.planner,maker:studio.maker,gemini:studio.gemini,jev:studio.jev,tick:5});
+  const s=await again.status(job),it=s.batch.items[0];assert.equal(it.state,'stopped');assert.match(it.error,/Try again/);assert.doesNotMatch(it.error,/start it again/);assert.equal(it.retryUsd,1.13);
+  await again.retry(job,{ids:['chk'],confirmUsd:1.13});const d=await until(()=>again.status(job),settled);assert.equal(d.batch.items[0].state,'done',d.batch.items[0].error);
+  assert.equal(reelIds[1],reelIds[0],'the same reel folder, so filmed parts are skipped');assert.equal(prices[1].usd,1.13);assert.equal(prices[1].maxUsd,4.43); // 2.17 spent + twice 1.13
+  await again.finished(RUN);hold();await studio.finished(RUN);
+ }finally{hold();await rm(root,{recursive:true,force:true});}
+});
+
+test('a comparison that fails keeps the made copy; comparing again costs no filming (audit, 2026-09-29)',async()=>{
+ const {root,studio,calls}=await setup();let made=0;const real=studio.maker.makeKit;studio.maker.makeKit=async(...a)=>{made++;return real(...a);};
+ const gem=studio.gemini;let fail=true;studio.gemini=async a=>{if(a.schema.required.includes('same_feel')&&fail)throw new Error('Gemini: HTTP 400. Request payload size exceeds the limit');return gem(a);};
+ try{
+  await picked(studio);await studio.start(job,{ids:['chk'],confirmUsd:3.3});
+  const s=await until(()=>studio.status(job),settled);await studio.finished(RUN);const it=s.batch.items[0];
+  assert.equal(it.state,'done');assert.ok(it.reel);assert.match(it.fidelity.error,/payload size/);assert.equal(it.retryUsd,0);
+  fail=false;await assert.rejects(studio.retry(job,{ids:['chk'],confirmUsd:1}),/Confirm the price first \(\$0\.00\)/);
+  await studio.retry(job,{ids:['chk'],confirmUsd:0});const d=await until(()=>studio.status(job),s=>s.batch.items[0].state==='done');await studio.finished(RUN);
+  assert.equal(d.batch.items[0].fidelity.faithful,true);assert.equal(made,1);assert.equal(calls.compare,1);
+  // The same through the compare route's method.
+  await studio.compareAgain(job,{postId:'chk'});await until(()=>studio.status(job),s=>s.batch.items[0].state==='done');await studio.finished(RUN);assert.equal(calls.compare,2);assert.equal(made,1);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('a batch file that cannot be written mid-batch is logged, never an unhandled rejection (audit, 2026-09-29)',async()=>{
+ const {root,studio}=await setup();const seen=[],on=e=>seen.push(e);process.on('unhandledRejection',on);
+ const save=studio.saveBatch.bind(studio);let n=0;studio.saveBatch=(r,b)=>++n===1?save(r,b):Promise.reject(Object.assign(new Error('ENOSPC: no space left on device'),{code:'ENOSPC'}));
+ const log=console.error;console.error=()=>{};
+ try{
+  await picked(studio);await studio.start(job,{ids:['chk'],confirmUsd:3.3});await until(()=>studio.status(job),settled);await studio.finished(RUN);await new Promise(r=>setTimeout(r,20));
+  assert.deepEqual(seen,[]);
+ }finally{console.error=log;process.off('unhandledRejection',on);await rm(root,{recursive:true,force:true});}
+});
+
+test('a transcript without word times fails before the cast call is paid (audit, 2026-09-29)',async()=>{
+ const {root,studio,calls,ledger}=await setup();const untimed={...job,posts:[{...post,transcript:{text,segments:[]}}]};
+ try{
+  await picked(studio);await studio.start(untimed,{ids:['chk'],confirmUsd:3.3});const s=await until(()=>studio.status(untimed),settled);await studio.finished(RUN);
+  assert.equal(s.batch.items[0].state,'failed');assert.match(s.batch.items[0].error,/no word times/);assert.equal(calls.cast,0);assert.ok(!ledger.some(e=>e.step==='copy cast'));
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('a failed copy is out of the batch bar: time left and percent follow the copies still running (audit, 2026-09-29)',async()=>{
+ const {root,studio}=await setup();const {plannedStages}=await import('../lib/copy.mjs');
+ try{
+  const planned=plannedStages(3,'native'),now=Date.now(),total=planned.reduce((a,s)=>a+s.seconds,0);
+  studio.batches.set(RUN,{id:'B',createdAt:'T',usd:6.6,voiceMode:'native',items:[{postId:'chk',reelId:'copy-a',parts:3,usd:3.3,state:'failed',error:'x',planned,pointer:0,stageAt:now},{postId:'bad',reelId:'copy-b',parts:3,usd:3.3,state:'working',stage:'Filming part 3 of 3',planned,pointer:6,stageAt:now}]});
+  const b=(await studio.status(job)).batch,run=b.items[1];assert.equal(b.left,run.left);assert.ok(b.left<total);assert.equal(b.pct,run.pct);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('learned stage times: copies at once keep every sample, and one change is learned once (audit, 2026-09-29)',async()=>{
+ const {root,studio}=await setup();const {plannedStages}=await import('../lib/copy.mjs');
+ try{
+  const planned=plannedStages(1,'native'),mk=()=>({state:'working',stage:'Studying the reel',stageAt:Date.now()-2000,pointer:0,planned});
+  const items=Array.from({length:5},mk);await Promise.all(items.map(i=>studio.setStage(i,'Writing the copy')));
+  const one=mk();await Promise.all([studio.setStage(one,'Writing the copy'),studio.setStage(one,'Writing the copy')]);
+  const learned=JSON.parse(await readFile(join(root,'experiments','stage-times.json'),'utf8'));assert.equal(learned.samples.study.length,6);
  }finally{await rm(root,{recursive:true,force:true});}
 });
