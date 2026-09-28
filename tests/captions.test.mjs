@@ -53,3 +53,13 @@ test('every render checks itself: black frames or missing sound fail loudly',asy
   await assert.rejects(checkRender(bad,2.1),/black frame|no sound/);
  }finally{await rmd(dir,{recursive:true,force:true});}
 });
+
+test('a line the audio never says is caught; a transcriber missing one word is not',async()=>{
+ const {alignScript,linesHeard}=await import('../lib/captions.mjs');
+ const lines=['Silver gets dull over time.','The aluminum pulls the tarnish right off.'];
+ const whisper=['silver','gets','dull','over','time','the','aluminium'].map((text,i)=>({text,start:i*0.4,end:i*0.4+0.3}));
+ const r=linesHeard(lines,alignScript(lines.join(' '),whisper));
+ assert.equal(r.lines[0].heard,true);assert.equal(r.lines[1].heard,false);assert.deepEqual(r.missing,['The aluminum pulls the tarnish right off.']);assert.equal(r.all,false);
+ const most=['silver','gets','dull','over','time','the','aluminum','pulls','tarnish','right','off'].map((text,i)=>({text,start:i*0.4,end:i*0.4+0.3}));
+ assert.equal(linesHeard(lines,alignScript(lines.join(' '),most)).all,true);
+});
