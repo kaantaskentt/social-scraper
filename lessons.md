@@ -12,3 +12,4 @@
 - 2026-09-26: A fix can create its own bug: caching empty transcripts made every silent reel a "duplicate" of the others. Run a second review on the fix diff, not just the first on the original code.
 - 2026-09-27: A new page module missing from the server's file list broke every tab, and all unit tests passed. tests/server-assets.test.mjs now fetches every module app.js imports; a real-browser pass is still the last check before calling UI work done.
 - 2026-09-27: I suspected the cut detector was wrong; a contact sheet proved it right for hard cuts but blind to jump cuts in the same room. Check a measurement against the frames by eye before "fixing" it, and again after.
+- 2026-09-28: A stricter quality rule looked right on the weak reel and would have failed the 99% winner too. Run any new check on a known-good reel before adopting it; a still frame cannot show bubbling, so do not call a payoff missed from stills alone.
