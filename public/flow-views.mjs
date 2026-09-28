@@ -195,11 +195,16 @@ const ofPlan=(r,plan)=>plan?.mode==='kit'?r.planAt===plan.createdAt:!r.planAt;
 const ideaOf=r=>Number.isInteger(r.idea)?r.idea:Number(String(r.id).split('-')[0]);
 export const madeIdeas=(reels,plan=null)=>new Set((reels||[]).filter(r=>ofPlan(r,plan)).map(ideaOf).filter(Number.isInteger));
 // A kit script: two 10-second parts, each a few timed beats (who does what, who says what).
-export function renderKitScript(plan){
+// Talking on camera or voice-over: the decision, its reason from the channel's data, and one tap to switch.
+export function renderVoiceChoice(plan,{busy=false}={}){
+ const v=plan.voice;if(!v)return '';const talking=v.mode==='talking';
+ return `<div class="voice-choice"><span class="pill ${talking?'pill-ok':''}">${talking?'🗣 Hosts talk on camera':'🎙 Voice-over'}</span><span class="hint">${esc(v.why||'')}</span><button type="button" class="chip chip-btn" data-voice-mode="${talking?'voiceover':'talking'}"${busy?' disabled':''}>${talking?'Use a voice-over instead':'Let the hosts talk instead'}</button></div>`;
+}
+export function renderKitScript(plan,{busy=false}={}){
  const s=plan.script,problems=plan.check?.problems||[];
  const checks=[['Starts mid-action',/mid-action/],['One clear action',/clear action/],['True',/may not be true/],['No health claim',/health claim/],['One feeling',/feeling/],['Easy for AI video',/risky|part \d|beat|words|keyword/i]].map(([label,re])=>{const bad=problems.some(p=>re.test(p));return `<span class="pill ${bad?'pill-bad':'pill-ok'}">${bad?'!':'✓'} ${label}</span>`;}).join('');
  return `<div class="card script"><div class="script-top"><div><span class="cmp-label">On screen first</span><h3>${esc(s.hook_title)}</h3></div>${s.keyword?`<span class="pill">Comment ${esc(s.keyword)}</span>`:''}</div>
-<div class="parts">${s.parts.map((p,i)=>`<section class="part"><span class="cmp-label">Part ${i+1} · ${i*10}–${i*10+10} s</span><ol class="beats">${p.beats.map(b=>`<li><span class="shot-s">${esc(i*10+b.from)}–${esc(i*10+b.to)} s</span><div><p class="shot-v"><b>${esc(b.who)}</b> ${esc(b.does)}</p>${b.says?`<p class="shot-l">“${esc(b.says)}”</p>`:''}</div></li>`).join('')}</ol></section>`).join('')}</div>
+${renderVoiceChoice(plan,{busy})}<div class="parts">${s.parts.map((p,i)=>`<section class="part"><span class="cmp-label">Part ${i+1} · ${i*10}–${i*10+10} s</span><ol class="beats">${p.beats.map(b=>`<li><span class="shot-s">${esc(i*10+b.from)}–${esc(i*10+b.to)} s</span><div><p class="shot-v"><b>${esc(b.who)}</b> ${esc(b.does)}</p>${b.says?`<p class="shot-l">“${esc(b.says)}”</p>`:''}</div></li>`).join('')}</ol></section>`).join('')}</div>
 <div class="pills">${checks}</div></div>`;
 }
 export function renderKitPrice(price,{busy}){
@@ -219,7 +224,7 @@ export function renderMake({account,plan,make,balance,mode='fast',busy=false,err
  const kitMode=p.mode==='kit',priced=kitMode?Number.isFinite(p.price?.usd):p.price&&p.price.kit!==undefined;
  const makeIt=finished||(pricing||!priced?'<div class="card"><b>Checking the price…</b><progress></progress></div>':p.check?.pass?(kitMode?renderKitPrice(p.price,{busy}):renderPrice(p.price,{mode,balance,busy})):`<p class="err">Jev found problems in this script: ${esc((p.check?.problems||[]).join('; '))}. Pick the idea again to rewrite it.</p>`);
  return `${top}${err}${renderLearned(make?.reels)}<section class="block"><h2 class="sub-title">1 · Pick an idea</h2>${renderIdeas(p,{busy,made,showAll})}<div class="next-row left"><button type="button" class="btn btn-ghost" data-act="ideas"${busy?' disabled':''}>New ideas · a few cents</button></div></section>
-${p.script?`<section class="block"><h2 class="sub-title">2 · Check the script</h2>${kitMode?renderKitScript(p):renderScript(p)}</section><section class="block"><h2 class="sub-title">3 · Make it</h2>${makeIt}</section>`:''}`;
+${p.script?`<section class="block"><h2 class="sub-title">2 · Check the script</h2>${kitMode?renderKitScript(p,{busy}):renderScript(p)}</section><section class="block"><h2 class="sub-title">3 · Make it</h2>${makeIt}</section>`:''}`;
 }
 
 // The confirm pop-up before a reel is made: who and where, exactly as the video will use them (the kit's pictures).
@@ -247,7 +252,13 @@ export function renderLearned(reels){
  return `<div class="card learned"><b>Learned from your feedback</b><p class="hint">${liked?`${liked} reel${liked>1?'s':''} you liked. `:''}${list.length?`The next scripts fix: ${list.map(([k,c])=>`${esc(FB_REASONS[k])} (${c}×)`).join(', ')}.`:''}</p></div>`;
 }
 // 6 · Ready to post
+// Everything needed to post on Instagram: the cover picture, the reel and the caption, each with one button.
 export function renderReady({reels=[],fbOpen=null}){
  if(!reels.length)return `${head('Nothing ready yet','Make a reel first.')}`;
- return `${head('Ready to post','Download the video, copy the caption, post it yourself.')}<div class="ready-grid">${reels.map(r=>`<article class="card ready"><video src="${esc(r.url)}#t=0.5" controls playsinline preload="metadata"></video><div class="ready-body"><h3>${esc(r.title||'Reel')}</h3><p class="caption" id="cap-${esc(r.id)}">${esc(r.caption||'')}</p><div class="ready-actions"><a class="btn btn-primary" href="${esc(r.url)}" download>Download</a><button type="button" class="btn" data-copy="cap-${esc(r.id)}">Copy caption</button></div><span class="hint">${esc(Math.round(r.seconds||0))} s · ${Number.isFinite(r.spentUsd)?`$${esc(r.spentUsd.toFixed(2))}`:`${esc(r.spent??'')} credits`}</span>${renderReelScore(r,{open:fbOpen===r.id})}</div></article>`).join('')}</div>`;
+ return `${head('Ready to post','For each reel: download the video and the cover, copy the caption, post it on Instagram.')}<div class="ready-grid">${reels.map(r=>`<article class="card ready">
+<div class="ready-media"><video src="${esc(r.url)}#t=0.5" controls playsinline preload="metadata"></video>${r.cover?`<img class="ready-cover" src="${esc(r.cover)}" alt="Cover">`:`<button type="button" class="ready-cover is-empty" data-act="make-cover" data-reel="${esc(r.id)}">Make the cover · free</button>`}</div>
+<div class="ready-body"><h3>${esc(r.title||'Reel')}</h3><p class="caption" id="cap-${esc(r.id)}">${esc(r.caption||'')}</p>
+<div class="ready-actions"><a class="btn btn-primary" href="${esc(r.url)}" download>1 · Download the reel</a>${r.cover?`<a class="btn" href="${esc(r.cover)}" download>2 · Download the cover</a>`:''}<button type="button" class="btn" data-copy="cap-${esc(r.id)}">${r.cover?'3':'2'} · Copy the caption</button></div>
+<span class="hint">${esc(Math.round(r.seconds||0))} s · ${Number.isFinite(r.spentUsd)?`$${esc(r.spentUsd.toFixed(2))}`:`${esc(r.spent??'')} credits`}</span>${renderReelScore(r,{open:fbOpen===r.id})}</div></article>`).join('')}</div>`;
 }
+

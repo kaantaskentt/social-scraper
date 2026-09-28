@@ -64,11 +64,11 @@ const server=http.createServer(async(req,res)=>{
   if(await handleReplicate({req,res,path,url,root:pipeline.root,jobs:pipeline.jobs,replicator,json,body}))return;
   if(await handleShotlist({req,res,path,root:pipeline.root,jobs:pipeline.jobs,json,body,streamFile}))return;
   // Make one original reel: GET the plan; POST ideas or a script (Gemini and Jev, a few cents; no video is made here).
-  const plan=path.match(/^\/api\/runs\/([\w-]+)\/reel-plan(?:\/(ideas|script|price|remake))?$/);
+  const plan=path.match(/^\/api\/runs\/([\w-]+)\/reel-plan(?:\/(ideas|script|price|remake|voice))?$/);
   if(plan){const job=pipeline.jobs.get(plan[1]);if(!job){json(res,404,{error:'Run not found'});return;}
    if(req.method==='GET'&&!plan[2]){json(res,200,await planner.status(job));return;}
    if(req.method==='POST'&&plan[2]){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm first');
-    json(res,plan[2]==='price'?200:202,plan[2]==='ideas'?await planner.startIdeas(job):plan[2]==='price'?await planner.reprice(job):plan[2]==='remake'?await planner.startRemake(job,String(data.postId||'')):await planner.startScript(job,Number(data.index)));return;}
+    json(res,plan[2]==='price'?200:202,plan[2]==='ideas'?await planner.startIdeas(job):plan[2]==='price'?await planner.reprice(job):plan[2]==='remake'?await planner.startRemake(job,String(data.postId||'')):plan[2]==='voice'?await planner.setVoice(job,String(data.mode||'')):await planner.startScript(job,Number(data.index)));return;}
    json(res,405,{error:'Method not allowed'});return;}
   // Make the pilot reel (spends Higgsfield credits): POST needs {confirm:true, mode, confirmCredits} matching a fresh price.
   const make=path.match(/^\/api\/runs\/([\w-]+)\/reel-make$/);
@@ -97,12 +97,14 @@ const server=http.createServer(async(req,res)=>{
    if(req.method==='POST'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm the price first');json(res,202,await dnas.start(job));return;}
    json(res,405,{error:'Method not allowed'});return;}
   // The feedback loop: one tap on a finished reel (👍 or 👎 with reasons).
+  const cov=path.match(/^\/api\/runs\/([\w-]+)\/reel-cover$/);
+  if(cov&&req.method==='POST'){const job=pipeline.jobs.get(cov[1]);if(!job){json(res,404,{error:'Run not found'});return;}const data=await body(req);json(res,200,await maker.makeCover(job,String(data.reelId||'')));return;}
   const fb=path.match(/^\/api\/runs\/([\w-]+)\/reel-feedback$/);
   if(fb){const job=pipeline.jobs.get(fb[1]);if(!job){json(res,404,{error:'Run not found'});return;}if(req.method!=='POST'){json(res,405,{error:'Method not allowed'});return;}
    const data=await body(req);json(res,200,await maker.feedback(job,String(data.reelId||''),{verdict:data.verdict,reasons:Array.isArray(data.reasons)?data.reasons.map(String):[]}));return;}
-  const made=path.match(/^\/channels\/([\w-]+)\/([\w-]+)\/(reel\.mp4|kit\.png|shot-[\w-]+\.mp4)$/);
+  const made=path.match(/^\/channels\/([\w-]+)\/([\w-]+)\/(reel\.mp4|cover\.jpg|kit\.png|shot-[\w-]+\.mp4)$/);
   if(made){const file=join(pipeline.root,'channels',made[1],'reels',made[2],made[3]);let info;try{info=await stat(file);}catch{res.writeHead(404);res.end();return;}
-   res.writeHead(200,{'Content-Type':made[3].endsWith('.png')?'image/png':'video/mp4','Content-Length':info.size,'Accept-Ranges':'bytes','Cache-Control':'no-cache'});streamFile(res,file);return;}
+   res.writeHead(200,{'Content-Type':made[3].endsWith('.png')?'image/png':made[3].endsWith('.jpg')?'image/jpeg':'video/mp4','Content-Length':info.size,'Accept-Ranges':'bytes','Cache-Control':'no-cache'});streamFile(res,file);return;}
   const vids=path.match(/^\/api\/runs\/([\w-]+)\/videos(?:\/(save|delete))?$/);
   if(vids){const job=pipeline.jobs.get(vids[1]);if(!job){json(res,404,{error:'Run not found'});return;}const state=videoJobs.get(job.id);
    if(vids[2]==='save'&&req.method==='POST')startVideoSave(job);

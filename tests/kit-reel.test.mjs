@@ -82,6 +82,8 @@ async function setup(){
  return {root,job:{id:run,creator:'ken'},ch};
 }
 const good={answers:{fit:{score:3},ai_ready:{score:3},hook:{score:2},health_claim:{noul:0.1},true_demo:{noul:0.9},starts_mid_action:{noul:0.9},clear_action:{noul:0.8},health_fact:{noul:0.1},true_claim:{noul:0.9},emotion:{choice:'satisfaction'},part_1_risky:{noul:0.1},part_2_risky:{noul:0.1}}};
+// The real cover renderer is checked on a real reel; here it only writes a file.
+const fakeCover=async a=>{await writeFile(a.out,'COVER');return a.out;};
 const until=async(get)=>{const end=Date.now()+10000;while(Date.now()<end){const s=await get();if(s.state!=='working')return s;await new Promise(r=>setTimeout(r,5));}throw new Error('stuck');};
 function fakeGoogle(){
  const calls={post:[]};const done=new Map();
@@ -104,7 +106,7 @@ test('kit path: ideas and script use the kit; the maker films two parts, checks 
  const scored=[];const watch=async({parts,schema})=>{if(schema.required.includes('keep_watching')){const f=String(parts[0].video);scored.push(f);return {json:f==='v'?scoreOf(7):{...scoreOf(6),stops_scroll:4},costUsd:0.001};}
   checks.push(parts.length);return {json:{shows:'ok',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'},costUsd:0.003};};
  let seconds=20;const spoken=[];const voices={design:async({name})=>({id:`voice_${name}`,sample:null,costUsd:0.02}),speak:async({voice,text})=>{spoken.push(text);return {wav:Buffer.from('w'),costUsd:0.001};},mix:async a=>{await writeFile(a.out,'MIX');return a.out;},trim:async(i,o)=>{await writeFile(o,'t');return o;}};
- const maker=new ReelMaker(root,keys,{gemini:watch,jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async f=>/line-/.test(f)?1:seconds,voices,cut:async(i,o)=>{await writeFile(o,'cut');return o;},render:async a=>{rendered=a;await writeFile(a.out,'REEL');return {seconds:22.5};}});
+ const maker=new ReelMaker(root,keys,{cover:fakeCover,gemini:watch,jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async f=>/line-/.test(f)?1:seconds,voices,cut:async(i,o)=>{await writeFile(o,'cut');return o;},render:async a=>{rendered=a;await writeFile(a.out,'REEL');return {seconds:22.5};}});
  // Two winners with saved videos, to score against.
  await writeFile(join(root,'secret','r1','secret.json'),JSON.stringify({account:'ken',secret:{headline:'h'},stats:{differences:[],house:[]},picked:[{id:'w1',group:'winner',xNormal:9},{id:'w2',group:'winner',xNormal:8}]}));
  await mkdir(join(root,'videos','r1'),{recursive:true});for(const id of ['w1','w2'])await writeFile(join(root,'videos','r1',`${id}.mp4`),'v');
@@ -115,8 +117,11 @@ test('kit path: ideas and script use the kit; the maker films two parts, checks 
  assert.equal(g.calls.post.length,2);assert.equal(g.calls.post[0].background,true);assert.equal(g.calls.post[0].input.filter(x=>x.type==='image').length,3);
  assert.equal(g.calls.post[0].response_format.aspect_ratio,'9:16');assert.equal(g.calls.post[1].previous_interaction_id,'job1');assert.equal(g.calls.post[1].input.length,1);
  assert.deepEqual(checks,[4,4]); // the clip, two face pictures, the brief
- const final=join(ch,'reels',m.reels[0].id,'part-2-a1.mp4');assert.equal(rendered.clips[0],final);assert.equal(rendered.voice,join(ch,'reels',m.reels[0].id,'voices.wav'));
- assert.equal(m.reels[0].voiceMode,'designed');assert.equal(spoken.length,4);assert.match(g.calls.post[0].input.at(-1).text,/No dialogue/);
+ // No readings here, so the hosts talk on camera: Omni's own lip-synced voices are the sound, nothing is dubbed.
+ const final=join(ch,'reels',m.reels[0].id,'part-2-a1.mp4');assert.equal(rendered.clips[0],final);assert.equal(rendered.voice,final);
+ assert.equal(m.reels[0].voiceMode,'native');assert.equal(spoken.length,0);assert.doesNotMatch(g.calls.post[0].input.at(-1).text,/No dialogue/);
+ assert.match(g.calls.post[0].input.at(-1).text,/Voices: Leo speaks with a warm voice; Mia speaks with a warm voice\. Each line is spoken on camera/);
+ assert.equal(s.plan.voice.mode,'talking');assert.match(s.plan.voice.why,/No readings yet/);
  assert.equal(rendered.sayText,spokenText(script()));assert.equal(rendered.endCard.title,'Kitchen Check');assert.equal(rendered.endCard.subtitle,'Follow for the next one');
  const reel=m.reels[0];assert.equal(reel.mode,'kit');assert.equal(reel.idea,0);assert.match(reel.caption,/Our hosts are AI\.$/);assert.match(reel.url,/^\/channels\/r1\/0-revive-celery-[0-9a-f]{6}\/reel\.mp4$/);
  // Scored against the winners: 2 winners × 3 + our reel × 3; winners cached for the next reel.
@@ -132,13 +137,13 @@ test('kit path: a part that fails its check is filmed once more; failing twice s
  const {root,job,ch}=await setup();const keys=()=>({gemini:'g',jev:'j',groq:'q'});
  await writeFile(join(ch,'plan.json'),JSON.stringify({mode:'kit',kitAt:kitSaved.createdAt,createdAt:'2026-09-28T01:00:00Z',chosen:0,picked:[{idea:{title:'Revive celery'}}],script:script(),check:{pass:true},price:{usd:2.17}}));
  let n=0;const g=fakeGoogle();const bad={shows:'x',match:3,same_people:'no',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'},fine={...bad,same_people:'yes'};
- const maker=new ReelMaker(root,keys,{gemini:async()=>({json:++n===1?bad:fine,costUsd:0}),jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async()=>20,cut:async(i,o)=>{await writeFile(o,'c');return o;},render:async a=>{await writeFile(a.out,'R');return {seconds:22};}});
+ const maker=new ReelMaker(root,keys,{cover:fakeCover,gemini:async()=>({json:++n===1?bad:fine,costUsd:0}),jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async()=>20,cut:async(i,o)=>{await writeFile(o,'c');return o;},render:async a=>{await writeFile(a.out,'R');return {seconds:22};}});
  await maker.start(job,{confirmCredits:2.17});let m=await until(()=>maker.status(job));assert.equal(m.state,'done',m.error);
  assert.equal(g.calls.post.length,3);assert.equal(g.calls.post[2].previous_interaction_id,'job2'); // part 2 extends the RETRIED part 1
- const always=new ReelMaker(root,keys,{gemini:async()=>({json:bad,costUsd:0}),jev:async()=>good,videoFetch:fakeGoogle().fetchImpl,pollMs:0,seconds:async()=>20,cut:async(i,o)=>{await writeFile(o,'c');return o;},render:async()=>({})});
+ const always=new ReelMaker(root,keys,{cover:fakeCover,gemini:async()=>({json:bad,costUsd:0}),jev:async()=>good,videoFetch:fakeGoogle().fetchImpl,pollMs:0,seconds:async()=>20,cut:async(i,o)=>{await writeFile(o,'c');return o;},render:async()=>({})});
  await writeFile(join(ch,'plan.json'),JSON.stringify({mode:'kit',kitAt:kitSaved.createdAt,createdAt:'2026-09-28T02:00:00Z',chosen:0,picked:[{idea:{title:'Other'}}],script:script(),check:{pass:true},price:{usd:2.17}}));
  await always.start(job,{confirmCredits:2.17});m=await until(()=>always.status(job));assert.equal(m.state,'failed');assert.match(m.error,/Part 1 failed its check twice \(the hosts look different from the kit\)/);
- const short=new ReelMaker(root,keys,{gemini:async()=>({json:fine,costUsd:0}),jev:async()=>good,videoFetch:fakeGoogle().fetchImpl,pollMs:0,seconds:async()=>10,cut:async(i,o)=>{await writeFile(o,'c');return o;},render:async()=>({})});
+ const short=new ReelMaker(root,keys,{cover:fakeCover,gemini:async()=>({json:fine,costUsd:0}),jev:async()=>good,videoFetch:fakeGoogle().fetchImpl,pollMs:0,seconds:async()=>10,cut:async(i,o)=>{await writeFile(o,'c');return o;},render:async()=>({})});
  await writeFile(join(ch,'plan.json'),JSON.stringify({mode:'kit',kitAt:kitSaved.createdAt,createdAt:'2026-09-28T03:00:00Z',chosen:0,picked:[{idea:{title:'Third'}}],script:script(),check:{pass:true},price:{usd:2.17}}));
  await short.start(job,{confirmCredits:2.17});m=await until(()=>short.status(job));assert.match(m.error,/finished video is 10\.0 s, expected about 20 s/);
  await writeFile(join(ch,'plan.json'),JSON.stringify({mode:'kit',kitAt:'older',createdAt:'x',chosen:0,picked:[{idea:{title:'T'}}],script:script(),check:{pass:true}}));
@@ -183,7 +188,7 @@ test('designed voices: nobody speaks on camera; each host gets one voice (made o
  const voices={design:async({name,description})=>{designed.push(name);return {id:`voice_${designed.length}`,sample:Buffer.from('WAV'),costUsd:0.02};},
   speak:async({voice,text})=>{spoken.push([voice,text]);return {wav:Buffer.from('w'),costUsd:0.001};},mix:async a=>{mixed=a;await writeFile(a.out,'MIX');return a.out;},trim:async(i,o)=>{await writeFile(o,'t');return o;}};
  const ok={shows:'ok',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'};
- const maker=new ReelMaker(root,keys,{gemini:async()=>({json:ok,costUsd:0}),jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async f=>/line-/.test(f)?1.5:20,cut:async(i,o)=>{await writeFile(o,'c');return o;},voices,render:async a=>{rendered=a;await writeFile(a.out,'R');return {seconds:22};}});
+ const maker=new ReelMaker(root,keys,{cover:fakeCover,gemini:async()=>({json:ok,costUsd:0}),jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async f=>/line-/.test(f)?1.5:20,cut:async(i,o)=>{await writeFile(o,'c');return o;},voices,render:async a=>{rendered=a;await writeFile(a.out,'R');return {seconds:22};}});
  await maker.start(job,{confirmCredits:2.17});const m=await until(()=>maker.status(job));assert.equal(m.state,'done',m.error);
  assert.match(g.calls.post[0].input.at(-1).text,/No dialogue/);assert.deepEqual(designed,['Kitchen Check Leo','Kitchen Check Mia']);
  assert.deepEqual(spoken.map(s=>s[0]),['voice_1','voice_2','voice_1','voice_2']);
@@ -247,9 +252,23 @@ test('the Winner DNA reaches the idea and script writers, Jev\'s check, and the 
  // The voice direction follows the DNA.
  const spoken=[];const g=fakeGoogle(),ok={shows:'ok',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'};
  await writeFile(join(ch,'plan.json'),JSON.stringify({...s.plan,voiceMode:'designed'}));
- const maker=new ReelMaker(root,keys,{gemini:async()=>({json:ok,costUsd:0}),jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async f=>/line-/.test(f)?1:20,cut:async(i,o)=>{await writeFile(o,'c');return o;},
+ const maker=new ReelMaker(root,keys,{cover:fakeCover,gemini:async()=>({json:ok,costUsd:0}),jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async f=>/line-/.test(f)?1:20,cut:async(i,o)=>{await writeFile(o,'c');return o;},
   voices:{design:async({name})=>({id:`v_${name}`,costUsd:0}),speak:async a=>{spoken.push(a.style);return {wav:Buffer.from('w'),costUsd:0};},mix:async a=>{await writeFile(a.out,'M');return a.out;},trim:async(i,o)=>{await writeFile(o,'t');return o;}},render:async a=>{await writeFile(a.out,'R');return {seconds:22};}});
  await maker.start(job,{confirmCredits:s.plan.price.usd});const m=await until(()=>maker.status(job));assert.equal(m.state,'done',m.error);
  assert.match(spoken[0],/^calm, warm and steady, at a natural pace/);
+ await rm(root,{recursive:true});
+});
+
+test('talking hosts: the script rule, a lower close-up bar, a lip-sync check, and Kaan\'s switch',async()=>{
+ const talkP=kitScriptPrompt({title:'t'},kit,'ai_host',{},null,'talking');assert.match(talkP,/The hosts talk to the viewer on camera/);assert.match(talkP,/At least 40% of beats/);assert.match(talkP,/side by side in one close-up/);assert.doesNotMatch(talkP,/At least 60%/);assert.doesNotMatch(kitScriptPrompt({title:'t'},kit,'ai_host',{},null,'voiceover'),/talk to the viewer on camera/);
+ const halfClose=script();halfClose.parts[0].beats[1].shot='Medium shot of Mia'; // 2 of 4 close-ups: 50%
+ assert.match(scriptProblems(halfClose,kit,'ai_host').join(),/at least 60%/);assert.doesNotMatch(scriptProblems(halfClose,kit,'ai_host','talking').join(),/close-ups/);
+ const ok={match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false};
+ assert.deepEqual(partVerdict({...ok,lips_match:'no'}).problems,['the lips do not match the words']);assert.equal(partVerdict({...ok,lips_match:'no_speech_on_camera'}).pass,true);
+ const {root,job,ch}=await setup();const planner=new ReelPlanner(root,()=>({gemini:'g',jev:'j'}));
+ await writeFile(join(ch,'plan.json'),JSON.stringify({mode:'kit',script:script(),voice:{mode:'talking',why:'In 63 of 79...',auto:'talking',autoWhy:'In 63 of 79...'},voiceMode:'native'}));
+ let s=await planner.setVoice(job,'voiceover');assert.equal(s.plan.voiceMode,'designed');assert.equal(s.plan.voice.why,'You chose this.');assert.equal(s.plan.voice.byKaan,true);
+ s=await planner.setVoice(job,'talking');assert.equal(s.plan.voiceMode,'native');assert.equal(s.plan.voice.why,'In 63 of 79...');
+ await assert.rejects(planner.setVoice(job,'singing'),/talking or voice-over/);
  await rm(root,{recursive:true});
 });

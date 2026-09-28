@@ -47,7 +47,7 @@ test('make: the ideas button first; then ideas with three meters; script with sh
 
 test('ready to post: video, download, copy caption; nothing yet says so',()=>{
  const html=renderReady({reels:[{id:'0-celery',url:'/channels/a/0-celery/reel.mp4',title:'Celery',caption:'Try it #kitchen',seconds:30.1,spent:76}]});
- assert.match(html,/<video src="\/channels\/a\/0-celery\/reel\.mp4#t=0\.5"/);assert.match(html,/download>Download/);assert.match(html,/data-copy="cap-0-celery"/);assert.match(html,/30 s · 76 credits/);
+ assert.match(html,/<video src="\/channels\/a\/0-celery\/reel\.mp4#t=0\.5"/);assert.match(html,/download>1 · Download the reel/);assert.match(html,/data-copy="cap-0-celery"/);assert.match(html,/30 s · 76 credits/);
  assert.match(renderReady({reels:[]}),/Nothing ready yet/);
 });
 
@@ -208,4 +208,17 @@ test('Winner DNA on the Secret page: the honest verdict first, details with numb
  assert.match(html,/No effect either way: glasses, humor\./);assert.match(html,/src="\/media\/r\/a".*9\.1× normal.*one man · mid action · calm voice · 3\+ payoffs/s);
  assert.match(renderDna({state:'done',saved:{...saved,validation:{verdict:'predictable',rho:0.34}},view},{imageFor}),/Their wins follow a pattern.*Follow them/s);
  assert.equal(renderDna(null,{imageFor}),'');
+});
+
+test('the script shows whether hosts talk or a voice explains, why, and a one-tap switch',()=>{
+ const plan={script:{hook_title:'H',caption:'c',parts:[{beats:[{from:0,to:10,who:'Leo',does:'d',says:'s'}]}]},check:{problems:[]},voice:{mode:'talking',why:'In 63 of 79 of their reels a host speaks first, to the camera.'}};
+ const html=renderKitScript(plan);assert.match(html,/🗣 Hosts talk on camera<\/span><span class="hint">In 63 of 79/);assert.match(html,/data-voice-mode="voiceover">Use a voice-over instead/);
+ assert.match(renderKitScript({...plan,voice:{mode:'voiceover',why:'You chose this.'}}),/data-voice-mode="talking">Let the hosts talk instead/);
+});
+
+test('ready to post: cover, reel and caption, each with one numbered button; a free cover button for older reels',()=>{
+ const html=renderReady({reels:[{id:'0-fizz',url:'/channels/a/0-fizz/reel.mp4',cover:'/channels/a/0-fizz/cover.jpg',title:'Fizz',caption:'Try it #kitchen',seconds:22,spentUsd:2.15}]});
+ assert.match(html,/<img class="ready-cover" src="\/channels\/a\/0-fizz\/cover\.jpg"/);assert.match(html,/href="\/channels\/a\/0-fizz\/reel\.mp4" download>1 · Download the reel/);
+ assert.match(html,/href="\/channels\/a\/0-fizz\/cover\.jpg" download>2 · Download the cover/);assert.match(html,/data-copy="cap-0-fizz">3 · Copy the caption/);
+ const old=renderReady({reels:[{id:'0-egg',url:'/e.mp4',title:'Egg',caption:'c',seconds:22}]});assert.match(old,/data-act="make-cover" data-reel="0-egg">Make the cover · free/);assert.match(old,/2 · Copy the caption/);
 });

@@ -98,7 +98,7 @@ async function reprice(){
 async function loadBalance(){try{S.balance=(await api('/api/higgsfield/balance')).credits;}catch(e){S.balance=null;S.error=e.message;}render();}
 
 document.addEventListener('click',async e=>{
- const t=e.target.closest('[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close],[data-kit-format],[data-kit-cast],[data-kit-place],[data-voice],[data-fb],[data-fb-reason]');if(!t||t.disabled)return;
+ const t=e.target.closest('[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close],[data-kit-format],[data-kit-cast],[data-kit-place],[data-voice],[data-fb],[data-fb-reason],[data-voice-mode]');if(!t||t.disabled)return;
  const base=`/api/runs/${encodeURIComponent(S.runId)}`;
  if(t.dataset.step){S.step=t.dataset.step;store.set(`flow.step.${S.runId}`,S.step);render();scrollTo({top:0,behavior:'smooth'});if(S.step==='make')prepareMake();return;}
  if(t.dataset.run){loadRun(t.dataset.run).catch(err=>toast(err.message));return;}
@@ -122,6 +122,8 @@ document.addEventListener('click',async e=>{
  if(t.dataset.voice){const a=(S.audio??=new Audio());a.src=t.dataset.voice;a.play().catch(()=>toast('Could not play the voice.'));return;}
  if(t.dataset.act==='kit-voices'){act(async()=>{await api(`${base}/kit/voices`,{confirm:true});S.kit=await api(`${base}/kit`);});return;}
  if(t.dataset.act==='kit-choose'){act(async()=>{await api(`${base}/kit/choose`,{confirm:true,...(S.kitPick||{})});S.kitPick=null;S.kit=await api(`${base}/kit`);});return;}
+ if(t.dataset.voiceMode){act(async()=>{S.plan=await api(`${base}/reel-plan/voice`,{confirm:true,mode:t.dataset.voiceMode});});return;}
+ if(t.dataset.act==='make-cover'){const id=t.dataset.reel;act(async()=>{const saved=await api(`${base}/reel-cover`,{reelId:id});S.make.reels=S.make.reels.map(x=>x.id===id?saved:x);});return;}
  if(t.dataset.act==='dna-build'){act(async()=>{S.dna=await api(`${base}/dna`,{confirm:true});});return;}
  if(t.dataset.act==='ideas-all'){S.showAllIdeas=true;render();return;}
  const a=t.dataset.act;
