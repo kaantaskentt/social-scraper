@@ -32,6 +32,7 @@ async function lab(name,kitFrom=null){
  await mkdir(ch,{recursive:true});await link(join(ROOT,'secret',runId),join(ROOT,'secret',id));await link(join(ROOT,'videos',runId),join(ROOT,'videos',id));
  if(!kitFrom||name!==kitFrom)await link(kitDir,join(ch,'kit'));if(existsSync(join(real,'craft')))await link(join(real,'craft'),join(ch,'craft'));
  if(existsSync(join(real,'craft.json')))await copyFile(join(real,'craft.json'),join(ch,'craft.json'));
+ if(existsSync(join(real,'dna.json')))await copyFile(join(real,'dna.json'),join(ch,'dna.json')); // the account's Winner DNA
  return {...job,id};
 }
 const planner=new ReelPlanner(ROOT,keys),maker=new ReelMaker(ROOT,keys);
