@@ -1,0 +1,77 @@
+{
+ "hook_title": "Fix Tarnished Silver Fast",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 2,
+     "shot": "extreme close-up on a glass bowl",
+     "who": "voice",
+     "does": "A black, tarnished spoon is dropped into steaming hot water with baking soda and foil, instantly fizzing and shining.",
+     "says": "Don't buy expensive chemical polishes for your tarnished spoons.",
+     "sound": "loud fizzing and bubbling"
+    },
+    {
+     "from": 2,
+     "to": 4,
+     "shot": "medium on Harlan",
+     "who": "Harlan",
+     "does": "Harlan holds up a blackened spoon to the camera.",
+     "says": "Silver gets dull over time.",
+     "sound": ""
+    },
+    {
+     "from": 4,
+     "to": 7,
+     "shot": "close-up on a glass bowl",
+     "who": "voice",
+     "does": "Hands line the glass bowl with a sheet of aluminum foil.",
+     "says": "But you can clean it easily with everyday items.",
+     "sound": "crinkling foil"
+    },
+    {
+     "from": 7,
+     "to": 10,
+     "shot": "close-up on the bowl",
+     "who": "voice",
+     "does": "Hands pour steaming hot water into the foil-lined bowl.",
+     "says": "Just add steaming hot water.",
+     "sound": "splashing water"
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "close-up on the bowl",
+     "who": "voice",
+     "does": "A spoonful of baking soda is dumped into the hot water.",
+     "says": "And a scoop of baking soda.",
+     "sound": "plop and fizz"
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "extreme close-up on the bowl",
+     "who": "voice",
+     "does": "The tarnished spoon is lowered into the bubbling mixture.",
+     "says": "The aluminum pulls the tarnish right off.",
+     "sound": "loud fizzing"
+    },
+    {
+     "from": 6,
+     "to": 10,
+     "shot": "medium on Harlan",
+     "who": "Harlan",
+     "does": "Harlan lifts the now shiny spoon, then raises a glass mug of warm herbal tea toward the camera.",
+     "says": "Follow for the next test.",
+     "sound": "clink of glass"
+    }
+   ]
+  }
+ ],
+ "caption": "Tired of dull spoons? Try this simple trick to make them shine again! Do you have tarnished silver at home? #EverydayRoots #SilverPolish #CleaningTricks #HomeHacks #ShinySilver"
+}

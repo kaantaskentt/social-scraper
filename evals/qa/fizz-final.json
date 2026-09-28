@@ -1,0 +1,77 @@
+{
+ "hook_title": "TEST YOUR BAKING POWDER",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 2,
+     "shot": "extreme close-up on a clear glass of baking powder",
+     "who": "Felix",
+     "does": "pours hot water from a plain glass jug onto the baking powder, causing a violent bubbling reaction",
+     "says": "Pour hot water over it now.",
+     "sound": "loud, violent fizzing and bubbling"
+    },
+    {
+     "from": 2,
+     "to": 5,
+     "shot": "medium shot on Felix and Stella at the counter",
+     "who": "Felix",
+     "does": "spoons baking powder from a plain glass jar into an empty clear glass",
+     "says": "Test Number One checks its activity.",
+     "sound": "spoon clinking against the glass jar"
+    },
+    {
+     "from": 5,
+     "to": 8,
+     "shot": "close-up on the clear glass",
+     "who": "Stella",
+     "does": "pours hot water from the glass jug over the baking powder",
+     "says": "Heat activates the acid and base.",
+     "sound": "splashing water and immediate hissing"
+    },
+    {
+     "from": 8,
+     "to": 10,
+     "shot": "close-up on the fizzing clear glass",
+     "who": "Stella",
+     "does": "points her finger directly at the rapidly bubbling glass with a shocked, wide-eyed expression",
+     "says": "Making it fizz violently.",
+     "sound": "continuous crisp fizzing"
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 4,
+     "shot": "close-up on a second clear glass",
+     "who": "Stella",
+     "does": "pours hot water onto old baking powder, which barely bubbles at all",
+     "says": "Test Number Two uses old baking powder.",
+     "sound": "flat splash of water with almost no fizz"
+    },
+    {
+     "from": 4,
+     "to": 7,
+     "shot": "medium shot on Felix and Stella",
+     "who": "Felix",
+     "does": "points directly at the camera while standing confidently next to the dull clear glass",
+     "says": "It loses reactivity and barely bubbles.",
+     "sound": ""
+    },
+    {
+     "from": 7,
+     "to": 10,
+     "shot": "close-up on both clear glasses side by side on the counter",
+     "who": "Felix",
+     "does": "slides the fizzing glass next to the flat glass while Stella leans into the frame nodding vigorously",
+     "says": "Always check before baking. Follow for more.",
+     "sound": "glass sliding on the quartz counter"
+    }
+   ]
+  }
+ ],
+ "caption": "Is your baking powder actually working, or is it ruining your cakes? Try this quick test at home and tell us your result! #BakingHacks #FoodFactCheck #KitchenTips #BakingPowder #FoodScience"
+}

@@ -1,0 +1,68 @@
+{
+ "hook_title": "Pull Shoulders Down First",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "Close-up on Vance's back",
+     "who": "voice",
+     "does": "Vance snaps his shoulder blades down hard, lighting his lat muscles bright green.",
+     "says": "Pull shoulders away from ears first.",
+     "sound": "heavy booming thud"
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "Wide dynamic camera sweep around Vance",
+     "who": "voice",
+     "does": "Vance lowers smoothly into a dead hang from the invisible bar.",
+     "says": "Start from a dead straight hang.",
+     "sound": "rushing wind"
+    },
+    {
+     "from": 6,
+     "to": 10,
+     "shot": "Medium low angle on Vance's torso",
+     "who": "voice",
+     "does": "Vance pulls his shoulder blades down and back with robotic precision.",
+     "says": "Depressing the scapula engages the lats.",
+     "sound": "metallic clank"
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 4,
+     "shot": "Close-up on Vance's chest",
+     "who": "voice",
+     "does": "Vance drives his chest smoothly up toward his hands.",
+     "says": "Pull your chest toward your hands.",
+     "sound": "deep bass thud"
+    },
+    {
+     "from": 4,
+     "to": 7,
+     "shot": "Dynamic 3D camera sweep from the side",
+     "who": "voice",
+     "does": "Vance lowers his body down from the invisible bar with slow control, lats glowing green.",
+     "says": "Lower down slowly with total control.",
+     "sound": "rushing wind"
+    },
+    {
+     "from": 7,
+     "to": 10,
+     "shot": "Wide shot on Vance facing the screen",
+     "who": "voice",
+     "does": "Vance reaches the bottom hang and immediately begins pulling his shoulders down again.",
+     "says": "Are you ready?",
+     "sound": "metallic clank"
+    }
+   ]
+  }
+ ],
+ "caption": "Master your pull-up form by starting with the scapula to engage your back properly. Ready? #PullUpForm #BackWorkout #ScapularRetraction #FitnessAnimation"
+}

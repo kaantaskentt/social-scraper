@@ -13,5 +13,7 @@ Fork of github.com/artemnovitckii/creator-lab (MIT), remote `upstream`. Being ex
   Kaan; changes go in a new version file registered in `public/money/index.mjs`. `tests/fixtures/money-1.0-golden.json`
   guards money-1.0 (regenerate only with `UPDATE_GOLDEN=1` and a written reason).
 - Hand check on real runs: `node scripts/validate-money.mjs` (reads `data/`, prints only).
+- Decision checks (paid, cents): `node scripts/judge-test.mjs <runId>` (does the reel judge pick this channel's winners? result in data/channels/<run>/judge-test.json), `node scripts/qa-eval.mjs` (the quality checks' exam: frozen cases in evals/qa, history in data/qa-eval.jsonl; run after any check change), `node scripts/review-reels.mjs` (every made reel as a scroller, plus code checks for cut lines and silences).
+- Free re-edit of a made reel: `node scripts/re-edit.mjs <runId> <reelId> <source.mp4> <keep ranges> [--captions] [--no-hook]` (keeps the old reel as reel-before-*.mp4).
 - Status: build 1 done (metrics, Money view, crash-safe saves, transcript policy). Next: build 2 spec (discovery, queue,
   spending guard, storage) with its own Codex review before code. See the spec, section 6.

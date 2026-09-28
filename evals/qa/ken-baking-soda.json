@@ -1,0 +1,77 @@
+{
+ "hook_title": "Test Your Baking Soda",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 2,
+     "shot": "extreme close-up on a clear glass",
+     "who": "Felix",
+     "does": "pours white vinegar from a plain glass jug onto fresh baking soda in the clear glass, causing a violent bubbling reaction",
+     "says": "Pour vinegar on your baking soda.",
+     "sound": "loud, aggressive fizzing"
+    },
+    {
+     "from": 2,
+     "to": 5,
+     "shot": "medium shot on Felix and Stella in the bright kitchen",
+     "who": "Felix",
+     "does": "points directly at the camera while Stella gasps and nods vigorously behind him",
+     "says": "Test Number One: is it active?",
+     "sound": ""
+    },
+    {
+     "from": 5,
+     "to": 8,
+     "shot": "close-up on the white quartz counter",
+     "who": "Felix",
+     "does": "sets a clear glass of old baking soda directly next to a clear glass of fresh baking soda",
+     "says": "Fresh and old baking soda side by side.",
+     "sound": "glass clinking lightly on the counter"
+    },
+    {
+     "from": 8,
+     "to": 10,
+     "shot": "close-up on both clear glasses",
+     "who": "Stella",
+     "does": "pours white vinegar from the glass jug into both glasses; the fresh one bubbles rapidly, the old one stays flat",
+     "says": "The active one fizzes loudly!",
+     "sound": "loud fizzing"
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "medium shot on Felix and Stella",
+     "who": "Felix",
+     "does": "gestures confidently over the counter while Stella points at the bubbling glass with a wide-eyed, shocked expression",
+     "says": "It needs vinegar to react and release gas.",
+     "sound": ""
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "extreme close-up on the flat clear glass",
+     "who": "Stella",
+     "does": "pokes the flat, wet baking soda sludge with a plain metal spoon",
+     "says": "If it just sits there, it is dead.",
+     "sound": "wet metal scraping against glass"
+    },
+    {
+     "from": 6,
+     "to": 10,
+     "shot": "medium shot on Felix and Stella",
+     "who": "Felix",
+     "does": "lifts the fizzing clear glass up to his chest, looking directly into the camera lens",
+     "says": "Dead baking soda ruins food. When did you buy yours?",
+     "sound": ""
+    }
+   ]
+  }
+ ],
+ "caption": "Is your pantry staple actually doing its job? When did you buy yours? #FoodFactCheck #BakingSoda #KitchenHacks"
+}

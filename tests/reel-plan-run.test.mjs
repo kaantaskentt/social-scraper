@@ -76,3 +76,12 @@ test('autopilot: a blocked idea hands over to the next best one; the page gets t
   assert.equal(saved.chosen,2);assert.equal(saved.check.pass,true);assert.deepEqual(saved.blocked.map(b=>[b.title,b.problems[0]]),[['Soda','Soda is not true']]);
  }finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('new ideas are told which tests this channel already made',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'cl-fresh-'));
+ try{
+  const p=new ReelPlanner(root,()=>({gemini:'g',jev:'j'}),{});
+  for(const [id,title] of [['a','Egg Freshness Float'],['b','Baking Powder Fizz Test'],['c','Baking Powder Fizz Test']]){await mkdir(join(root,'channels','run1','reels',id),{recursive:true});await writeFile(join(root,'channels','run1','reels',id,'reel.json'),JSON.stringify({title}));}
+  assert.deepEqual((await p.madeTitles('run1')).sort(),['Baking Powder Fizz Test','Egg Freshness Float']);assert.deepEqual(await p.madeTitles('none1'),[]);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
