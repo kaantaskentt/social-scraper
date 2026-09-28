@@ -220,3 +220,4 @@ dialog::backdrop{background:rgba(20,18,14,.45)}
 .compare b{justify-self:end}
 .why-kid{margin:0 0 8px!important;color:var(--ink)!important;font-size:16px!important;font-weight:500}
 .why-list .tag{margin-left:0}
+.ready-tip{margin:-4px 0 18px;color:var(--muted,#666);font-size:14px}

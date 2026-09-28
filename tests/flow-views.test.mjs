@@ -222,3 +222,11 @@ test('ready to post: cover, reel and caption, each with one numbered button; a f
  assert.match(html,/href="\/channels\/a\/0-fizz\/cover\.jpg" download>2 · Download the cover/);assert.match(html,/data-copy="cap-0-fizz">3 · Copy the caption/);
  const old=renderReady({reels:[{id:'0-egg',url:'/e.mp4',title:'Egg',caption:'c',seconds:22}]});assert.match(old,/data-act="make-cover" data-reel="0-egg">Make the cover · free/);assert.match(old,/2 · Copy the caption/);
 });
+
+test('a blocked script is never a dead end: try the next idea or write it again',()=>{
+ const plan={mode:'kit',kitAt:'K1',createdAt:'P1',chosen:0,picked:[{idea:{title:'Soda test',hook_line:'h'},scores:{fit:2,ai_ready:2,hook:2}},{idea:{title:'Egg float',hook_line:'h'},scores:{fit:2,ai_ready:2,hook:2}}],rejected:[],
+  script:{hook_title:'H',caption:'c',parts:[{beats:[{from:0,to:10,who:'Leo',does:'d',says:'s'}]}]},check:{pass:false,problems:['The method or an ingredient is wrong: the result shown would not really happen']},price:{usd:2.17,maxUsd:4.34,parts:2,partSeconds:10}};
+ const html=renderMake({account:'ken',plan:{state:'ready',plan},make:{reels:[]},kit:{approved:true,createdAt:'K1',kit:{cast:[]}}});
+ assert.match(html,/Jev stopped this script before any money was spent: The method or an ingredient is wrong/);assert.match(html,/data-idea="1">Try the next idea: Egg float/);assert.match(html,/data-idea="0">Write this one again/);
+ assert.match(html,/Write the script again/);assert.doesNotMatch(html,/data-act="make"/);
+});
