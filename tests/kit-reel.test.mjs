@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {PART_USD,PARTS,MAX_WORDS,kitBrief,kitIdeaPrompt,judgeKitIdeaRequest,kitScriptPrompt,remakePrompt,scriptProblems,checkKitScriptRequest,readKitScriptCheck,kitPrice,referencesFor,partPrompt,spokenText,discloseCaption,partVerdict} from '../lib/kit-reel.mjs';
+import {HEALTH_Q,PART_USD,PARTS,MAX_WORDS,kitBrief,kitIdeaPrompt,judgeKitIdeaRequest,kitScriptPrompt,remakePrompt,scriptProblems,checkKitScriptRequest,readKitScriptCheck,kitPrice,referencesFor,partPrompt,spokenText,discloseCaption,partVerdict} from '../lib/kit-reel.mjs';
 const craft={rules:[{kind:'hook',rule:'Open on a pour',how:'extreme close-up of pouring',reels:['a','b']}],voice_direction:'brisk and confident, close to the mic',shot_style:'close-ups, cut every 2 s',sound_style:'loud fizz at the reveal',ending_style:'end on the result'};
 import {ReelPlanner} from '../lib/reel-plan-run.mjs';
 import {ReelMaker} from '../lib/reel-make.mjs';
@@ -45,7 +45,7 @@ test('Jev checks truth, health, feeling and risk per part; code turns answers in
  const good={answers:{starts_mid_action:{noul:0.9},clear_action:{noul:0.8},health_fact:{noul:0.1},true_claim:{noul:0.9},emotion:{choice:'satisfaction'},gripping:{score:2.4},part_1_risky:{noul:0.1},part_2_risky:{noul:0.2}}};
  assert.equal(readKitScriptCheck(good,script(),kit,'ai_host').pass,true);
  const bad=readKitScriptCheck({answers:{...good.answers,true_claim:{noul:0.2},part_2_risky:{noul:0.8}}},script(),kit,'ai_host');
- assert.deepEqual(bad.problems,['Says something that may not be true','Part 2 is risky for AI video']);assert.deepEqual(bad.riskyParts,[2]);
+ assert.deepEqual(bad.problems,['Something the reel shows or implies may not be true: check what each shot shows (for example which muscle works or what the result proves)','Part 2 is risky for AI video']);assert.deepEqual(bad.riskyParts,[2]);
  assert.deepEqual(readKitScriptCheck({answers:{...good.answers,first_second:{score:1.1}}},script(),kit,'ai_host').problems,['The first second is not striking enough (1.1 of 3)']);assert.ok(req.questions.first_second);
  const dull=readKitScriptCheck({answers:{...good.answers,gripping:{score:1.2}}},script(),kit,'ai_host');assert.deepEqual(dull.problems,['Not gripping enough (1.2 of 3)']);assert.equal(dull.gripping,1.2);
 });
@@ -103,7 +103,7 @@ test('kit path: ideas and script use the kit; the maker films two parts, checks 
  const scoreOf=n=>({first_second:'x',stops_scroll:n,visuals:n,sound:n,voice:n,payoff:n,pace:n,looks_real:n,keep_watching:n,best_moment:'b',weakest_moment:'w',fix:'Open on the fizz.'});
  const scored=[];const watch=async({parts,schema})=>{if(schema.required.includes('keep_watching')){const f=String(parts[0].video);scored.push(f);return {json:f==='v'?scoreOf(7):{...scoreOf(6),stops_scroll:4},costUsd:0.001};}
   checks.push(parts.length);return {json:{shows:'ok',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'},costUsd:0.003};};
- let seconds=20;const spoken=[];const voices={design:async({name})=>({id:`voice_${name}`,sample:null,costUsd:0.02}),speak:async({voice,text})=>{spoken.push(text);return {wav:Buffer.from('w'),costUsd:0.001};},mix:async a=>{await writeFile(a.out,'MIX');return a.out;}};
+ let seconds=20;const spoken=[];const voices={design:async({name})=>({id:`voice_${name}`,sample:null,costUsd:0.02}),speak:async({voice,text})=>{spoken.push(text);return {wav:Buffer.from('w'),costUsd:0.001};},mix:async a=>{await writeFile(a.out,'MIX');return a.out;},trim:async(i,o)=>{await writeFile(o,'t');return o;}};
  const maker=new ReelMaker(root,keys,{gemini:watch,jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async f=>/line-/.test(f)?1:seconds,voices,cut:async(i,o)=>{await writeFile(o,'cut');return o;},render:async a=>{rendered=a;await writeFile(a.out,'REEL');return {seconds:22.5};}});
  // Two winners with saved videos, to score against.
  await writeFile(join(root,'secret','r1','secret.json'),JSON.stringify({account:'ken',secret:{headline:'h'},stats:{differences:[],house:[]},picked:[{id:'w1',group:'winner',xNormal:9},{id:'w2',group:'winner',xNormal:8}]}));
@@ -181,15 +181,47 @@ test('designed voices: nobody speaks on camera; each host gets one voice (made o
  await writeFile(join(ch,'plan.json'),JSON.stringify(plan));
  const g=fakeGoogle(),designed=[],spoken=[];let mixed,rendered;
  const voices={design:async({name,description})=>{designed.push(name);return {id:`voice_${designed.length}`,sample:Buffer.from('WAV'),costUsd:0.02};},
-  speak:async({voice,text})=>{spoken.push([voice,text]);return {wav:Buffer.from('w'),costUsd:0.001};},mix:async a=>{mixed=a;await writeFile(a.out,'MIX');return a.out;}};
+  speak:async({voice,text})=>{spoken.push([voice,text]);return {wav:Buffer.from('w'),costUsd:0.001};},mix:async a=>{mixed=a;await writeFile(a.out,'MIX');return a.out;},trim:async(i,o)=>{await writeFile(o,'t');return o;}};
  const ok={shows:'ok',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'};
  const maker=new ReelMaker(root,keys,{gemini:async()=>({json:ok,costUsd:0}),jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async f=>/line-/.test(f)?1.5:20,cut:async(i,o)=>{await writeFile(o,'c');return o;},voices,render:async a=>{rendered=a;await writeFile(a.out,'R');return {seconds:22};}});
  await maker.start(job,{confirmCredits:2.17});const m=await until(()=>maker.status(job));assert.equal(m.state,'done',m.error);
  assert.match(g.calls.post[0].input.at(-1).text,/No dialogue/);assert.deepEqual(designed,['Kitchen Check Leo','Kitchen Check Mia']);
  assert.deepEqual(spoken.map(s=>s[0]),['voice_1','voice_2','voice_1','voice_2']);
  assert.deepEqual(mixed.lines.map(l=>l.start),[0,3,10,15]);assert.equal(rendered.voice,mixed.out);assert.equal(rendered.clips[0],mixed.video);
- const k=JSON.parse(await readFile(join(ch,'kit','kit.json'),'utf8'));assert.equal(k.voices.Leo.id,'voice_1');assert.match(k.voices.Leo.description,/natural, conversational/);
+ const k=JSON.parse(await readFile(join(ch,'kit','kit.json'),'utf8'));assert.equal(k.voices.Leo.id,'voice_1');assert.match(k.voices.Leo.description,/speaking naturally and close to the mic\.$/);
  // A second reel reuses the saved voices.
  await writeFile(join(ch,'plan.json'),JSON.stringify({...plan,createdAt:'2026-09-28T06:00:00Z'}));await maker.start(job,{confirmCredits:2.17});await until(()=>maker.status(job));assert.equal(designed.length,2);
  await rm(root,{recursive:true});
+});
+
+test('health claims: remedies and cures are out, exercise form and muscles are fitness instruction, not medicine',()=>{
+ const q=HEALTH_Q('idea');assert.match(q,/curing, treating or preventing an illness, pain/);assert.match(q,/detox/);assert.match(q,/weight-loss/);assert.match(q,/good form, and which muscles it works is NOT a health claim/);
+ assert.equal(judgeKitIdeaRequest({},{},kit,'ai_host').questions.health_claim.instructions,q);assert.equal(checkKitScriptRequest(script()).questions.health_fact.instructions,HEALTH_Q('script'));
+});
+
+test('medical-looking props from the look never reach the writers',()=>{
+ const k={...kit,assets:[{what:'A transparent plastic model',kind:'object',how:'shows build-up'},{what:'glass mugs',kind:'object',how:'every test'}]};
+ assert.deepEqual(kitBrief(k,'ai_host').signature,['glass mugs (object): every test']);
+});
+
+test('Jev checks every spoken line, so a rewrite knows which sentence is doubtful',()=>{
+ const req=checkKitScriptRequest(script());assert.ok(req.questions.line_1_1_true);assert.match(req.questions.line_1_1_true.instructions,/"Floppy celery\? Wait\."/);
+ const good={answers:{starts_mid_action:{noul:0.9},clear_action:{noul:0.8},health_fact:{noul:0.1},true_claim:{noul:0.3},emotion:{choice:'satisfaction'},gripping:{score:2.4},part_1_risky:{noul:0.1},part_2_risky:{noul:0.1},line_1_2_true:{noul:0.2}}};
+ assert.deepEqual(readKitScriptCheck(good,script(),kit,'ai_host').problems,['Not sure this is true: "Ice water, fifteen minutes."']);
+ assert.match(readKitScriptCheck({answers:{...good.answers,line_1_2_true:{noul:0.9}}},script(),kit,'ai_host').problems.join(),/shows or implies may not be true: check what each shot shows/);
+ assert.deepEqual(readKitScriptCheck({answers:{...good.answers,true_claim:{noul:0.9},line_1_2_true:{noul:0.9},emotion:{choice:'aspiration'}}},script(),kit,'ai_host').problems,[]);
+ const link=script();link.parts[1].beats[1].says='Check the link for more recipes.';assert.match(scriptProblems(link,kit,'ai_host').join(),/link, bio, DM or freebie/);
+});
+
+test('medical props in the craft study never reach the writers either',async()=>{
+ const {craftBrief}=await import('../lib/craft.mjs');
+ const b=craftBrief({...craft,rules:[{rule:'Show it on a clear pipe model',how:'drop it in the model'},{rule:'Open on a pour',how:'close-up'}]});
+ assert.deepEqual(b.moves,['Open on a pour (close-up)']);
+});
+
+test('each spoken line fits its own beat',()=>{
+ const long=script();long.parts[0].beats[0].says="Don't buy expensive chemical polishes for your tarnished spoons.";
+ assert.doesNotMatch(scriptProblems(long,kit,'ai_host').join(),/part 1 beat 1 says/); // 9 words in 3 s fits
+ long.parts[0].beats[0]={...long.parts[0].beats[0],to:2};long.parts[0].beats[1].from=2;
+ assert.match(scriptProblems(long,kit,'ai_host').join(),/part 1 beat 1 says 9 words in 2 s, at most 6/);
 });

@@ -85,7 +85,7 @@ const FORMAT_NAMES={ai_host:'AI host',hands_pov:'Hands only',visuals:'No person'
 const KIND={object:'Prop',colour:'Colour',action:'Move',sound:'Sound',words:'Words',effect:'Edit'};
 function kitPic(p,{big=false}={}){
  if(!p)return '';const flag=p.check&&!p.check.pass;
- return `<figure class="kit-pic${big?' is-big':''}${p.role.startsWith('turn')?' is-wide':''}"><a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="${esc(p.label)}" loading="lazy"></a><figcaption>${esc(p.label.replace(/^[^:]+: /,'').replace(/^./,c=>c.toUpperCase()))}${flag?`<span class="tag tag-avoid" title="${esc(p.check.problems.join('; '))}">Check: ${esc(p.check.problems[0])}</span>`:''}</figcaption></figure>`;
+ return `<figure class="kit-pic${big?' is-big':''}${p.role.startsWith('turn')?' is-wide':''}">${p.url?`<a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="${esc(p.label)}" loading="lazy"></a>`:'<div class="kit-gap">Not drawn</div>'}<figcaption>${esc(p.label.replace(/^[^:]+: /,'').replace(/^./,c=>c.toUpperCase()))}${flag?`<span class="tag tag-avoid" title="${esc(p.check.problems.join('; '))}">Check: ${esc(p.check.problems[0])}</span>`:''}</figcaption></figure>`;
 }
 // Choosing the look: 3 host options and 3 places, each checked, with Jev's pick marked and why (from its scores).
 function renderChoose(k,{account,busy,pick}){
@@ -103,10 +103,10 @@ ${o.casts.length?`<section class="block"><h2 class="sub-title">1 · Pick your ho
 // then upcoming frames) and the hosts' voices. No invented follower counts.
 export const handleOf=name=>String(name||'channel').toLowerCase().replace(/[^a-z0-9]+/g,'.').replace(/^\.|\.$/g,'').slice(0,28)||'channel';
 export function renderChannelPreview(k,{reels=[],voices=[]}={}){
- const pics=Object.fromEntries((k.pictures||[]).map(p=>[p.role,p])),avatar=pics.face0||pics.hands||pics.place,kit=k.kit;
+ const pics=Object.fromEntries((k.pictures||[]).filter(p=>p.url).map(p=>[p.role,p])),avatar=pics.face0||pics.hands||pics.place,kit=k.kit;
  const grid=[...reels.filter(r=>r.url).map(r=>`<a class="ig-cell" href="${esc(r.url)}" target="_blank" rel="noopener"><video src="${esc(r.url)}#t=1" muted playsinline preload="metadata"></video><span class="ig-play">▶</span></a>`),
-  ...['scene','place','body0','face1','turn0','body1','face0'].map(r=>pics[r]).filter(Boolean).map(p=>`<div class="ig-cell is-next"><img src="${esc(p.url)}" alt="" loading="lazy"><span class="ig-soon">Next</span></div>`)].slice(0,9).join('');
- const highlights=(kit.assets||[]).slice(0,3).map((a,i)=>`<div class="ig-hl"><i style="background:${/^#[0-9a-f]{6}$/i.test(kit.palette?.[i]?.hex||'')?kit.palette[i].hex:'#ddd'}"></i><span>${esc(String(a.what).split(/\s+/).slice(0,2).join(' '))}</span></div>`).join('');
+  ...['scene','place','body0','face1','turn0','body1','face0'].map(r=>pics[r]).filter(p=>p?.url).map(p=>`<div class="ig-cell is-next"><img src="${esc(p.url)}" alt="" loading="lazy"><span class="ig-soon">Next</span></div>`)].slice(0,9).join('');
+ const highlights=(kit.assets||[]).slice(0,3).map((a,i)=>`<div class="ig-hl"><i style="background:${/^#[0-9a-f]{6}$/i.test(kit.palette?.[i]?.hex||'')?kit.palette[i].hex:'#ddd'}"></i><span>${esc(String(a.what).replace(/^(a|an|the)\s+/i,'').split(/\s+/).slice(0,2).join(' '))}</span></div>`).join('');
  const hosts=kit.cast?.length?' · Our hosts are AI':'';
  const voiceRow=voices.length?`<div class="ig-voices">${voices.map(v=>`<button type="button" class="chip chip-btn" data-voice="${esc(v.url)}">▶ Hear ${esc(v.name)}</button>`).join('')}</div>`:(kit.cast?.length?'<div class="ig-voices"><button type="button" class="chip chip-btn" data-act="kit-voices">Make their voices · about $0.05</button></div>':'');
  return `<section class="block"><h2 class="sub-title">Your channel on Instagram</h2><div class="card ig">
@@ -146,8 +146,10 @@ ${k.approved?next('make','Make a reel with this look'):''}`;
 
 // 5 · Make: ideas → script and price → confirm → progress → video.
 const meter=(label,v)=>`<div class="meter"><span>${label}</span><i><b style="width:${Math.round(Math.max(0,Math.min(3,v||0))/3*100)}%"></b></i></div>`;
-export function renderIdeas(plan,{busy,made=new Set()}){
- return `<div class="idea-grid">${plan.picked.slice(0,4).map((p,i)=>`<article class="card idea${plan.chosen===i?' is-on':''}">${made.has(i)?'<span class="pill pill-ok made">Made ✓</span>':''}<h3>${esc(p.idea.title)}</h3><p class="quote">“${esc(p.idea.hook_line)}”</p>${meter('Fits the winners',p.scores.fit)}${meter('Easy for AI',p.scores.ai_ready)}${meter('Strong start',p.scores.hook)}<button type="button" class="btn${plan.chosen===i?'':' btn-primary'}" data-idea="${i}"${busy?' disabled':''}>${plan.chosen===i?'Chosen':'Use this idea'}</button></article>`).join('')}</div>
+// Up to 12 ideas, best first: 6 shown, the rest one tap away. Each says why it is true and how big the payoff is.
+export function renderIdeas(plan,{busy,made=new Set(),showAll=false}){
+ const shown=showAll?plan.picked:plan.picked.slice(0,6),more=plan.picked.length-shown.length;
+ return `<div class="idea-grid">${shown.map((p,i)=>`<article class="card idea${plan.chosen===i?' is-on':''}">${made.has(i)?'<span class="pill pill-ok made">Made ✓</span>':''}<h3>${esc(p.idea.title)}</h3><p class="quote">“${esc(p.idea.hook_line)}”</p>${p.idea.why_true?`<p class="why-true"><b>Why it's true:</b> ${esc(p.idea.why_true)}</p>`:''}${meter('Fits the winners',p.scores.fit)}${Number.isFinite(p.scores.payoff)?meter('Big payoff',p.scores.payoff):''}${meter('Easy for AI',p.scores.ai_ready)}${meter('Strong start',p.scores.hook)}<button type="button" class="btn${plan.chosen===i?'':' btn-primary'}" data-idea="${i}"${busy?' disabled':''}>${plan.chosen===i?'Chosen':'Use this idea'}</button></article>`).join('')}</div>${more>0?`<div class="next-row left"><button type="button" class="btn btn-ghost" data-act="ideas-all">Show all ${plan.picked.length} ideas</button></div>`:''}
 ${plan.rejected?.length?`<p class="hint">Jev removed ${plan.rejected.length} idea${plan.rejected.length>1?'s':''}: ${plan.rejected.map(r=>`${esc(r.idea.title)} (${esc(r.reason)})`).join(', ')}.</p>`:''}`;
 }
 export function renderScript(plan){
@@ -175,7 +177,7 @@ export const madeIdeas=(reels,plan=null)=>new Set((reels||[]).filter(r=>ofPlan(r
 export function renderKitScript(plan){
  const s=plan.script,problems=plan.check?.problems||[];
  const checks=[['Starts mid-action',/mid-action/],['One clear action',/clear action/],['True',/may not be true/],['No health claim',/health claim/],['One feeling',/feeling/],['Easy for AI video',/risky|part \d|beat|words|keyword/i]].map(([label,re])=>{const bad=problems.some(p=>re.test(p));return `<span class="pill ${bad?'pill-bad':'pill-ok'}">${bad?'!':'✓'} ${label}</span>`;}).join('');
- return `<div class="card script"><div class="script-top"><div><span class="cmp-label">On screen first</span><h3>${esc(s.hook_title)}</h3></div><span class="pill">Comment ${esc(s.keyword)}</span></div>
+ return `<div class="card script"><div class="script-top"><div><span class="cmp-label">On screen first</span><h3>${esc(s.hook_title)}</h3></div>${s.keyword?`<span class="pill">Comment ${esc(s.keyword)}</span>`:''}</div>
 <div class="parts">${s.parts.map((p,i)=>`<section class="part"><span class="cmp-label">Part ${i+1} · ${i*10}–${i*10+10} s</span><ol class="beats">${p.beats.map(b=>`<li><span class="shot-s">${esc(i*10+b.from)}–${esc(i*10+b.to)} s</span><div><p class="shot-v"><b>${esc(b.who)}</b> ${esc(b.does)}</p>${b.says?`<p class="shot-l">“${esc(b.says)}”</p>`:''}</div></li>`).join('')}</ol></section>`).join('')}</div>
 <div class="pills">${checks}</div></div>`;
 }
@@ -183,7 +185,7 @@ export function renderKitPrice(price,{busy}){
  return `<div class="card price"><div class="price-kit"><span class="price-n">$${esc(price.usd.toFixed(2))}</span><span class="hint">on your Gemini key, for ${price.parts*price.partSeconds} seconds of video. Up to $${esc(price.maxUsd.toFixed(2))} if a part needs its one retry. Each part is checked before the next one is paid for.</span></div>
 <div class="price-foot"><span class="hint">Made with Gemini Omni Flash from your look's pictures.</span><button type="button" class="btn btn-primary" data-act="make" data-usd="${price.usd}" data-max="${price.maxUsd}"${busy?' disabled':''}>Make the reel · $${esc(price.usd.toFixed(2))}</button></div></div>`;
 }
-export function renderMake({account,plan,make,balance,mode='fast',busy=false,error='',pricing=false,kit=null,fbOpen=null}){
+export function renderMake({account,plan,make,balance,mode='fast',busy=false,error='',pricing=false,kit=null,fbOpen=null,showAll=false}){
  const useKit=kit?.approved,hosts=(kit?.kit?.cast||[]).map(h=>h.name);
  const top=head(`Make a reel in @${account}'s style`,useKit?`Made from your look${hosts.length?`: ${hosts.join(' and ')}`:''}. Jev picks the ideas that fit the winners and checks the script.`:'Hands and a voice, no face. Jev picks the ideas that fit the winners and checks the script.');
  const err=error||make?.error||plan?.error?`<p class="err">${esc(error||make?.error||plan?.error)}</p>`:'';
@@ -195,7 +197,7 @@ export function renderMake({account,plan,make,balance,mode='fast',busy=false,err
  const finished=doneReel?`<div class="card done"><video src="${esc(doneReel.url)}#t=0.5" controls playsinline preload="metadata"></video><div><span class="pill pill-ok">Made ✓</span><h3>${esc(doneReel.title||'Your reel')}</h3>${renderReelScore(doneReel,{open:fbOpen===doneReel.id})}<p class="hint">Pick another idea above to make a new reel.</p>${next('ready','Open Ready to post')}</div></div>`:'';
  const kitMode=p.mode==='kit',priced=kitMode?Number.isFinite(p.price?.usd):p.price&&p.price.kit!==undefined;
  const makeIt=finished||(pricing||!priced?'<div class="card"><b>Checking the price…</b><progress></progress></div>':p.check?.pass?(kitMode?renderKitPrice(p.price,{busy}):renderPrice(p.price,{mode,balance,busy})):`<p class="err">Jev found problems in this script: ${esc((p.check?.problems||[]).join('; '))}. Pick the idea again to rewrite it.</p>`);
- return `${top}${err}${renderLearned(make?.reels)}<section class="block"><h2 class="sub-title">1 · Pick an idea</h2>${renderIdeas(p,{busy,made})}<div class="next-row left"><button type="button" class="btn btn-ghost" data-act="ideas"${busy?' disabled':''}>New ideas · a few cents</button></div></section>
+ return `${top}${err}${renderLearned(make?.reels)}<section class="block"><h2 class="sub-title">1 · Pick an idea</h2>${renderIdeas(p,{busy,made,showAll})}<div class="next-row left"><button type="button" class="btn btn-ghost" data-act="ideas"${busy?' disabled':''}>New ideas · a few cents</button></div></section>
 ${p.script?`<section class="block"><h2 class="sub-title">2 · Check the script</h2>${kitMode?renderKitScript(p):renderScript(p)}</section><section class="block"><h2 class="sub-title">3 · Make it</h2>${makeIt}</section>`:''}`;
 }
 

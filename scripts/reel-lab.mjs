@@ -40,12 +40,16 @@ if(command==='kit'){
  const [name,format]=args;const j=await lab(name,name),kits=new KitBuilder(ROOT,keys);
  // A format given here is used from the first build (no paid build in another format first).
  await kits.start(j,format?{format}:{});const s=await until(()=>kits.status(j));if(s.state==='failed')throw new Error(s.error);
+ // The lab takes Jev's pick of the host and place options (the app lets Kaan choose).
+ const o=s.saved.options;console.log('options',o.casts.map(c=>`${c.hosts.map(h=>h.name).join('&')}:${c.score}`).join(' '),'| places',o.places.map(p=>p.score).join(' '),'| pick',JSON.stringify({cast:o.pick.cast?.index,place:o.pick.place?.index}));
+ await kits.choose(j);const c=await until(()=>kits.status(j));if(c.state==='failed')throw new Error(c.error);
  const k=await kits.approve(j);console.log(k.format,k.kit.name,'$'+k.costUsd,k.pictures.map(p=>`${p.role}:${p.check.pass?'ok':p.check.problems.join('/')}`).join(' '));
 }
 if(command==='ideas'){
  // ideas [@kitname]: a lab look can be used for the ideas too.
  const kitFrom=args.find(a=>a.startsWith('@'))?.slice(1)||null,j=await lab(kitFrom?`ideas-${kitFrom}`:'ideas',kitFrom);await planner.startIdeas(j);const s=await until(()=>planner.status(j));if(s.state==='failed')throw new Error(s.error);
  // The craft study is shared: copy it back to the real account so every lab and the app reuse it.
+ await mkdir(join(ROOT,'channels',runId),{recursive:true}); // a freshly scanned account has no folder yet
  for(const f of ['craft.json'])if(existsSync(join(ROOT,'channels',j.id,f)))await copyFile(join(ROOT,'channels',j.id,f),join(ROOT,'channels',runId,f));
  s.plan.picked.forEach((p,i)=>console.log(`${i}\t${p.total}\t${p.idea.title}\t| ${p.idea.pattern_used||''} | ${p.idea.why_true}`));
  for(const r of s.plan.rejected)console.log(`rejected\t${r.idea.title}\t(${r.reason})`);

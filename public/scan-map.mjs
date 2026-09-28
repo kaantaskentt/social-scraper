@@ -29,14 +29,18 @@ export function mountScanMap(root,{posts,imageFor,videoFor,selected,onSelect}){
  const offY=stacked?wallH+16:0,svg=stage.querySelector('svg');
  const a=L.axes;svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
  svg.innerHTML=`<g transform="translate(0,${offY})">${a.y.map(t=>`<line x1="${a.box.l}" x2="${a.box.r}" y1="${t.at}" y2="${t.at}" class="grid"/><text x="${a.box.l-6}" y="${t.at+4}" text-anchor="end">${t.v.toFixed(0)}</text>`).join('')}${a.x.map(t=>`<text x="${t.at}" y="${a.box.b+18}" text-anchor="middle">${compact(t.v)}</text>`).join('')}${a.median?`<line class="med" x1="${a.median.x}" x2="${a.median.x}" y1="${a.box.t}" y2="${a.box.b}"/><line class="med" x1="${a.box.l}" x2="${a.box.r}" y1="${a.median.y}" y2="${a.median.y}"/>`:''}<text class="ax" x="${a.box.l}" y="${a.box.t-4}">↑ likes per 1,000 plays</text><text class="ax" x="${a.box.r}" y="${a.box.b-6}" text-anchor="end">plays →</text></g>`;
- const have=new Map([...stage.querySelectorAll('.st')].map(el=>[el.dataset.id,el]));
- for(const t of L.tiles){let el=have.get(t.id);
-  if(!el){el=document.createElement('button');el.type='button';el.className='st';el.dataset.id=t.id;el.innerHTML=`<img src="${imageFor(t.id)}" alt="" loading="lazy" onerror="this.remove()">`;el.onclick=()=>onSelect(t.id);stage.append(el);}
-  have.delete(t.id);const box=t.map?{...t.map,y:t.map.y+offY}:t.wall;
-  el.classList.toggle('on-map',Boolean(t.map));el.classList.toggle('waiting',!t.analysed);el.classList.toggle('is-sel',t.id===selected);
-  el.style.width=`${box.w}px`;el.style.height=`${box.h}px`;el.style.transform=`translate(${box.x}px,${box.y}px)`;}
- for(const el of have.values())el.remove();
+ // Two tiles per reel, as in the lab: the wall keeps every reel (the archive), and a copy flies from its place on the
+ // wall to the map once the reel is analysed (an empty wall after a finished scan looked broken, 2026-09-28).
+ const tile=(cls,id)=>{const el=document.createElement('button');el.type='button';el.className=cls;el.dataset.id=id;el.innerHTML=`<img src="${imageFor(id)}" alt="" loading="lazy" onerror="this.remove()">`;el.onclick=()=>onSelect(id);stage.append(el);return el;};
+ const place=(el,b)=>{el.style.width=`${b.w}px`;el.style.height=`${b.h}px`;el.style.transform=`translate(${b.x}px,${b.y}px)`;};
+ const walls=new Map([...stage.querySelectorAll('.st-wall')].map(el=>[el.dataset.id,el])),maps=new Map([...stage.querySelectorAll('.st-map')].map(el=>[el.dataset.id,el]));
+ for(const t of L.tiles){
+  const w=walls.get(t.id)||tile('st st-wall',t.id);walls.delete(t.id);place(w,t.wall);w.classList.toggle('waiting',!t.analysed);w.classList.toggle('is-sel',t.id===selected);
+  if(!t.map)continue;let m=maps.get(t.id);maps.delete(t.id);const to={...t.map,y:t.map.y+offY};
+  if(!m){m=tile('st st-map on-map',t.id);m.style.transition='none';place(m,t.wall);void m.offsetWidth;m.style.transition='';}
+  place(m,to);m.classList.toggle('is-sel',t.id===selected);}
+ for(const el of [...walls.values(),...maps.values()])el.remove();
  const done=posts.filter(analysed).length,label=root.querySelector('.scan-count');if(label)label.textContent=`${done} of ${posts.length} reels analysed · ${L.plotted} on the map`;
  const player=root.querySelector('.scan-player');if(player&&selected){const p=posts.find(x=>x.id===selected);if(p&&player.dataset.id!==p.id){player.dataset.id=p.id;const src=videoFor(p.id);
-  player.innerHTML=`${src?`<video src="${src}" controls playsinline autoplay muted loop></video>`:`<img src="${imageFor(p.id)}" alt="">`}<div class="scan-facts"><b>${compact(reach(p))}</b> plays · <b>${compact(p.likes)}</b> likes${reach(p)?` · <b>${(p.likes/reach(p)*1000).toFixed(1)}</b> per 1,000`:''}</div><p class="hint">${(p.caption||'').slice(0,140).replace(/[<>&]/g,'')}</p>`;}}
+  player.innerHTML=`${src?`<video src="${src}#t=0.5" controls playsinline preload="metadata" poster="${imageFor(p.id)}"></video>`:`<img src="${imageFor(p.id)}" alt="">`}<div class="scan-facts"><b>${compact(reach(p))}</b> plays · <b>${compact(p.likes)}</b> likes${reach(p)?` · <b>${(p.likes/reach(p)*1000).toFixed(1)}</b> per 1,000`:''}</div><p class="hint">${(p.caption||'').slice(0,140).replace(/[<>&]/g,'')}</p>`;}}
 }

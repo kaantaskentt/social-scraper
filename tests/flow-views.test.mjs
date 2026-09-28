@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {reachable,renderStepper,renderScan,renderWinners,renderSecret,renderKit,renderMake,renderReady,renderPrice} from '../public/flow-views.mjs';
+import {reachable,renderStepper,renderScan,renderWinners,renderSecret,renderKit,renderMake,renderReady,renderPrice,renderIdeas} from '../public/flow-views.mjs';
 const img=id=>`/media/r/${id}`;
 
 test('steps open in order: winners and secret need a scored scan, make needs the secret, ready needs a reel',()=>{
@@ -169,6 +169,7 @@ test('channel preview: a profile with the host as avatar, the promise, AI disclo
  assert.ok(html.indexOf('/r1.mp4')<html.indexOf('/s.jpg'));assert.match(html,/data-voice="\/v\.wav"[^>]*>▶ Hear Felix/);
  assert.match(html,/background:#112233/);assert.match(html,/background:#ddd/);
  assert.match(renderChannelPreview(k,{}),/data-act="kit-voices"/);
+ const gap=renderChannelPreview({...k,pictures:[...k.pictures,{role:'body0',url:null}]},{});assert.doesNotMatch(gap,/src="null"|src=""/);assert.match(renderChannelPreview({...k,kit:{...k.kit,assets:[{what:'A transparent glass'}]}},{}),/<span>transparent glass<\/span>/);
 });
 
 test('feedback loop on screen: the score against the winners, one-tap verdict, reasons after 👎, what was learned',()=>{
@@ -186,4 +187,11 @@ test('the confirm pop-up shows the hosts, their voices and the place the video w
  const k={kit:{cast:[{name:'Felix'},{name:'Stella'}]},voices:{Felix:{sample:'/v.wav'}},pictures:[{role:'face0',url:'/f0.jpg'},{role:'face1',url:'/f1.jpg'},{role:'place',url:'/p.jpg'},{role:'scene',url:'/s.jpg'}]};
  const html=renderConfirmLook(k);assert.match(html,/src="\/f0\.jpg".*Felix <button[^>]*data-voice="\/v\.wav"/s);assert.match(html,/src="\/f1\.jpg".*Stella<\/figcaption>/s);assert.match(html,/src="\/p\.jpg".*The place/s);assert.doesNotMatch(html,/s\.jpg/);
  assert.equal(renderConfirmLook(null),'');
+});
+
+test('ideas: 6 shown with why each is true and how big its payoff is; the rest one tap away',()=>{
+ const picked=Array.from({length:12},(_,i)=>({idea:{title:`Idea ${i}`,hook_line:'h',why_true:`Reason ${i}`},scores:{fit:2,ai_ready:2,hook:2,payoff:2.5}}));
+ const plan={picked,rejected:[],chosen:null};
+ const html=renderIdeas(plan,{busy:false});assert.equal((html.match(/class="card idea/g)||[]).length,6);assert.match(html,/Why it's true:<\/b> Reason 0/);assert.match(html,/Big payoff/);assert.match(html,/data-act="ideas-all">Show all 12 ideas/);
+ const all=renderIdeas(plan,{busy:false,showAll:true});assert.equal((all.match(/class="card idea/g)||[]).length,12);assert.doesNotMatch(all,/ideas-all/);
 });

@@ -194,3 +194,14 @@ test('draw flagged pictures again: same look and choice; only the failed picture
  assert.equal(second.calls.image,1);assert.equal(s.saved.pictures.at(-1).check.pass,true);assert.deepEqual(s.saved.kit,s1.saved.kit);assert.deepEqual(s.saved.chose,s1.saved.chose);
  await rm(root,{recursive:true});
 });
+
+test('a picture the image filter refuses is tried once more, then kept as a flagged gap; the look still finishes; a failed build shows as failed',async()=>{
+ const {root,job}=await setup();const {calls,opts}=fakes();let refused=0;
+ const image=opts.image;opts.image=async a=>{if(/single frame/.test(a.prompt)){refused++;throw new Error('Gemini: HTTP 400. Image generation blocked for unspecified reasons.');}return image(a);};
+ const b=new KitBuilder(root,keys,opts);await b.start(job);await until(b,job);await b.choose(job);const s=await until(b,job);
+ assert.equal(s.state,'done',s.error);assert.equal(refused,2);const scene=s.saved.pictures.find(p=>p.role==='scene');
+ assert.equal(scene.url,null);assert.deepEqual(scene.check.problems,['the image filter refused it']);assert.equal(s.saved.stage,'ready');
+ const g=opts.gemini;opts.gemini=async a=>{if(a.schema.required.includes('assets'))throw new Error('Gemini: HTTP 500. down');return g(a);};const b2=new KitBuilder(root,keys,opts);await b2.start(job,{redo:'character'});const f=await until(b2,job);
+ assert.equal(f.state,'failed');assert.match(f.error,/HTTP 500/);assert.ok(f.saved);
+ await rm(root,{recursive:true});
+});

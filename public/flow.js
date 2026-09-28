@@ -47,7 +47,7 @@ function render(){
  if(S.step==='winners')html=renderWinners({account,...winners()});
  if(S.step==='secret')html=renderSecret({account,status:S.secret,imageFor,feedback:S.feedback});
  if(S.step==='kit')html=renderKit({account,status:S.kit,busy:S.busy,error:S.error,pick:S.kitPick,reels:(S.make?.reels||[]).filter(r=>r.mode==='kit'&&r.kitAt===S.kit?.saved?.createdAt)});
- if(S.step==='make')html=renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing,kit:S.kit?.saved,fbOpen:S.fbOpen});
+ if(S.step==='make')html=renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing,kit:S.kit?.saved,fbOpen:S.fbOpen,showAll:S.showAllIdeas});
  if(S.step==='ready')html=renderReady({reels:S.make?.reels||[],fbOpen:S.fbOpen});
  // The scan map keeps its tiles between refreshes (so they fly from the wall to the map); the rest redraws.
  const key=S.step==='scan'?`scan:${S.runId}:${scanProgress()?.state}:${S.error}:${S.runs.length}`:null;
@@ -121,6 +121,7 @@ document.addEventListener('click',async e=>{
  if(t.dataset.voice){const a=(S.audio??=new Audio());a.src=t.dataset.voice;a.play().catch(()=>toast('Could not play the voice.'));return;}
  if(t.dataset.act==='kit-voices'){act(async()=>{await api(`${base}/kit/voices`,{confirm:true});S.kit=await api(`${base}/kit`);});return;}
  if(t.dataset.act==='kit-choose'){act(async()=>{await api(`${base}/kit/choose`,{confirm:true,...(S.kitPick||{})});S.kitPick=null;S.kit=await api(`${base}/kit`);});return;}
+ if(t.dataset.act==='ideas-all'){S.showAllIdeas=true;render();return;}
  const a=t.dataset.act;
  if(a==='kit-build')kitGo({});if(a==='kit-character')kitGo({redo:'character'});if(a==='kit-pictures')kitGo({redo:'pictures'});
  if(a==='kit-approve')act(async()=>{await api(`${base}/kit/approve`,{confirm:true});S.kit=await api(`${base}/kit`);});
