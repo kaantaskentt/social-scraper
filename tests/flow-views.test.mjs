@@ -88,7 +88,7 @@ const kitSaved=(o={})=>({format:'ai_host',byJev:true,formatWhy:'In 15 of their 1
 
 test('kit: before building it says what it does and the price; while building it shows progress',()=>{
  const none=renderKit({account:'ken',status:{state:'none',estimate:{usd:0.66}}});
- assert.match(none,/Your look, in @ken&#39;s style/);assert.match(none,/data-act="kit-build"[^>]*>Build my look · up to \$0\.66/);
+ assert.match(none,/Your look, in @ken&#39;s style/);assert.match(none,/data-act="kit-build"[^>]*>Build my look · about \$0\.66/); // .usd is the expected cost, not a cap (audit #17)
  const working=renderKit({account:'ken',status:{state:'working',stage:'Drawing Rhea: face',progress:{done:2,total:5}}});
  assert.match(working,/Drawing Rhea: face/);assert.match(working,/value="2" max="5"/);assert.match(working,/Picture 3 of 5/);
 });
@@ -108,7 +108,7 @@ test('kit: shows the format and why, the host pictures, the place, signature thi
 
 test('kit: once used, it says so and leads on to Make; hands-only kits have no host buttons',()=>{
  const used=renderKit({account:'ken',status:{state:'done',saved:kitSaved({approved:true}),estimate:{usd:0.66}}});
- assert.match(used,/In use ✓/);assert.match(used,/data-step="make"[^>]*>Make a reel with this look/);
+ assert.match(used,/In use ✓/);assert.match(used,/data-step="make"[^>]*>Copy their winners with this look/); // Make opens the copy studio (audit #63)
  const hands=renderKit({account:'ken',status:{state:'done',saved:kitSaved({format:'hands_pov',kit:{...kitSaved().kit,cast:[],hands:'slim hands, grey sleeves'},pictures:[pic('hands','The hands'),pic('place','The place'),pic('scene','A frame from a reel')]}),estimate:{usd:0.3}}});
  assert.doesNotMatch(hands,/kit-character/);assert.match(hands,/The hands<\/h3>/);assert.doesNotMatch(hands,/flagged/);
 });
@@ -138,7 +138,7 @@ test('make with a look: an old hands-only plan asks for new ideas; made badges o
 
 test('ready: kit reels show dollars, older reels show credits',()=>{
  const html=renderReady({reels:[{id:'a',url:'/a.mp4',seconds:22.4,spentUsd:2.07,caption:'x'},{id:'b',url:'/b.mp4',seconds:30,spent:76,caption:'y'}]});
- assert.match(html,/22 s · \$2\.07/);assert.match(html,/30 s · 76 credits/);
+ assert.match(html,/22 s · video \$2\.07, checks extra/);assert.match(html,/30 s · 76 credits/); // spentUsd counts only the video parts (audit #46)
 });
 
 test('secret comparison reads as one plain sentence, never as numbers soup',()=>{
