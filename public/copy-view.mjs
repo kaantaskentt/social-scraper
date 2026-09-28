@@ -15,7 +15,7 @@ function profile(kit,count){
 function intro(copy,{busy}){
  if(copy?.picking?.state==='working')return `<div class="card writing rise"><span class="cmp-label">Picking the winners to copy</span><h3>${esc(copy.picking.stage||'Working')}</h3><div class="shimmer" aria-hidden="true"></div><p class="hint">Their best reels, studied shot by shot; Jev judges which ones AI video can copy faithfully. A few cents, no video yet.</p></div>`;
  return `<div class="card hero rise"><span class="cmp-label">✦ Copy what already works</span><h3>Copy their 5 best reels with your hosts</h3>
-<p class="hint">The same shots, words, timing and sounds as their winners; only the people and the place are yours. Picks the winners that won more than once and that AI video can copy faithfully.</p>
+<p class="hint">The same shots, words, timing and sounds as their winners; only the people and the place are yours. Picks their strongest winners that AI video can copy faithfully.</p>
 ${copy?.picking?.state==='failed'?`<p class="err">${esc(copy.picking.error)}</p>`:''}
 <div class="hero-cta"><button type="button" class="btn btn-primary btn-big" data-act="copy-pick"${busy?' disabled':''}>Find the 5 to copy · a few cents</button></div></div>`;
 }
@@ -28,8 +28,11 @@ function picks(copy,{busy,unpicked}){
 <div class="hero-cta"><button type="button" class="btn btn-primary btn-big" data-act="copy-start" data-usd="${usd}" data-ids="${esc(chosen.map(p=>p.id).join(','))}"${busy||!chosen.length?' disabled':''}>Copy ${chosen.length===1?'this one':chosen.length===list.length?`these ${chosen.length}`:`these ${chosen.length}`} · $${usd.toFixed(2)}</button><span class="hint">All at once, about ${esc(Math.round(Math.max(...chosen.map(p=>p.parts),1)*1.4+3))} minutes. Each part is checked against the original before the next is paid for.</span></div></section>`;
 }
 // One tile: a ring that fills with real progress while it is made, then the reel.
+// The badge is a match score, most of it Gemini's beat-by-beat rating, so it does not claim a measured "% same".
+// A comparison that failed offers to compare again ($0 filming: the copy-retry route only compares a made copy).
 function tile(it,i){
- if(it.reel&&it.state==='done')return `<div class="ig-cell copy-tile is-done" data-tile="${esc(it.postId)}"><video src="${esc(it.reel.url)}#t=1" ${it.reel.cover?`poster="${esc(it.reel.cover)}"`:''} playsinline preload="metadata" controls></video>${it.fidelity?`<span class="fid ${it.fidelity.faithful?'is-ok':'is-off'}">${esc(it.fidelity.score)}% same</span>`:''}</div>`;
+ const f=it.fidelity,badge=Number.isFinite(f?.score)?`<span class="fid ${f.faithful?'is-ok':'is-off'}">${esc(f.score)}/100 match</span>`:f?.error&&it.retryUsd===0?`<button type="button" class="tile-retry" data-act="copy-retry" data-post="${esc(it.postId)}" data-usd="0">Compare again</button>`:'';
+ if(it.reel&&it.state==='done')return `<div class="ig-cell copy-tile is-done" data-tile="${esc(it.postId)}"><video src="${esc(it.reel.url)}#t=1" ${it.reel.cover?`poster="${esc(it.reel.cover)}"`:''} playsinline preload="metadata" controls></video>${badge}</div>`;
  const state=it.state==='failed'||it.state==='stopped'?'is-failed':it.state==='working'?'is-working':'';
  return `<div class="ig-cell copy-tile ${state}" data-tile="${esc(it.postId)}" style="--p:${it.pct};--i:${i}"><img src="${esc(it.originalImage)}" alt="" loading="lazy"><div class="ring-wrap"><div class="ring" aria-hidden="true"></div><b class="ring-n" data-live="pct">${it.state==='failed'||it.state==='stopped'?'!':`${it.pct}%`}</b></div>
 <span class="tile-stage" data-live="stage">${esc(it.state==='failed'||it.state==='stopped'?it.error:it.stage||'Waiting')}</span>${(it.state==='failed'||it.state==='stopped')&&Number.isFinite(it.retryUsd)?`<button type="button" class="tile-retry" data-act="copy-retry" data-post="${esc(it.postId)}" data-usd="${esc(it.retryUsd)}">Try again · $${esc(it.retryUsd.toFixed(2))}</button>`:''}<span class="tile-eta" data-live="eta">${it.state==='working'?`${clock(it.left)} left`:''}</span></div>`;
@@ -39,17 +42,24 @@ function compare(it){
  const f=it.fidelity;
  const beats=f?.beats?.length?`<ol class="fid-beats">${f.beats.map(b=>`<li class="m${b.match}"><span class="shot-s">${esc(b.from)}–${esc(b.to)} s</span><span>${esc(b.happens||'')}</span><b>${['missing','different','close','same'][b.match]||''}</b>${b.differs&&!/^nothing/i.test(b.differs)?`<em>${esc(b.differs)}</em>`:''}</li>`).join('')}</ol>`:'';
  return `<div class="cmp-col"><div class="ig-cell"><video src="${esc(it.original)}#t=1" playsinline preload="metadata" controls data-orig="${esc(it.postId)}"></video><span class="fid-label">Original</span></div>
-${f?`<div class="fid-card"><b>${esc(f.score)}% the same</b> <span class="hint">shots ${esc(f.shots??'?')}% · words ${esc(f.words??'?')}% · length ${esc(f.length??'?')}%</span>
+${f?.error?`<p class="hint">Not compared: ${esc(f.error)}</p>`:f?`<div class="fid-card"><b>Match score ${esc(f.score)} of 100</b> <span class="hint">shots ${esc(f.shots??'?')}% (Gemini watched both) · words ${esc(f.words??'?')}% · length ${esc(f.length??'?')}%</span>
 <p class="hint">${f.faithful?'A faithful copy.':`Not faithful yet${f.redo?`: film ${esc(f.redo.replace('_',' '))} again`:''}.`} ${f.gap&&!/^nothing/i.test(f.gap)?esc(f.gap):''}</p>${it.reel?`<button type="button" class="chip chip-btn" data-act="copy-sync" data-post="${esc(it.postId)}">▶ Play both together</button>`:''}${beats}</div>`:`<p class="hint">${it.state==='done'?'Not compared.':'Compared when the copy is made.'}</p>`}</div>`;
 }
 export function renderCopyStudio({copy,kit,busy=false,unpicked=new Set(),compareOpen=false}){
  if(!copy?.picks&&!copy?.batch)return intro(copy,{busy});
- if(!copy.batch)return `${copy.picking?.state==='working'?intro(copy,{busy}):''}${picks(copy,{busy,unpicked})}`;
- const b=copy.batch,done=b.items.filter(i=>i.state==='done').length,working=b.items.some(i=>i.state==='working'||i.state==='waiting');
+ // Picking again, or picks newer than the batch, come first; the last batch stays below. Once a batch existed the
+ // picks never came back, so a paid re-pick showed nothing (audit, 2026-09-29).
+ const b=copy.batch,after=t=>!b||String(t||'')>String(b.createdAt||''),fresh=!!copy.picks&&after(copy.picks.createdAt);
+ const pick=copy.picking&&copy.picking.state!=='done'&&after(copy.picking.at)?copy.picking:null;
+ const top=`${pick?.state==='working'?intro(copy,{busy}):pick?.state==='failed'?`<p class="err">Picking failed: ${esc(pick.error)}</p>`:''}${fresh?picks(copy,{busy,unpicked}):''}`;
+ if(!b)return top;
+ const done=b.items.filter(i=>i.state==='done').length,working=b.items.some(i=>i.state==='working'||i.state==='waiting');
  const bar=`<div class="copy-bar"><div class="row-between"><b data-live="batch-label">${working?`Making ${b.items.length} copies`:`${done} of ${b.items.length} copies made`}</b><span class="hint" data-live="batch-eta">${working?`${b.pct}% · about ${clock(b.left)} left`:`$${esc(b.usd.toFixed(2))} confirmed`}</span></div><div class="bar"><i data-live="batch-bar" style="width:${b.pct}%"></i></div></div>`;
- return `<section class="block"><div class="card ig ig-wide rise">${profile(kit,done)}${bar}
+ // Made copies are downloaded, covered and captioned on Ready to post, the same next step as the other Make screen.
+ const ready=done&&!working?'<button type="button" class="btn btn-primary" data-step="ready">Open Ready to post →</button>':'';
+ return `${top}<section class="block">${top?'<h2 class="sub-title">Your last copies</h2>':''}<div class="card ig ig-wide rise">${profile(kit,done)}${bar}
 <div class="ig-grid copy-grid">${b.items.map(tile).join('')}</div></div>
-<div class="hero-cta">${done?`<button type="button" class="btn${compareOpen?'':' btn-primary'}" data-act="copy-compare">${compareOpen?'Hide the originals':'Compare with the originals'}</button>`:''}${working?'':`<button type="button" class="btn btn-ghost" data-act="copy-new">Copy other winners</button>`}</div>
+<div class="hero-cta">${ready}${done?`<button type="button" class="btn${compareOpen||ready?'':' btn-primary'}" data-act="copy-compare">${compareOpen?'Hide the originals':'Compare with the originals'}</button>`:''}${working||fresh||pick?.state==='working'?'':`<button type="button" class="btn btn-ghost" data-act="copy-new">Copy other winners</button>`}</div>
 ${compareOpen?`<div class="cmp-grid">${b.items.map(compare).join('')}</div>`:''}</section>`;
 }
 // What changes second to second while copies are made, so the page can update numbers without redrawing videos.
@@ -58,4 +68,4 @@ export function copyLive(copy){
  return {items:b.items.map(i=>({postId:i.postId,pct:i.pct,stage:i.state==='failed'||i.state==='stopped'?i.error:i.stage||'Waiting',eta:i.state==='working'?`${clock(i.left)} left`:'',state:i.state})),pct:b.pct,eta:`${b.pct}% · about ${clock(b.left)} left`};
 }
 // The page's shape: when this changes the page is redrawn; otherwise only the live numbers move.
-export const copyShape=copy=>JSON.stringify([copy?.picking?.state,!!copy?.picks,copy?.picks?.createdAt,copy?.batch?.id,copy?.batch?.items.map(i=>[i.state,i.reel?.url,!!i.fidelity])]);
+export const copyShape=copy=>JSON.stringify([copy?.picking?.state,copy?.picking?.at,!!copy?.picks,copy?.picks?.createdAt,copy?.batch?.id,copy?.batch?.items.map(i=>[i.state,i.reel?.url,i.fidelity?.score??i.fidelity?.error??null,i.retryUsd??null])]);

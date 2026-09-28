@@ -96,11 +96,13 @@ const server=http.createServer(async(req,res)=>{
    res.writeHead(200,{'Content-Type':kitFile[2].endsWith('.wav')?'audio/wav':'image/jpeg','Cache-Control':kitFile[2].endsWith('.wav')?'no-cache':'public, max-age=31536000, immutable'});res.end(bytes);return;}
   // Winner DNA (about half a cent a reel): every detail of every scored reel tested against the creator's own normal.
   // The copy studio: pick the five most copyable winners (cents), then make the chosen copies (the confirmed price).
-  const copyRoute=path.match(/^\/api\/runs\/([\w-]+)\/copy(?:\/(pick|start|retry))?$/);
+  const copyRoute=path.match(/^\/api\/runs\/([\w-]+)\/copy(?:\/(pick|start|retry|compare))?$/);
   if(copyRoute){const job=pipeline.jobs.get(copyRoute[1]);if(!job){json(res,404,{error:'Run not found'});return;}
    if(req.method==='GET'&&!copyRoute[2]){json(res,200,await copies.status(job));return;}
    if(req.method==='POST'&&copyRoute[2]==='pick'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm first');await copies.pickStart(job);json(res,202,await copies.status(job));return;}
    if(req.method==='POST'&&copyRoute[2]==='retry'){const data=await body(req);json(res,202,await copies.retry(job,{ids:data.ids,confirmUsd:Number(data.confirmUsd)}));return;}
+   // Compare a made copy with its original again (cents), without filming anything (audit, 2026-09-29).
+   if(req.method==='POST'&&copyRoute[2]==='compare'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm first');json(res,202,await copies.compareAgain(job,{postId:String(data.postId||'')}));return;}
    if(req.method==='POST'&&copyRoute[2]==='start'){const data=await body(req);json(res,202,await copies.start(job,{ids:data.ids,confirmUsd:Number(data.confirmUsd)}));return;}
   }
   // Real results: Kaan's handle, then a check scans his account (public, about 3 cents) and matches our reels.
