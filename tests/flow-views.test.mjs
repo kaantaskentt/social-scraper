@@ -264,7 +264,8 @@ test('real results: ask for the handle once, then one check button; each posted 
 
 test('the gate and the rank show on the reel card',()=>{
  const base={id:'a',url:'/r.mp4',title:'T',caption:'c',seconds:20,spentUsd:2};
- assert.match(renderReady({reels:[{...base,check:{level:'broken',problems:['16s missing_result: spoon still black'],weaknesses:[]}}]}),/Not ready: 16s missing_result: spoon still black/);
+ const opinion=renderReady({reels:[{...base,check:{level:'broken',problems:['16s missing_result: spoon still black'],weaknesses:[]}}]});
+ assert.match(opinion,/Second opinion: 16s missing_result: spoon still black/);assert.doesNotMatch(opinion,/Not ready/); // advice, not a gate: it flips between runs
  const weak=renderReady({reels:[{...base,check:{level:'weak',problems:[],weaknesses:['6s missing_result: no floating egg']},rank:{sentence:'Beat 3 of 5 of their typical reels in a side-by-side watch.'}}]});
- assert.match(weak,/Weak spot: 6s missing_result: no floating egg/);assert.match(weak,/Beat 3 of 5 of their typical reels/);assert.doesNotMatch(weak,/Not ready/);
+ assert.match(weak,/Second opinion: 6s missing_result: no floating egg/);assert.match(weak,/Beat 3 of 5 of their typical reels/);assert.doesNotMatch(weak,/Not ready/);
 });

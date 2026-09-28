@@ -63,3 +63,11 @@ test('a line the audio never says is caught; a transcriber missing one word is n
  const most=['silver','gets','dull','over','time','the','aluminum','pulls','tarnish','right','off'].map((text,i)=>({text,start:i*0.4,end:i*0.4+0.3}));
  assert.equal(linesHeard(lines,alignScript(lines.join(' '),most)).all,true);
 });
+
+test('a spoken promise we cannot keep is caught from what was really said',async()=>{
+ const {spokenPromise}=await import('../lib/captions.mjs');
+ const w=t=>t.split(' ').map(text=>({text}));
+ assert.match(spokenPromise(w('pushing it up. Comment Egg G to get our full food safety guide.')),/Comment Egg G/);
+ assert.match(spokenPromise(w('the link in bio has it')),/link in bio/);
+ assert.equal(spokenPromise(w('They will snap perfectly again. Follow for the next test.')),null);
+});
