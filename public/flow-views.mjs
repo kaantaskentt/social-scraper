@@ -168,9 +168,11 @@ ${k.approved?next('make','Make a reel with this look'):''}`;
 // 5 · Make: ideas → script and price → confirm → progress → video.
 const meter=(label,v)=>`<div class="meter"><span>${label}</span><i><b style="width:${Math.round(Math.max(0,Math.min(3,v||0))/3*100)}%"></b></i></div>`;
 // Up to 12 ideas, best first: 6 shown, the rest one tap away. Each says why it is true and how big the payoff is.
-export function renderIdeas(plan,{busy,made=new Set(),showAll=false}){
- const shown=showAll?plan.picked:plan.picked.slice(0,6),more=plan.picked.length-shown.length;
- return `<div class="idea-grid">${shown.map((p,i)=>`<article class="card idea${plan.chosen===i?' is-on':''}">${made.has(i)?'<span class="pill pill-ok made">Made ✓</span>':''}<h3>${esc(p.idea.title)}</h3><p class="quote">“${esc(p.idea.hook_line)}”</p>${p.idea.why_true?`<p class="why-true"><b>Why it's true:</b> ${esc(p.idea.why_true)}</p>`:''}${meter('Fits the winners',p.scores.fit)}${Number.isFinite(p.scores.payoff)?meter('Big payoff',p.scores.payoff):''}${meter('Easy for AI',p.scores.ai_ready)}${meter('Strong start',p.scores.hook)}<button type="button" class="btn${plan.chosen===i?'':' btn-primary'}" data-idea="${i}"${busy?' disabled':''}>${plan.chosen===i?'Write the script again':'Use this idea'}</button></article>`).join('')}</div>${more>0?`<div class="next-row left"><button type="button" class="btn btn-ghost" data-act="ideas-all">Show all ${plan.picked.length} ideas</button></div>`:''}
+export function renderIdeas(plan,{busy,made=new Set(),showAll=false,limit=6,skip=null}){
+ // Ideas Jev already stopped go last, marked, so the fresh ones are the first thing you see.
+ const stopped=new Set((plan.blocked||[]).map(b=>b.index));
+ const list=plan.picked.map((p,i)=>({p,i})).filter(x=>x.i!==skip).sort((a,b)=>stopped.has(a.i)-stopped.has(b.i)),shown=showAll?list:list.slice(0,limit),more=list.length-shown.length;
+ return `<div class="idea-grid">${shown.map(({p,i},n)=>`<article class="card idea rise" style="--i:${n}">${made.has(i)?'<span class="pill pill-ok made">Made ✓</span>':stopped.has(i)?'<span class="pill pill-bad made">Jev stopped it</span>':''}<h3>${esc(p.idea.title)}</h3><p class="quote">“${esc(p.idea.hook_line)}”</p>${meter('Fits the winners',p.scores.fit)}${Number.isFinite(p.scores.payoff)?meter('Big payoff',p.scores.payoff):meter('Strong start',p.scores.hook)}<details class="why"><summary>Why this idea</summary>${p.idea.why_true?`<p class="why-true"><b>Why it's true:</b> ${esc(p.idea.why_true)}</p>`:''}${meter('Easy for AI',p.scores.ai_ready)}${meter('Strong start',p.scores.hook)}<p class="hint">Jev's scores, 0 to 3.</p></details><button type="button" class="btn${stopped.has(i)||plan.chosen===i&&plan.script?'':' btn-primary'}" data-idea="${i}"${busy?' disabled':''}>${stopped.has(i)||plan.chosen===i&&plan.script?'Try it again':'Use this idea'}</button></article>`).join('')}</div>${more>0?`<div class="next-row left"><button type="button" class="btn btn-ghost" data-act="ideas-all">Show ${more} more idea${more>1?'s':''}</button></div>`:''}
 ${plan.rejected?.length?`<p class="hint">Jev removed ${plan.rejected.length} idea${plan.rejected.length>1?'s':''}: ${plan.rejected.map(r=>`${esc(r.idea.title)} (${esc(r.reason)})`).join(', ')}.</p>`:''}`;
 }
 export function renderScript(plan){
@@ -207,6 +209,42 @@ export function renderKitScript(plan,{busy=false}={}){
 ${renderVoiceChoice(plan,{busy})}<div class="parts">${s.parts.map((p,i)=>`<section class="part"><span class="cmp-label">Part ${i+1} · ${i*10}–${i*10+10} s</span><ol class="beats">${p.beats.map(b=>`<li><span class="shot-s">${esc(i*10+b.from)}–${esc(i*10+b.to)} s</span><div><p class="shot-v"><b>${esc(b.who)}</b> ${esc(b.does)}</p>${b.says?`<p class="shot-l">“${esc(b.says)}”</p>`:''}</div></li>`).join('')}</ol></section>`).join('')}</div>
 <div class="pills">${checks}</div></div>`;
 }
+// What the viewer hears, beat by beat: the short version of the script (every shot is under "Why this script").
+const sayLines=s=>s.parts.flatMap((p,i)=>p.beats.filter(b=>b.says).map(b=>`<li><span class="shot-s">${esc(i*10+b.from)}–${esc(i*10+b.to)} s</span><p>${/voice|narrator/i.test(b.who)?'':`<b>${esc(b.who)}</b> `}“${esc(b.says)}”</p></li>`)).join('');
+const jevRow=(label,v)=>Number.isFinite(v)?`<li><span>${label}</span><b>${v.toFixed(2)} of 3</b></li>`:'';
+// Why this script: Jev's stored numbers, the voice decision, ideas the autopilot skipped and why, and every shot.
+function scriptWhy(p,{busy}){
+ const c=p.check||{},skipped=(p.blocked||[]).filter(b=>b.index!==p.chosen);
+ return `<details class="why"><summary>Why this script</summary><div class="why-body">
+<ul class="jev-nums">${jevRow('Gripping',c.gripping)}${jevRow('First second',c.firstSecond)}${jevRow('Matches the winners\' details',c.dnaMatch)}${c.emotion?`<li><span>Feeling</span><b>${esc(c.emotion)}</b></li>`:''}</ul>
+<p class="hint">Jev checked it is true, the method is the standard one, and every line fits its beat${c.rewritten?' (it was rewritten once to pass)':''}.</p>
+${renderVoiceChoice(p,{busy})}${p.result?.why?`<p class="hint">${esc(p.result.why)}</p>`:''}
+${skipped.length?`<h4>Ideas Jev skipped</h4><ul class="skipped">${skipped.map(b=>`<li><b>${esc(b.title)}</b>: ${esc(b.problems.join('; '))}</li>`).join('')}</ul>`:''}
+<h4>Every shot</h4><div class="parts">${p.script.parts.map((pt,i)=>`<section class="part"><span class="cmp-label">Part ${i+1} · ${i*10}–${i*10+10} s</span><ol class="beats">${pt.beats.map(b=>`<li><span class="shot-s">${esc(i*10+b.from)}–${esc(i*10+b.to)} s</span><div><p class="shot-v">${esc(b.does)}</p>${b.says?`<p class="shot-l">“${esc(b.says)}”</p>`:''}</div></li>`).join('')}</ol></section>`).join('')}</div>
+</div></details>`;
+}
+export function renderKitHero(p,{busy=false,pricing=false}={}){
+ const s=p.script,v=p.voice,secs=s.parts.length*10,price=p.price;
+ const button=pricing||!Number.isFinite(price?.usd)?'<button type="button" class="btn btn-primary btn-big" disabled>Checking the price…</button>'
+  :`<button type="button" class="btn btn-primary btn-big" data-act="make" data-usd="${price.usd}" data-max="${price.maxUsd}"${busy?' disabled':''}>Make the reel · $${esc(price.usd.toFixed(2))}</button>`;
+ return `<div class="card hero rise"><span class="cmp-label">✦ Ready to make · Jev passed it</span><h3>${esc(s.hook_title)}</h3>
+<p class="hint">${esc(p.picked[p.chosen]?.idea?.title||'')} · ${secs} s · ${v?.mode==='talking'?'Hosts talk on camera':'Voice-over'}</p>
+<ol class="say">${sayLines(s)}</ol>
+<div class="hero-cta">${button}<span class="hint">Up to $${esc((price?.maxUsd??0).toFixed(2))} if a part is redone. Each part is checked before the next is paid for.</span></div>
+${scriptWhy(p,{busy})}</div>`;
+}
+export function renderWriting(st){
+ return `<div class="card writing rise"><span class="cmp-label">Writing your script</span><h3>${esc(st.stage||'Working')}</h3><div class="shimmer" aria-hidden="true"></div>
+<p class="hint">Jev checks every draft for truth, the right method and timing. If an idea cannot pass, the next best idea is tried by itself. No video is paid for until you press Make.</p></div>`;
+}
+export function renderAllBlocked(p,{busy=false}={}){
+ // Plans from before the autopilot have no list of skipped ideas: the chosen idea's own reasons stand in.
+ const tried=p.blocked?.length?p.blocked.slice(-3):[{title:p.picked[p.chosen]?.idea?.title||'This idea',problems:p.check?.problems||[]}];
+ return `<div class="card blocked rise"><span class="cmp-label">No script yet · nothing spent on video</span><h3>Jev did not pass ${tried.length>1?`these ${tried.length} ideas`:'this idea'}</h3>
+<p class="hint">It stops scripts that could show something untrue or would not hold attention. New ideas usually fix it.</p>
+<div class="hero-cta"><button type="button" class="btn btn-primary btn-big" data-act="ideas"${busy?' disabled':''}>Get new ideas · a few cents</button></div>
+<details class="why"><summary>Why</summary><ul class="skipped">${tried.map(b=>`<li><b>${esc(b.title)}</b>: ${esc(b.problems.join('; '))}</li>`).join('')}</ul></details></div>`;
+}
 export function renderKitPrice(price,{busy}){
  return `<div class="card price"><div class="price-kit"><span class="price-n">$${esc(price.usd.toFixed(2))}</span><span class="hint">on your Gemini key, for ${price.parts*price.partSeconds} seconds of video. Up to $${esc(price.maxUsd.toFixed(2))} if a part needs its one retry. Each part is checked before the next one is paid for.</span></div>
 <div class="price-foot"><span class="hint">Made with Gemini Omni Flash from your look's pictures.</span><button type="button" class="btn btn-primary" data-act="make" data-usd="${price.usd}" data-max="${price.maxUsd}"${busy?' disabled':''}>Make the reel · $${esc(price.usd.toFixed(2))}</button></div></div>`;
@@ -216,11 +254,16 @@ export function renderMake({account,plan,make,balance,mode='fast',busy=false,err
  const top=head(`Make a reel in @${account}'s style`,useKit?`Made from your look${hosts.length?`: ${hosts.join(' and ')}`:''}. Jev picks the ideas that fit the winners and checks the script.`:'Hands and a voice, no face. Jev picks the ideas that fit the winners and checks the script.');
  const err=error||make?.error||plan?.error?`<p class="err">${esc(error||make?.error||plan?.error)}</p>`:'';
  if(make?.state==='working')return `${top}${renderProgress(make)}`;
- if(plan?.state==='working')return `${top}<div class="card"><b>${esc(plan.stage||'Working')}</b><progress></progress></div>`;
+ if(plan?.state==='working')return `${top}${renderWriting(plan)}`;
  const p0=plan?.plan,stale=useKit&&p0&&(p0.mode!=='kit'||p0.kitAt!==kit.createdAt),p=stale?null:p0;
  if(!p)return `${top}${err}<div class="card cta-card"><ul class="ticks"><li>4 ideas ${useKit?'for your look':'in the winners\' style'}</li><li>Health claims and fake tests removed</li><li>You pick one and see the exact price</li></ul><button type="button" class="btn btn-primary" data-act="ideas"${busy?' disabled':''}>Get ideas · a few cents</button></div>`;
  const made=madeIdeas(make?.reels,p),doneReel=(make?.reels||[]).find(r=>r.url&&ofPlan(r,p)&&ideaOf(r)===p.chosen);
- const finished=doneReel?`<div class="card done"><video src="${esc(doneReel.url)}#t=0.5" controls playsinline preload="metadata"></video><div><span class="pill pill-ok">Made ✓</span><h3>${esc(doneReel.title||'Your reel')}</h3>${renderReelScore(doneReel,{open:fbOpen===doneReel.id})}<p class="hint">Pick another idea above to make a new reel.</p>${next('ready','Open Ready to post')}</div></div>`:'';
+ const finished=doneReel?`<div class="card done"><video src="${esc(doneReel.url)}#t=0.5" controls playsinline preload="metadata"></video><div><span class="pill pill-ok">Made ✓</span><h3>${esc(doneReel.title||'Your reel')}</h3>${renderReelScore(doneReel,{open:fbOpen===doneReel.id,judge:make?.judge})}<p class="hint">Pick another idea below to make a new reel.</p>${next('ready','Open Ready to post')}</div></div>`:'';
+ if(p.mode==='kit'){
+  // The answer first: the finished reel, a script ready to make, or why nothing passed; other ideas below.
+  const hero=finished||(p.script?(p.check?.pass?renderKitHero(p,{busy,pricing}):renderAllBlocked(p,{busy})):'');
+  return `${top}${err}${hero}${renderLearned(make?.reels)}<section class="block"><h2 class="sub-title">${hero?'Or pick a different idea':'Pick an idea'}</h2>${renderIdeas(p,{busy,made,showAll,limit:hero?3:6,skip:p.script&&p.check?.pass?p.chosen:null})}<div class="next-row left"><button type="button" class="btn btn-ghost" data-act="ideas"${busy?' disabled':''}>New ideas · a few cents</button></div></section>`;
+ }
  const kitMode=p.mode==='kit',priced=kitMode?Number.isFinite(p.price?.usd):p.price&&p.price.kit!==undefined;
  const makeIt=finished||(pricing||!priced?'<div class="card"><b>Checking the price…</b><progress></progress></div>':p.check?.pass?(kitMode?renderKitPrice(p.price,{busy}):renderPrice(p.price,{mode,balance,busy})):`<div class="card blocked"><p class="err">Jev stopped this script before any money was spent: ${esc((p.check?.problems||[]).join('; '))}.</p><div class="next-row left">${p.picked[p.chosen+1]?`<button type="button" class="btn btn-primary" data-idea="${p.chosen+1}"${busy?' disabled':''}>Try the next idea: ${esc(p.picked[p.chosen+1].idea.title)}</button>`:''}<button type="button" class="btn" data-idea="${p.chosen}"${busy?' disabled':''}>Write this one again</button></div></div>`);
  return `${top}${err}${renderLearned(make?.reels)}<section class="block"><h2 class="sub-title">1 · Pick an idea</h2>${renderIdeas(p,{busy,made,showAll})}<div class="next-row left"><button type="button" class="btn btn-ghost" data-act="ideas"${busy?' disabled':''}>New ideas · a few cents</button></div></section>
@@ -237,8 +280,10 @@ export function renderConfirmLook(k){
 // The feedback loop on a finished reel: its score against the winners, and one tap (👍 or 👎 with reasons).
 const PART_NAME={stops_scroll:'the first second',visuals:'the images',sound:'the sounds',voice:'the voice',payoff:'the payoff',pace:'the pace',looks_real:'looking real'};
 export const FB_REASONS={boring_start:'Boring start',weak_payoff:'Weak payoff',voice:'The voice',looks_fake:'Looks fake',too_slow:'Too slow',wrong_topic:'Wrong topic'};
-export function renderReelScore(r,{open=false}={}){
- const sc=r.score?`<div class="score-line"><b>${esc(r.score.share)}%</b> of their winners' score · weakest: ${esc(PART_NAME[r.score.weakest]||r.score.weakest)}</div>`:r.scoreError?`<p class="hint">Not scored: ${esc(r.scoreError)}</p>`:'';
+export function renderReelScore(r,{open=false,judge=null}={}){
+ // The judge's notes, never a score to trust: its test on this channel's own past reels says how well it picks winners.
+ const jt=judge?.auc!=null?` On ${esc(judge.reels)} of this channel's past reels it picked the winner ${Math.round(judge.auc*100)}% of the time (50% is a coin flip), so only real views decide.`:'';
+ const sc=r.score?`<details class="why judge-note"><summary>Judge's note: weakest part is ${esc(PART_NAME[r.score.weakest]||r.score.weakest)}</summary><p class="hint">${r.score.fix?`Fix: ${esc(r.score.fix)} `:''}An opinion, not a forecast.${jt}</p></details>`:r.scoreError?`<p class="hint">Not scored: ${esc(r.scoreError)}</p>`:'';
  if(r.mode!=='kit')return sc;
  const f=r.feedback,down=f?.verdict==='down'||open;
  const chips=down?`<div class="chips fb-reasons">${Object.entries(FB_REASONS).map(([k,v])=>`<button type="button" class="chip chip-btn${f?.reasons?.includes(k)?' is-on':''}" data-fb-reason="${k}" data-reel="${esc(r.id)}">${v}</button>`).join('')}</div>`:'';
@@ -253,12 +298,12 @@ export function renderLearned(reels){
 }
 // 6 · Ready to post
 // Everything needed to post on Instagram: the cover picture, the reel and the caption, each with one button.
-export function renderReady({reels=[],fbOpen=null}){
+export function renderReady({reels=[],fbOpen=null,judge=null}){
  if(!reels.length)return `${head('Nothing ready yet','Make a reel first.')}`;
  return `${head('Ready to post','For each reel: download the video and the cover, copy the caption, post it on Instagram.')}<p class="ready-tip">When you post: pick the cover, then Advanced settings, turn on <b>Label as made with AI</b>. Meta asks for it on realistic AI video.</p>${''}<div class="ready-grid">${reels.map(r=>`<article class="card ready">
 <div class="ready-media"><video src="${esc(r.url)}#t=0.5" controls playsinline preload="metadata"></video>${r.cover?`<img class="ready-cover" src="${esc(r.cover)}" alt="Cover">`:`<button type="button" class="ready-cover is-empty" data-act="make-cover" data-reel="${esc(r.id)}">Make the cover · free</button>`}</div>
-<div class="ready-body"><h3>${esc(r.title||'Reel')}</h3><p class="caption" id="cap-${esc(r.id)}">${esc(r.caption||'')}</p>
+<div class="ready-body"><h3>${esc(r.title||'Reel')}</h3>${r.review?.postable===false?`<p class="ready-warn">Not ready: ${esc(r.review.why)}</p>`:r.heard&&!r.heard.all?`<p class="ready-warn">Not ready: this line is cut off or never heard: “${esc(r.heard.missing[0])}”${r.heard.missing.length>1?` and ${r.heard.missing.length-1} more`:''}</p>`:''}<p class="caption" id="cap-${esc(r.id)}">${esc(r.caption||'')}</p>
 <div class="ready-actions"><a class="btn btn-primary" href="${esc(r.url)}" download>1 · Download the reel</a>${r.cover?`<a class="btn" href="${esc(r.cover)}" download>2 · Download the cover</a>`:''}<button type="button" class="btn" data-copy="cap-${esc(r.id)}">${r.cover?'3':'2'} · Copy the caption</button></div>
-<span class="hint">${esc(Math.round(r.seconds||0))} s · ${Number.isFinite(r.spentUsd)?`$${esc(r.spentUsd.toFixed(2))}`:`${esc(r.spent??'')} credits`}</span>${renderReelScore(r,{open:fbOpen===r.id})}</div></article>`).join('')}</div>${next('make','Make another reel')}`;
+<span class="hint">${esc(Math.round(r.seconds||0))} s · ${Number.isFinite(r.spentUsd)?`$${esc(r.spentUsd.toFixed(2))}`:`${esc(r.spent??'')} credits`}</span>${renderReelScore(r,{open:fbOpen===r.id,judge})}</div></article>`).join('')}</div>${next('make','Make another reel')}`;
 }
 

@@ -57,3 +57,22 @@ test('the price is checked again for free, so the page never shows a price the m
   await rm(join(root,'channels','run1','plan.json'));await assert.rejects(p.reprice(job),/Write the script first/);
  }finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('autopilot: a blocked idea hands over to the next best one; the page gets the script that passed and why the others did not',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'cl-auto-'));
+ try{
+  const p=new ReelPlanner(root,()=>({gemini:'g',jev:'j'}),{});await mkdir(join(root,'channels','run1'),{recursive:true});
+  const plan={mode:'kit',kitAt:'K1',createdAt:'P1',pattern:'x',picked:['Soda','Egg','Rice','Salt'].map(title=>({idea:{title},scores:{}}))};
+  await writeFile(join(root,'channels','run1','plan.json'),JSON.stringify(plan));
+  const written=[];
+  const payoffs=[];await writeFile(join(root,'channels','run1','dna.json'),JSON.stringify({labels:Array.from({length:90},(_,i)=>({labels:{payoffs:i<20?'1':'0'}}))}));
+  Object.assign(p,{approvedKit:async()=>({createdAt:'K1',kit:{},format:'ai_host'}),craft:async()=>null,voiceDecision:async()=>({mode:'talking',why:'w'}),madeIdeas:async()=>new Set([1]),
+   writeChecked:async(job,kit,craft,prompt,keys,live,mode,payoff)=>{payoffs.push(payoff);const t=['Soda','Egg','Rice','Salt'].find(x=>prompt.includes(x));written.push(t);
+    return {script:{hook_title:t,parts:[{beats:[]},{beats:[]}]},check:t==='Rice'?{pass:true,problems:[]}:{pass:false,problems:[`${t} is not true`]}};}});
+  await p.startScript({id:'run1',posts:[]},0);const st=await settle(p,'run1');assert.notEqual(st?.state,'failed',st?.error);
+  const saved=JSON.parse(await readFile(join(root,'channels','run1','plan.json'),'utf8'));
+  assert.deepEqual(written,['Soda','Rice']); // Egg already has a reel, so it is skipped
+  assert.deepEqual(payoffs,[false,false]);assert.equal(saved.result.payoff,false); // 20 of 90 reels show a result: the full readings reach the decision
+  assert.equal(saved.chosen,2);assert.equal(saved.check.pass,true);assert.deepEqual(saved.blocked.map(b=>[b.title,b.problems[0]]),[['Soda','Soda is not true']]);
+ }finally{await rm(root,{recursive:true,force:true});}
+});

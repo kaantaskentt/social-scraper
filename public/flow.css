@@ -221,3 +221,31 @@ dialog::backdrop{background:rgba(20,18,14,.45)}
 .why-kid{margin:0 0 8px!important;color:var(--ink)!important;font-size:16px!important;font-weight:500}
 .why-list .tag{margin-left:0}
 .ready-tip{margin:-4px 0 18px;color:var(--muted,#666);font-size:14px}
+.ready-warn{margin:6px 0 10px;padding:8px 10px;border-radius:8px;background:#fdecea;color:#8a1c12;font-size:14px}
+/* Make step, 2026-09-28: the answer on top (hero), details fold open, calm motion. */
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes sweep{from{background-position:-200% 0}to{background-position:200% 0}}
+.rise{animation:rise .38s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i,0)*60ms)}
+.btn{transition:transform .12s ease,background .15s ease,box-shadow .15s ease}.btn:active:not(:disabled){transform:scale(.97)}
+.btn-big{padding:14px 26px;font-size:16px;font-weight:600}
+.hero{display:flex;flex-direction:column;gap:10px;padding:24px;border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink),var(--shadow)}
+.hero h3,.writing h3,.blocked h3{margin:0;font-size:24px;letter-spacing:-.02em;line-height:1.2}
+.hero .cmp-label{color:var(--good);font-weight:600}
+.say{list-style:none;margin:4px 0 2px;padding:0;display:grid;gap:6px}
+.say li{display:grid;grid-template-columns:64px 1fr;gap:10px;align-items:baseline}.say p{margin:0;font-size:16px}
+.hero-cta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}
+details.why{border-top:1px solid var(--line);padding-top:8px}
+details.why summary{cursor:pointer;color:var(--muted);font-size:14px;list-style:none;padding:4px 0;width:max-content}
+details.why summary::before{content:'▸ ';display:inline-block;transition:transform .2s}details.why[open] summary::before{transform:rotate(90deg)}
+details.why summary:hover{color:var(--ink)}
+details.why[open]>:not(summary){animation:rise .25s ease both}
+.why-body{display:flex;flex-direction:column;gap:10px;padding-top:6px}.why-body h4{margin:6px 0 0;font-size:14px}
+.jev-nums{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.jev-nums li{display:flex;gap:8px;padding:6px 10px;border-radius:10px;background:var(--soft);font-size:14px}.jev-nums span{color:var(--muted)}
+.skipped{margin:0;padding-left:18px;font-size:14px;color:var(--muted)}.skipped b{color:var(--ink)}
+.idea details.why{border:0;padding:0}.idea details.why summary{font-size:13px}
+.writing{display:flex;flex-direction:column;gap:10px;padding:24px}
+.shimmer{height:6px;border-radius:99px;background:linear-gradient(90deg,var(--soft) 0%,#d9d4ca 50%,var(--soft) 100%);background-size:200% 100%;animation:sweep 1.4s linear infinite}
+.blocked{display:flex;flex-direction:column;gap:10px;padding:24px}
+@media(prefers-reduced-motion:reduce){.rise,details.why[open]>:not(summary){animation:none}.shimmer{animation:none}}
+@media(max-width:600px){.say li{grid-template-columns:52px 1fr}.hero{padding:18px}}

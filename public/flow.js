@@ -39,6 +39,8 @@ function winners(){
 }
 
 function render(){
+ // A channel still loading shows a quiet placeholder, never the empty "Pick an account" page for a moment.
+ if(S.runId&&!S.job){$('#view').innerHTML='<div class="card writing rise"><span class="cmp-label">Opening your channel</span><div class="shimmer" aria-hidden="true"></div></div>';S.lastHtml=null;return;}
  const open=reachable(flags());if(!open[S.step])S.step='scan';
  $('#stepper').innerHTML=renderStepper(S.step,open,doneSteps());
  $('#acct-now').textContent=S.job?`@${S.job.creator}`:'';
@@ -48,10 +50,11 @@ function render(){
  if(S.step==='secret')html=renderSecret({account,status:S.secret,imageFor,feedback:S.feedback,dna:S.dna});
  if(S.step==='kit')html=renderKit({account,status:S.kit,busy:S.busy,error:S.error,pick:S.kitPick,reels:(S.make?.reels||[]).filter(r=>r.mode==='kit'&&r.kitAt===S.kit?.saved?.createdAt)});
  if(S.step==='make')html=renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing,kit:S.kit?.saved,fbOpen:S.fbOpen,showAll:S.showAllIdeas});
- if(S.step==='ready')html=renderReady({reels:S.make?.reels||[],fbOpen:S.fbOpen});
+ if(S.step==='ready')html=renderReady({reels:S.make?.reels||[],fbOpen:S.fbOpen,judge:S.make?.judge});
  // The scan map keeps its tiles between refreshes (so they fly from the wall to the map); the rest redraws.
  const key=S.step==='scan'?`scan:${S.runId}:${scanProgress()?.state}:${S.error}:${S.runs.length}`:null;
- if(!(key&&key===S.viewKey&&$('#view .scan-stage')))$('#view').innerHTML=html;S.viewKey=key;
+ // Other steps redraw only when the page really changed: open "Why" panels stay open and nothing re-animates.
+ if(!(key&&key===S.viewKey&&$('#view .scan-stage'))&&(key||html!==S.lastHtml))$('#view').innerHTML=html;S.viewKey=key;S.lastHtml=key?null:html;
  if(S.step==='scan'&&S.job){if(!S.scanSel)S.scanSel=[...S.job.posts].filter(p=>reach(p)).sort((a,b)=>reach(b)-reach(a))[0]?.id||null;
   mountScanMap($('#view'),{posts:S.job.posts,imageFor,videoFor,selected:S.scanSel,onSelect:id=>{S.scanSel=id;render();}});}
 }
@@ -59,9 +62,13 @@ addEventListener('resize',()=>{if(S.step==='scan')render();});
 
 // Loads everything for one account; later refreshes only fetch what is still running.
 async function loadRun(id,{keepStep=false}={}){
- S.runId=id;store.set('flow.run',id);S.error='';S.scanSel=null;
+ const switching=S.runId!==id;S.runId=id;store.set('flow.run',id);S.error='';S.scanSel=null;if(switching){S.job=null;render();}
  const base=`/api/runs/${encodeURIComponent(id)}`;
- const [job,videos,secret,kit,plan,make,money,dna]=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(()=>({results:{}})),api(`${base}/dna`).catch(e=>({state:'none',error:e.message}))]);
+ let loaded;try{loaded=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(()=>({results:{}})),api(`${base}/dna`).catch(e=>({state:'none',error:e.message}))]);}
+ // A channel that cannot load goes back to the account list with the reason, never a spinner forever.
+ catch(e){if(S.runId===id){S.runId=null;S.step='scan';S.error=e.message;render();}throw e;}
+ const [job,videos,secret,kit,plan,make,money,dna]=loaded;
+
  if(S.runId!==id)return;
  Object.assign(S,{job,dna,saved:new Set(videos.saved||[]),secret,kit,plan,make,results:money.results||{},feedback:secret?.saved?.feedback||null});
  if(!keepStep){const d=doneSteps(),remembered=store.get(`flow.step.${id}`);S.step=remembered&&reachable(flags())[remembered]?remembered:d.kit?'make':d.secret?'kit':d.winners?'winners':'scan';}
@@ -79,7 +86,8 @@ async function refresh(){
   if(S.secret?.state==='building')S.secret=await api(`${base}/secret`);
   if(S.kit?.state==='working')S.kit=await api(`${base}/kit`);
   if(S.dna?.state==='working')S.dna=await api(`${base}/dna`);
-  if(S.plan?.state==='working')S.plan=await api(`${base}/reel-plan`);
+  // When the script is ready the answer is at the top of the page: bring it into view.
+  if(S.plan?.state==='working'){S.plan=await api(`${base}/reel-plan`);if(S.plan.state!=='working')scrollTo({top:0,behavior:'smooth'});}
   if(S.make?.state==='working'){S.make=await api(`${base}/reel-make`);if(S.make.state!=='working')S.balance=null;}
  }catch(e){S.error=e.message;}
  if(S.runId===id){render();poll();}
@@ -107,7 +115,7 @@ document.addEventListener('click',async e=>{
  if(t.dataset.copy){const text=document.getElementById(t.dataset.copy)?.textContent||'';try{await navigator.clipboard.writeText(text);toast('Caption copied');}catch{toast('Could not copy. Select the caption and copy it.');}return;}
  if(t.dataset.mode){S.mode=t.dataset.mode;render();return;}
  if(t.dataset.feedback){act(async()=>{await api(`${base}/secret-feedback`,{answer:t.dataset.feedback});S.feedback=t.dataset.feedback;});return;}
- if(t.dataset.idea!==undefined){act(async()=>{S.plan=await api(`${base}/reel-plan/script`,{confirm:true,index:Number(t.dataset.idea)});});return;}
+ if(t.dataset.idea!==undefined){scrollTo({top:0,behavior:'smooth'});act(async()=>{S.plan=await api(`${base}/reel-plan/script`,{confirm:true,index:Number(t.dataset.idea)});});return;}
  // The kit: build, new host, redraw flagged pictures, switch format (each shows its price on the button), use it.
  const kitGo=body=>act(async()=>{await api(`${base}/kit`,{confirm:true,...body});S.kit=await api(`${base}/kit`);});
  if(t.dataset.kitFormat){kitGo({redo:'format',format:t.dataset.kitFormat});return;}
@@ -130,6 +138,7 @@ document.addEventListener('click',async e=>{
  if(a==='kit-build')kitGo({});if(a==='kit-character')kitGo({redo:'character'});if(a==='kit-pictures')kitGo({redo:'pictures'});
  if(a==='kit-approve')act(async()=>{await api(`${base}/kit/approve`,{confirm:true});S.kit=await api(`${base}/kit`);});
  if(a==='secret-build')act(async()=>{S.secret={...(await api(`${base}/secret`,{confirm:true})),plan:S.secret?.plan};});
+ if(a==='ideas'){scrollTo({top:0,behavior:'smooth'});S.showAllIdeas=false;}
  if(a==='ideas')act(async()=>{S.plan=await api(`${base}/reel-plan/ideas`,{confirm:true});});
  if(a==='make'){
   const usd=t.dataset.usd!==undefined,credits=Number(usd?t.dataset.usd:t.dataset.credits),max=Number(t.dataset.max);

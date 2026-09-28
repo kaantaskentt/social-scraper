@@ -116,7 +116,7 @@ test('kit path: ideas and script use the kit; the maker films two parts, checks 
  const m=await until(()=>maker.status(job));assert.equal(m.state,'done',m.error);
  assert.equal(g.calls.post.length,2);assert.equal(g.calls.post[0].background,true);assert.equal(g.calls.post[0].input.filter(x=>x.type==='image').length,3);
  assert.equal(g.calls.post[0].response_format.aspect_ratio,'9:16');assert.equal(g.calls.post[1].previous_interaction_id,'job1');assert.equal(g.calls.post[1].input.length,1);
- assert.deepEqual(checks,[4,4]); // the clip, two face pictures, the brief
+ assert.deepEqual(checks,[4,4,4,4]); // each part watched twice: the clip, two face pictures, the brief
  // No readings here, so the hosts talk on camera: Omni's own lip-synced voices are the sound, nothing is dubbed.
  const final=join(ch,'reels',m.reels[0].id,'part-2-a1.mp4');assert.equal(rendered.clips[0],final);assert.equal(rendered.voice,final);
  assert.equal(m.reels[0].voiceMode,'native');assert.equal(spoken.length,0);assert.doesNotMatch(g.calls.post[0].input.at(-1).text,/No dialogue/);
@@ -125,7 +125,8 @@ test('kit path: ideas and script use the kit; the maker films two parts, checks 
  assert.equal(rendered.sayText,spokenText(script()));assert.equal(rendered.endCard.title,'Kitchen Check');assert.equal(rendered.endCard.subtitle,'Follow for the next one');
  const reel=m.reels[0];assert.equal(reel.mode,'kit');assert.equal(reel.idea,0);assert.match(reel.caption,/Our hosts are AI\.$/);assert.match(reel.url,/^\/channels\/r1\/0-revive-celery-[0-9a-f]{6}\/reel\.mp4$/);
  // Scored against the winners: 2 winners × 3 + our reel × 3; winners cached for the next reel.
- assert.equal(scored.length,9);assert.equal(reel.score.share,83); // 5.8 of 10 (shown rounded) against the winners 7assert.equal(reel.score.weakest,'stops_scroll');assert.equal(reel.score.fix,'Open on the fizz.');
+ // Only our reel is judged (3 times, averaged); the winners are no longer scored, and there is no share of them.
+ assert.equal(scored.length,3);assert.equal(reel.score.share,undefined);assert.equal(reel.score.weakest,'stops_scroll');assert.equal(reel.score.fix,'Open on the fizz.');
  const partCost=(1000*1.5+57920*17.5)/1e6;assert.ok(Math.abs(reel.spentUsd-2*partCost)<1e-3);
  const ledger=JSON.parse(await readFile(join(ch,'spend.json'),'utf8')).map(x=>x.step);assert.deepEqual(ledger.filter(x=>/part/.test(x)),['reel part-1','check part-1','reel part-2','check part-2']);
  // Asked again after it is done: nothing new is filmed or paid.
@@ -288,4 +289,13 @@ test('a clip whose result differs from the script always fails, whatever else is
 test('lip sync is judged only when the hosts talk on camera',()=>{
  const ok={shows:'x',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing',lips_match:'no',result_as_written:'yes'};
  assert.deepEqual(partVerdict(ok).problems,['the lips do not match the words']);assert.equal(partVerdict(ok,{talking:false}).pass,true);
+});
+
+test('a channel that teaches movements has no close-up quota and no payoff close-up rule',async()=>{
+ const {scriptRules:_}={};const sc={hook_title:'h',caption:'c?',parts:[0,1].map(()=>({beats:[{from:0,to:5,who:'Voice',does:'full-body squat',says:'Sit back.',shot:'wide'},{from:5,to:10,who:'Voice',does:'full-body squat',says:'Drive up.',shot:'wide'}]}))};
+ const kit={cast:[],name:'k'};
+ assert.ok(scriptProblems(sc,kit,'animated','voiceover',true).some(p=>/close-ups/.test(p)));assert.ok(!scriptProblems(sc,kit,'animated','voiceover',false).some(p=>/close-ups/.test(p)));
+ const raw={answers:{starts_mid_action:{noul:0.9},clear_action:{noul:0.9},health_fact:{noul:0.1},true_claim:{noul:0.9},payoff_closeup:{noul:0.1},gripping:{score:2.5},first_second:{score:2.5}}};
+ assert.ok(readKitScriptCheck(raw,sc,kit,'animated','voiceover',true).problems.some(p=>/close-up right after/.test(p)));assert.ok(!readKitScriptCheck(raw,sc,kit,'animated','voiceover',false).problems.some(p=>/close-up right after/.test(p)));
+ assert.match(kitScriptPrompt({title:'t'},kit,'animated',{},null,'voiceover',false),/teaches movements/);assert.doesNotMatch(kitScriptPrompt({title:'t'},kit,'animated',{},null,'voiceover',false),/Every payoff is shown in a close-up/);
 });

@@ -121,9 +121,9 @@ const usedKit={approved:true,createdAt:'K1',kit:{cast:[{name:'Leo'},{name:'Mia'}
 
 test('make with a look: the script shows two timed parts, the price is in dollars on the Gemini key',()=>{
  const html=renderMake({account:'ken',plan:{state:'ready',plan:kitPlan()},make:{reels:[]},kit:usedKit});
- assert.match(html,/Made from your look: Leo and Mia/);assert.match(html,/Part 1 · 0–10 s/);assert.match(html,/Part 2 · 10–20 s/);assert.match(html,/<b>Mia<\/b> drops it in ice water/);
+ assert.match(html,/Made from your look: Leo and Mia/);assert.match(html,/Part 1 · 0–10 s/);assert.match(html,/Part 2 · 10–20 s/);assert.match(html,/Ready to make · Jev passed it/);assert.match(html,/drops it in ice water/);
  assert.match(html,/13–20 s|10–20 s/);assert.match(html,/data-act="make" data-usd="2.08" data-max="4.16"/);assert.match(html,/Make the reel · \$2\.08/);assert.doesNotMatch(html,/credits/);
- assert.match(html,/✓ True/);
+ assert.match(html,/Why this script/);
 });
 
 test('make with a look: an old hands-only plan asks for new ideas; made badges only count this plan\'s reels',()=>{
@@ -172,10 +172,10 @@ test('channel preview: a profile with the host as avatar, the promise, AI disclo
  const gap=renderChannelPreview({...k,pictures:[...k.pictures,{role:'body0',url:null}]},{});assert.doesNotMatch(gap,/src="null"|src=""/);assert.match(renderChannelPreview({...k,kit:{...k.kit,assets:[{what:'A transparent glass'}]}},{}),/<span>transparent glass<\/span>/);
 });
 
-test('feedback loop on screen: the score against the winners, one-tap verdict, reasons after 👎, what was learned',()=>{
+test('feedback loop on screen: the judge note with its measured record, one-tap verdict, reasons after 👎, what was learned',()=>{
  assert.deepEqual(FB_REASONS,REASONS); // the page and the engine use the same reasons
- const r={id:'0-fizz-abc',mode:'kit',score:{share:96,weakest:'stops_scroll'}};
- const html=renderReelScore(r);assert.match(html,/<b>96%<\/b> of their winners' score · weakest: the first second/);assert.match(html,/data-fb="up"[^>]*>👍 Post it/);assert.doesNotMatch(html,/data-fb-reason/);
+ const r={id:'0-fizz-abc',mode:'kit',score:{weakest:'stops_scroll',fix:'Open on the fizz.'}};
+ const html=renderReelScore(r,{judge:{reels:79,auc:0.532}});assert.match(html,/Judge's note: weakest part is the first second/);assert.match(html,/Fix: Open on the fizz\. An opinion, not a forecast\. On 79 of this channel's past reels it picked the winner 53% of the time \(50% is a coin flip\)/);assert.doesNotMatch(html,/%<\/b>/);assert.match(html,/data-fb="up"[^>]*>👍 Post it/);assert.doesNotMatch(html,/data-fb-reason/);
  const down=renderReelScore({...r,feedback:{verdict:'down',reasons:['voice']}});assert.match(down,/data-fb-reason="voice" data-reel="0-fizz-abc">The voice/);assert.match(down,/chip chip-btn is-on" data-fb-reason="voice"/);
  assert.match(renderReelScore(r,{open:true}),/data-fb-reason="boring_start"/);
  assert.match(renderReelScore({...r,score:null,scoreError:'Gemini busy'}),/Not scored: Gemini busy/);assert.doesNotMatch(renderReelScore({id:'x',score:null}),/data-fb/);
@@ -192,7 +192,7 @@ test('the confirm pop-up shows the hosts, their voices and the place the video w
 test('ideas: 6 shown with why each is true and how big its payoff is; the rest one tap away',()=>{
  const picked=Array.from({length:12},(_,i)=>({idea:{title:`Idea ${i}`,hook_line:'h',why_true:`Reason ${i}`},scores:{fit:2,ai_ready:2,hook:2,payoff:2.5}}));
  const plan={picked,rejected:[],chosen:null};
- const html=renderIdeas(plan,{busy:false});assert.equal((html.match(/class="card idea/g)||[]).length,6);assert.match(html,/Why it's true:<\/b> Reason 0/);assert.match(html,/Big payoff/);assert.match(html,/data-act="ideas-all">Show all 12 ideas/);
+ const html=renderIdeas(plan,{busy:false});assert.equal((html.match(/class="card idea/g)||[]).length,6);assert.match(html,/Why it's true:<\/b> Reason 0/);assert.match(html,/Big payoff/);assert.match(html,/data-act="ideas-all">Show 6 more ideas/);
  const all=renderIdeas(plan,{busy:false,showAll:true});assert.equal((all.match(/class="card idea/g)||[]).length,12);assert.doesNotMatch(all,/ideas-all/);
 });
 
@@ -223,15 +223,32 @@ test('ready to post: cover, reel and caption, each with one numbered button; a f
  const old=renderReady({reels:[{id:'0-egg',url:'/e.mp4',title:'Egg',caption:'c',seconds:22}]});assert.match(old,/data-act="make-cover" data-reel="0-egg">Make the cover · free/);assert.match(old,/2 · Copy the caption/);
 });
 
-test('a blocked script is never a dead end: try the next idea or write it again',()=>{
+test('when nothing passes: one clear next step (new ideas), the reasons folded under Why',()=>{
  const plan={mode:'kit',kitAt:'K1',createdAt:'P1',chosen:0,picked:[{idea:{title:'Soda test',hook_line:'h'},scores:{fit:2,ai_ready:2,hook:2}},{idea:{title:'Egg float',hook_line:'h'},scores:{fit:2,ai_ready:2,hook:2}}],rejected:[],
   script:{hook_title:'H',caption:'c',parts:[{beats:[{from:0,to:10,who:'Leo',does:'d',says:'s'}]}]},check:{pass:false,problems:['The method or an ingredient is wrong: the result shown would not really happen']},price:{usd:2.17,maxUsd:4.34,parts:2,partSeconds:10}};
  const html=renderMake({account:'ken',plan:{state:'ready',plan},make:{reels:[]},kit:{approved:true,createdAt:'K1',kit:{cast:[]}}});
- assert.match(html,/Jev stopped this script before any money was spent: The method or an ingredient is wrong/);assert.match(html,/data-idea="1">Try the next idea: Egg float/);assert.match(html,/data-idea="0">Write this one again/);
- assert.match(html,/Write the script again/);assert.doesNotMatch(html,/data-act="make"/);
+ assert.match(html,/Jev did not pass this idea/);assert.match(html,/nothing spent on video/);assert.match(html,/data-act="ideas"[^>]*>Get new ideas/);
+ assert.match(html,/<b>Soda test<\/b>: The method or an ingredient is wrong/);assert.doesNotMatch(html,/data-act="make"/);
+ assert.match(html,/data-idea="1">Use this idea/); // any other idea is one tap away
 });
 
 test('the Ready step leads straight to the next reel',()=>{
  const html=renderReady({reels:[{id:'a',url:'/r.mp4',title:'T',caption:'c',seconds:20,spentUsd:2}]});
  assert.match(html,/data-step="make">Make another reel →/);
+});
+
+test('a reel with a line cut off says so on its card',()=>{
+ const base={id:'a',url:'/r.mp4',title:'T',caption:'c',seconds:20,spentUsd:2};
+ assert.match(renderReady({reels:[{...base,heard:{all:false,missing:['Follow for the next test.']}}]}),/Not ready: this line is cut off or never heard: “Follow for the next test.”/);
+ assert.doesNotMatch(renderReady({reels:[{...base,heard:{all:true,missing:[]}}]}),/Not ready/);
+});
+
+test('ideas Jev stopped go last and say so; fresh ideas come first',()=>{
+ const picked=['A','B','C'].map(t=>({idea:{title:t,hook_line:'h'},scores:{fit:2,ai_ready:2,hook:2,payoff:2}}));
+ const html=renderIdeas({picked,chosen:null,blocked:[{index:0,title:'A',problems:['x']}]},{busy:false});
+ assert.ok(html.indexOf('<h3>B</h3>')<html.indexOf('<h3>A</h3>'));assert.match(html,/Jev stopped it<\/span><h3>A<\/h3>/);assert.match(html,/data-idea="0">Try it again/);assert.match(html,/data-idea="1">Use this idea/);
+});
+
+test('a reel reviewed as not postable says why on its card',()=>{
+ assert.match(renderReady({reels:[{id:'s',url:'/r.mp4',title:'Silver',caption:'c',seconds:20,spentUsd:2,review:{postable:false,why:'The spoon never turns shiny.'}}]}),/Not ready: The spoon never turns shiny\./);
 });
