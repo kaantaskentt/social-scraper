@@ -225,3 +225,10 @@ test('each spoken line fits its own beat',()=>{
  long.parts[0].beats[0]={...long.parts[0].beats[0],to:2};long.parts[0].beats[1].from=2;
  assert.match(scriptProblems(long,kit,'ai_host').join(),/part 1 beat 1 says 9 words in 2 s, at most 6/);
 });
+
+test('the payoff must be shown up close, and objects named in every beat',()=>{
+ const req=checkKitScriptRequest(script());assert.ok(req.questions.payoff_closeup);
+ const a={starts_mid_action:{noul:0.9},clear_action:{noul:0.8},health_fact:{noul:0.1},true_claim:{noul:0.9},emotion:{choice:'satisfaction'},gripping:{score:2.4},part_1_risky:{noul:0.1},part_2_risky:{noul:0.1},payoff_closeup:{noul:0.2}};
+ assert.deepEqual(readKitScriptCheck({answers:a},script(),kit,'ai_host').problems,['The result is not shown in a close-up right after the action']);
+ assert.match(kitScriptPrompt({title:'t'},kit,'ai_host',{}),/never just "curls"/);
+});

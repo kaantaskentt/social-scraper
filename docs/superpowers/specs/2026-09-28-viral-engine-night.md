@@ -36,3 +36,19 @@ Winners cut to close-ups of the action and time a satisfying sound to the reveal
   refused by Google's filter (cause not found: "white powder" wording and a health-flavoured voice direction fixed);
   refused jobs no longer poll forever; lemon reel lost to a carton label twice ($3.30).
 - Spend tonight so far about $15.40 of $50. 305 tests pass.
+- 02:20 Two fresh accounts, 100 reels each (Kaan's links): @_drzenphd (animated 3D fitness figure) and
+  @natural.solutions.us (health remedies; its top reel's caption says "#syntheticperfomer": an AI host).
+  natural.solutions.us: its winning craft is anatomical models, "flush the sludge" and a book pitch. The engine filters
+  all of it (health rule, medical-prop filter, no fake links) and pivots to true household tricks; Jev blocks the
+  weaker scripts. A silver-polish reel made through the full app (options → Jev's pick → voice → confirm pop-up →
+  make) scored 103% of its winners but payoff 2/10 and a voice cut off at 20 s (both fixed since).
+  drzenphd: Jev picked "animated" and the host Titan (2.45 vs 1.66); the broad health rule first rejected all 12
+  fitness ideas (fixed: form and muscles are fitness, cures are not).
+- Final round (same-run winners): Ken fizz 6.7 = 99%, Jev 2.24 · drzenphd curl 6.2 = 103%, Jev 1.81 ·
+  natural copper blocked by the per-line truth check before any video spend.
+- Fixed tonight from real runs: voice pace and fit (trim, tempo ≤ 1.35×, no cut words, line-per-beat check), per-line
+  truth, visual-truth hint, aspiration feeling, payoff close-up check, named objects in every beat, refused pictures
+  kept as flagged gaps, failed builds shown as failed, clean voice descriptions, status race.
+- Not verified: why Google refused the hands-only video (twice); the hands-only format has no finished reel yet.
+  Scores are noisy (±0.6 per run); shares against same-run winners are the fair read.
+- Spend tonight $28.88 of $50. 327 tests pass.
