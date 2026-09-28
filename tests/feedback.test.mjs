@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {scoreSummary,validFeedback,lessonsFrom,lessonsText,REASONS} from '../lib/feedback.mjs';
 const s=(n,o={})=>({stops_scroll:n,visuals:n,sound:n,voice:n,payoff:n,pace:n,looks_real:n,keep_watching:n,fix:'f',...o});
-test('score summary: share of the winners, the weakest part (not the overall one), the fix',()=>{
- const r=scoreSummary(s(6,{voice:3}),[7,7]);assert.equal(r.total,5.6);assert.equal(r.share,80);assert.equal(r.weakest,'voice');assert.equal(r.fix,'f');
+test('score summary: the weakest part (not the overall one) and the fix, never a share of the winners',()=>{
+ const r=scoreSummary(s(6,{voice:3}));assert.equal(r.total,5.6);assert.equal(r.share,undefined);assert.equal(r.weakest,'voice');assert.equal(r.fix,'f');
 });
 test('feedback is one tap: up or down with known reasons only',()=>{
  assert.deepEqual(validFeedback({verdict:'down',reasons:['voice','voice']}).reasons,['voice']);
