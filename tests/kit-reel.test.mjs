@@ -162,13 +162,14 @@ test('remake: studies the winner shot by shot, learns the craft once (cached), w
   if(schema.required.includes('first_second')){calls.breakdown++;assert.match(parts.at(-1).text,/Pour it and watch|transcript|producer/);return {json:{first_second:'extreme close-up of a pour',beats:[]},costUsd:0.01};}
   if(schema.required.includes('voice_direction')){calls.craft++;return {json:{...craft,rules:[{kind:'hook',rule:'r',how:'h',reels:['w1','w2','zz']},{kind:'pace',rule:'lonely',how:'h',reels:['w1']}]},costUsd:0.03};}
   calls.script.push(parts[0].text);return {json:script(),costUsd:0.02};};
- const planner=new ReelPlanner(root,keys,{gemini,jev:async()=>good});
+ let drift=false;const planner=new ReelPlanner(root,keys,{gemini,jev:async req=>req.questions.same_subject?{answers:{same_subject:{noul:drift?0.1:0.9}}}:good});
  await assert.rejects(planner.startRemake(job,'nope'),/Pick one of this account/);
  await planner.startRemake(job,'w1');let s=await until(()=>planner.status(job));assert.equal(s.state,'ready',s.error);
  assert.equal(s.plan.source,'remake');assert.equal(s.plan.remakeOf,'w1');assert.equal(s.plan.chosen,0);assert.equal(s.plan.check.pass,true);assert.equal(s.plan.price.usd,2.17);
  assert.match(calls.script[0],/Remake this proven reel.*extreme close-up of a pour/s);assert.equal(calls.breakdown,2);assert.equal(calls.craft,1); // w1 and w2 studied once each
  const saved=JSON.parse(await readFile(join(ch,'craft.json'),'utf8'));assert.deepEqual(saved.rules.map(r=>r.reels),[['w1','w2']]);assert.deepEqual(saved.dropped,['lonely']);
  await planner.startRemake(job,'w2');await until(()=>planner.status(job));assert.equal(calls.breakdown,2);assert.equal(calls.craft,1); // all cached
+ drift=true;await planner.startRemake(job,'w2');s=await until(()=>planner.status(job));assert.equal(s.plan.check.pass,false);assert.match(s.plan.check.problems.at(-1),/drifted to a different subject \(Jev 0\.10\)/); // an egg test is not a sweet potato remake
  await rm(root,{recursive:true});
 });
 
