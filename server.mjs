@@ -62,11 +62,11 @@ const server=http.createServer(async(req,res)=>{
   if(await handleReplicate({req,res,path,url,root:pipeline.root,jobs:pipeline.jobs,replicator,json,body}))return;
   if(await handleShotlist({req,res,path,root:pipeline.root,jobs:pipeline.jobs,json,body,streamFile}))return;
   // Make one original reel: GET the plan; POST ideas or a script (Gemini and Jev, a few cents; no video is made here).
-  const plan=path.match(/^\/api\/runs\/([\w-]+)\/reel-plan(?:\/(ideas|script|price))?$/);
+  const plan=path.match(/^\/api\/runs\/([\w-]+)\/reel-plan(?:\/(ideas|script|price|remake))?$/);
   if(plan){const job=pipeline.jobs.get(plan[1]);if(!job){json(res,404,{error:'Run not found'});return;}
    if(req.method==='GET'&&!plan[2]){json(res,200,await planner.status(job));return;}
    if(req.method==='POST'&&plan[2]){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm first');
-    json(res,plan[2]==='price'?200:202,plan[2]==='ideas'?await planner.startIdeas(job):plan[2]==='price'?await planner.reprice(job):await planner.startScript(job,Number(data.index)));return;}
+    json(res,plan[2]==='price'?200:202,plan[2]==='ideas'?await planner.startIdeas(job):plan[2]==='price'?await planner.reprice(job):plan[2]==='remake'?await planner.startRemake(job,String(data.postId||'')):await planner.startScript(job,Number(data.index)));return;}
    json(res,405,{error:'Method not allowed'});return;}
   // Make the pilot reel (spends Higgsfield credits): POST needs {confirm:true, mode, confirmCredits} matching a fresh price.
   const make=path.match(/^\/api\/runs\/([\w-]+)\/reel-make$/);

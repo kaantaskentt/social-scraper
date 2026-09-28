@@ -55,3 +55,11 @@ test('nothing is Ken-specific: ideas stay in the channel\'s own topic and the pl
  const kit=kitPrompt({pattern});assert.match(kit,/concrete studio with a clothing rail/);assert.doesNotMatch(kit,/kitchen/i);
  assert.doesNotMatch(shotPrompt({visual:'Hands fold a tee',camera:'top-down'}),/kitchen/i);
 });
+
+test('kit ideas with a payoff score: a dramatic reveal outranks a mild one with the same fit',async()=>{
+ const {rankIdeas}=await import('../lib/reel-plan.mjs');
+ const j=payoff=>({answers:{fit:{score:3},ai_ready:{score:3},hook:{score:3},payoff:{score:payoff},health_claim:{noul:0.1},true_demo:{noul:0.9}}});
+ const r=rankIdeas([{title:'mild'},{title:'whoa'}],[j(1),j(3)]);
+ assert.deepEqual(r.picked.map(p=>p.idea.title),['whoa','mild']);assert.equal(r.picked[0].total,1);assert.equal(r.picked[1].total,0.8);
+ assert.equal(rankIdeas([{title:'old'}],[{answers:{fit:{score:3},ai_ready:{score:3},hook:{score:3},health_claim:{noul:0},true_demo:{noul:1}}}]).picked[0].total,1);
+});

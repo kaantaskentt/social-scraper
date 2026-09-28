@@ -111,7 +111,8 @@ function fakes({kits=[kit()],checks=()=>seenOk,format='ai_host'}={}){
  const frame=async()=>Buffer.from('original frame');
  return {calls,opts:{gemini,image,jev,frame}};
 }
-const until=async(b,job)=>{for(let i=0;i<200;i++){const s=await b.status(job);if(s.state!=='working')return s;await new Promise(r=>setTimeout(r,5));}throw new Error('stuck');};
+// A time limit, not a count: the whole suite runs in parallel and 200 short waits was not enough under load.
+const until=async(b,job)=>{const end=Date.now()+10000;while(Date.now()<end){const s=await b.status(job);if(s.state!=='working')return s;await new Promise(r=>setTimeout(r,5));}throw new Error('stuck');};
 const keys=()=>({gemini:'g',jev:'j'});
 
 test('build: studies 3 winners, Jev picks the format, writes the kit, draws and checks every picture, saves it',async()=>{

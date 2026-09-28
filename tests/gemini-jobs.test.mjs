@@ -63,3 +63,12 @@ test('a job that takes too long stays saved and says so',async()=>{
  await assert.rejects(jobs.run('part-1',{input:[]}),/still being made/);assert.equal((await jobs.record('part-1')).status,'submitted');
  await rm(dir,{recursive:true});
 });
+
+test('a job Google refuses while it is polled is marked failed, so the next try sends a new job',async()=>{
+ const dir=await setup();let posts=0;
+ const refuse=async(url,o={})=>o.method==='POST'?(posts++,Response.json({id:`r${posts}`})):Response.json({error:{message:'Request blocked due to prohibited content guidelines.'}},{status:400});
+ const jobs=new VideoJobs(dir,{key:'k',model:'gemini-omni-1.1-flash',fetchImpl:refuse,sleep:async()=>{},pollMs:0});
+ await assert.rejects(jobs.run('part-1',{input:[]}),/prohibited content/);assert.equal((await jobs.record('part-1')).status,'failed');
+ await assert.rejects(jobs.run('part-1',{input:[]}),/prohibited/);assert.equal(posts,2);
+ await rm(dir,{recursive:true});
+});
