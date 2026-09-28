@@ -1,0 +1,59 @@
+{
+ "hook_title": "Bring Limp Celery Back",
+ "caption": "Do not throw out bendy celery. #KitchenHacks #NoWaste",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "extreme close-up on a limp celery stalk bending over",
+     "who": "Ada",
+     "does": "bends a floppy celery stalk in half",
+     "says": "Your celery went limp?",
+     "sound": ""
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "close-up on a bowl",
+     "who": "Ada",
+     "does": "pours a big handful of salt into a bowl of water and stirs",
+     "says": "Soak it in very salty water.",
+     "sound": "salt pouring"
+    },
+    {
+     "from": 6,
+     "to": 10,
+     "shot": "close-up on the bowl",
+     "who": "Ada",
+     "does": "pushes the celery stalks into the salty water",
+     "says": "The salt pulls water back into the stalk.",
+     "sound": "splash"
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 5,
+     "shot": "close-up an hour later",
+     "who": "Ada",
+     "does": "lifts a stiff celery stalk out of the salty water and snaps it",
+     "says": "One hour later, it snaps.",
+     "sound": "crisp snap"
+    },
+    {
+     "from": 5,
+     "to": 10,
+     "shot": "medium shot on Ada",
+     "who": "Ada",
+     "does": "holds up the crisp stalk",
+     "says": "Salt water brings it back every time.",
+     "sound": ""
+    }
+   ]
+  }
+ ]
+}

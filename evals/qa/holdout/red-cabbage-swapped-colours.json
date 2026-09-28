@@ -1,0 +1,59 @@
+{
+ "hook_title": "Cabbage That Changes Colour",
+ "caption": "Kitchen science with red cabbage water. #KitchenScience",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "extreme close-up on a jug of purple cabbage water",
+     "who": "Theo",
+     "does": "pours purple red-cabbage water into two clear glasses",
+     "says": "Red cabbage water is purple.",
+     "sound": "liquid pouring"
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "close-up on the left glass",
+     "who": "Theo",
+     "does": "squeezes lemon juice into the left glass; it turns blue-green",
+     "says": "Add lemon juice and it turns green.",
+     "sound": ""
+    },
+    {
+     "from": 6,
+     "to": 10,
+     "shot": "close-up on the right glass",
+     "who": "Theo",
+     "does": "stirs a spoon of baking soda into the right glass; it turns bright pink",
+     "says": "Add baking soda and it turns pink.",
+     "sound": "spoon clinking"
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 5,
+     "shot": "close-up on both glasses side by side",
+     "who": "Theo",
+     "does": "lifts the green glass and the pink glass together",
+     "says": "Acids go green, bases go pink.",
+     "sound": ""
+    },
+    {
+     "from": 5,
+     "to": 10,
+     "shot": "medium shot on Theo",
+     "who": "Theo",
+     "does": "smiles at the camera, holding both glasses",
+     "says": "Try it with anything in your fridge.",
+     "sound": ""
+    }
+   ]
+  }
+ ]
+}

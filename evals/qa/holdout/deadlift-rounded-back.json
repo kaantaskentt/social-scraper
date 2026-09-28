@@ -1,0 +1,59 @@
+{
+ "hook_title": "Lift More On Deadlifts",
+ "caption": "The trick to pulling heavier. #Fitness #Deadlift",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "side view of Kai over a loaded barbell",
+     "who": "Kai",
+     "does": "grips the bar with his lower back rounded like a C",
+     "says": "Round your lower back to reach the bar.",
+     "sound": ""
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "side view, low angle",
+     "who": "Kai",
+     "does": "yanks the bar up by bending his elbows and pulling with his arms",
+     "says": "Pull it up with your arms.",
+     "sound": "plates rattling"
+    },
+    {
+     "from": 6,
+     "to": 10,
+     "shot": "close-up on Kai's back",
+     "who": "Kai",
+     "does": "jerks the bar to his hips with his back still rounded",
+     "says": "Jerk it fast so it feels lighter.",
+     "sound": "clank"
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 5,
+     "shot": "medium shot on Kai",
+     "who": "Kai",
+     "does": "drops the bar from hip height",
+     "says": "Then just drop it.",
+     "sound": "loud crash"
+    },
+    {
+     "from": 5,
+     "to": 10,
+     "shot": "medium shot on Kai",
+     "who": "Kai",
+     "does": "points at the camera",
+     "says": "That is how you pull heavy.",
+     "sound": ""
+    }
+   ]
+  }
+ ]
+}

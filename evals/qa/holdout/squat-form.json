@@ -1,0 +1,59 @@
+{
+ "hook_title": "Squat Without Knee Pain",
+ "caption": "Three cues for a better squat. #Fitness #SquatForm",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "side view of Rio standing with feet shoulder width apart",
+     "who": "Rio",
+     "does": "stands tall with toes turned slightly out",
+     "says": "Feet shoulder width, toes slightly out.",
+     "sound": ""
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "side view, low angle",
+     "who": "Rio",
+     "does": "sits his hips back and down, knees moving in line with his toes",
+     "says": "Sit your hips back, knees follow your toes.",
+     "sound": ""
+    },
+    {
+     "from": 6,
+     "to": 10,
+     "shot": "close-up on Rio's feet",
+     "who": "Rio",
+     "does": "keeps his heels flat on the floor at the bottom of the squat",
+     "says": "Keep your heels down the whole time.",
+     "sound": ""
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 5,
+     "shot": "front view of Rio",
+     "who": "Rio",
+     "does": "rises up with his chest up and back straight",
+     "says": "Chest up, drive up through your whole foot.",
+     "sound": ""
+    },
+    {
+     "from": 5,
+     "to": 10,
+     "shot": "medium shot on Rio",
+     "who": "Rio",
+     "does": "finishes standing tall and nods to the camera",
+     "says": "Slow and controlled beats heavy and sloppy.",
+     "sound": ""
+    }
+   ]
+  }
+ ]
+}
