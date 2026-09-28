@@ -1,0 +1,59 @@
+{
+ "hook_title": "A Push-Up That Counts",
+ "caption": "Fix your push-up in 20 seconds. #Fitness #PushUp",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "side view of Omar in a high plank",
+     "who": "Omar",
+     "does": "holds his body in one straight line from head to heels",
+     "says": "Straight line from head to heels.",
+     "sound": ""
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "top-down view",
+     "who": "Omar",
+     "does": "lowers down with his elbows angled about 45 degrees from his body",
+     "says": "Elbows at about forty-five degrees.",
+     "sound": ""
+    },
+    {
+     "from": 6,
+     "to": 10,
+     "shot": "side view, low angle",
+     "who": "Omar",
+     "does": "lowers until his chest is just above the floor",
+     "says": "Chest nearly touches the floor.",
+     "sound": ""
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 5,
+     "shot": "side view",
+     "who": "Omar",
+     "does": "presses back up, body still in one line",
+     "says": "Push the floor away, hips stay level.",
+     "sound": ""
+    },
+    {
+     "from": 5,
+     "to": 10,
+     "shot": "medium shot on Omar",
+     "who": "Omar",
+     "does": "finishes the rep and nods",
+     "says": "Ten good ones beat thirty bad ones.",
+     "sound": ""
+    }
+   ]
+  }
+ ]
+}

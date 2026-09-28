@@ -1,0 +1,59 @@
+{
+ "hook_title": "Is Your Egg Still Good?",
+ "caption": "Drop it in water before you crack it. #KitchenHacks #Eggs",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "extreme close-up on a tall glass of cold water",
+     "who": "Mara",
+     "does": "lowers an egg into the glass; it floats to the top",
+     "says": "Drop your egg in cold water.",
+     "sound": "soft plop"
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "close-up on the glass",
+     "who": "Mara",
+     "does": "taps the floating egg",
+     "says": "Floating means it is super fresh.",
+     "sound": ""
+    },
+    {
+     "from": 6,
+     "to": 10,
+     "shot": "close-up on a second glass",
+     "who": "Mara",
+     "does": "lowers an older egg; it sinks and lies flat on the bottom",
+     "says": "If it sinks flat, throw it out.",
+     "sound": "gentle splash"
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 4,
+     "shot": "medium shot on Mara at the counter",
+     "who": "Mara",
+     "does": "holds up the floating egg",
+     "says": "Fresh eggs are full of air, so they float.",
+     "sound": ""
+    },
+    {
+     "from": 4,
+     "to": 10,
+     "shot": "close-up on both glasses side by side",
+     "who": "Mara",
+     "does": "points from the floating egg to the sunken one",
+     "says": "Floating is fresh. Sunk is done.",
+     "sound": ""
+    }
+   ]
+  }
+ ]
+}

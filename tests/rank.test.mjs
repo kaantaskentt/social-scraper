@@ -12,10 +12,15 @@ test('ours wins a game only when the judge picks our side, whichever side it was
  const dir=await mkdtemp(join(tmpdir(),'rank-'));
  try{
   for(const f of ['ours','t1','t2'])await writeFile(join(dir,f),f);
-  // A judge that always prefers the reel whose bytes are "ours".
-  const gemini=async({parts})=>{assert.equal(parts[4].text,PAIR_PROMPT);return {json:{more_views:String(parts[1].video)==='ours'?'A':'B',why:'w'},costUsd:0.01};};
-  let flip=0;const r=await rankAgainstTypical({ours:join(dir,'ours'),opponents:[{id:'t1',file:join(dir,'t1'),xNormal:1},{id:'t2',file:join(dir,'t2'),xNormal:1}],gemini,key:'k',model:'m',rand:()=>(flip++%2)?0.9:0.1});
-  assert.equal(r.wins,2);assert.equal(r.of,2);assert.equal(Math.round(r.costUsd*100),2);
+  for(const f of ['t3','t4'])await writeFile(join(dir,f),f);
+  // A judge that prefers t1 and t2 over ours, and ours over t3 and t4. The old judge always preferred ours, so a
+  // rankAgainstTypical that always said "won" still passed (audit, 2026-09-29). Sides alternate: ours is A against
+  // t1 and t3, B against t2 and t4, so a loss and a win are each checked from both sides.
+  const gemini=async({parts})=>{assert.equal(parts[4].text,PAIR_PROMPT);const a=String(parts[1].video),b=String(parts[3].video),beats=['t1','t2'];
+   return {json:{more_views:beats.includes(a)?'A':beats.includes(b)?'B':a==='ours'?'A':'B',why:'w'},costUsd:0.01};};
+  let flip=0;const r=await rankAgainstTypical({ours:join(dir,'ours'),opponents:['t1','t2','t3','t4'].map(id=>({id,file:join(dir,id),xNormal:1})),gemini,key:'k',model:'m',rand:()=>(flip++%2)?0.9:0.1});
+  assert.equal(r.wins,2);assert.equal(r.of,4);assert.equal(Math.round(r.costUsd*100),4);
+  assert.deepEqual(Object.fromEntries(r.games.map(g=>[g.against,g.won])),{t1:false,t2:false,t3:true,t4:true});
  }finally{await rm(dir,{recursive:true,force:true});}
 });
 test('the card says whether the comparison is proven on this channel',async()=>{

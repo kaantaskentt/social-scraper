@@ -1,0 +1,59 @@
+{
+ "hook_title": "Is Your Egg Still Good?",
+ "caption": "Drop it in water before you crack it. #KitchenHacks #Eggs",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "extreme close-up on a tall glass of cold water",
+     "who": "Mara",
+     "does": "lowers an egg into the glass; it sinks and lies flat on its side at the bottom",
+     "says": "Drop your egg in cold water.",
+     "sound": "soft plop"
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "close-up on the glass",
+     "who": "Mara",
+     "does": "lowers a second, older egg into another glass; it sinks but stands upright on its tip",
+     "says": "Standing up means it is getting old.",
+     "sound": ""
+    },
+    {
+     "from": 6,
+     "to": 10,
+     "shot": "close-up on a third glass",
+     "who": "Mara",
+     "does": "lowers a third egg; it floats to the top",
+     "says": "If it floats, throw it out.",
+     "sound": "gentle splash"
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 4,
+     "shot": "medium shot on Mara at the counter",
+     "who": "Mara",
+     "does": "holds up the floating egg next to the glass",
+     "says": "Old eggs have a bigger air pocket inside.",
+     "sound": ""
+    },
+    {
+     "from": 4,
+     "to": 10,
+     "shot": "close-up on the three glasses side by side",
+     "who": "Mara",
+     "does": "points from the flat egg to the floating one",
+     "says": "Flat is fresh. Floating is done.",
+     "sound": ""
+    }
+   ]
+  }
+ ]
+}

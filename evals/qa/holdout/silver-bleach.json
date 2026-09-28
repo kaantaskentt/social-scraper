@@ -1,0 +1,59 @@
+{
+ "hook_title": "Make Old Silver Shine",
+ "caption": "Tarnished spoons look new again. #CleaningHacks",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "extreme close-up on a black tarnished spoon",
+     "who": "June",
+     "does": "holds up a dark, tarnished silver spoon",
+     "says": "This spoon is black with tarnish.",
+     "sound": ""
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "close-up on a bowl",
+     "who": "June",
+     "does": "pours household bleach into a bowl and drops the spoon in",
+     "says": "Soak it in bleach for ten minutes.",
+     "sound": "liquid pouring"
+    },
+    {
+     "from": 6,
+     "to": 10,
+     "shot": "close-up on the bowl",
+     "who": "June",
+     "does": "lifts the spoon out, bright and shiny",
+     "says": "Bleach strips the tarnish right off.",
+     "sound": "clink"
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 5,
+     "shot": "close-up on the shiny spoon",
+     "who": "June",
+     "does": "turns the gleaming spoon in the light",
+     "says": "Look at that shine.",
+     "sound": ""
+    },
+    {
+     "from": 5,
+     "to": 10,
+     "shot": "medium shot on June",
+     "who": "June",
+     "does": "sets the spoon on a cloth",
+     "says": "Do this with all your silver.",
+     "sound": ""
+    }
+   ]
+  }
+ ]
+}

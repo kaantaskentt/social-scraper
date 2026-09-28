@@ -18,3 +18,4 @@
 - 2026-09-28: Gemini missed a cut-off voice line that code caught by comparing the transcript with the script. Anything checkable against the script is checked by code, not by asking a model.
 - 2026-09-28: Two makers on one channel at once: my manual run resumed a reel the batch was also making and paid $1.03 for a part twice. One maker per channel at a time; check `ps` before starting another.
 - 2026-09-28: An AI checker that looked good in one exam run flipped its verdict on 5 of 10 reels across three runs. Run any judge at least 3 times before trusting it, and keep deterministic code as the gate.
+- 2026-09-29: The QA exam's three script cases were the same worked examples written into Jev's question, so 6 of 6 only showed Jev could repeat its own examples. Score in-prompt cases apart from hold-out cases whose answers the prompt never gives, run each case 3 times, and print what an always-the-same-answer checker would score.

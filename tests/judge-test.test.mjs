@@ -28,8 +28,25 @@ test('the sentence carries the computed numbers, and says coin flip for 50%',()=
  assert.match(judgeSentence({verdict:'too_few',reels:12}),/12; it needs 30/);
 });
 
-test('a judge that leans the right way but scores winners like everyone else is "weak", never "predicts"',()=>{
- // Ken's real numbers: rho 0.24 over 79 reels, winners 5.67 vs 5.65, AUC 0.53.
- const r=rng(8),items=Array.from({length:79},(_,i)=>{const logx=(r()-0.5)*2,lean=logx>0.6?0:(logx+0.2)*0.8;/* others lean with views around 0; winners sit at 0 like the average */const run=()=>Object.fromEntries(PARTS.map(k=>[k,Math.max(0,Math.min(10,Math.round(5.6+lean+(r()-0.5)*2.5)))]));return {id:`k${i}`,xNormal:Math.exp(logx),runs:[run(),run()]};});
- const t=judgeTest(items,{perms:300,boots:200});assert.notEqual(t.verdict,'predicts');
+// Ken-like channels: 79 reels ranked by views; the top fifth (the winners) score at the channel's average by
+// construction, the rest lean with views by `lean`, plus seeded noise.
+function kenLike({seed,lean,noise=3}){
+ const r=rng(seed),n=79,w=Math.floor(n/5);
+ return Array.from({length:n},(_,i)=>{const logx=-1+2*i/(n-1),base=i>=n-w?0:lean*(logx+w/n);
+  const run=()=>Object.fromEntries(PARTS.map(k=>[k,Math.max(0,Math.min(10,Math.round(5.6+base+(r()-0.5)*noise)))]));
+  return {id:`k${i}`,xNormal:Math.exp(logx),runs:[run(),run()]};});
+}
+
+test('Ken\'s real numbers (rho 0.24, winners 5.67 vs 5.65, AUC 0.53) give "weak"',()=>{
+ // The old version of this test used a generator whose rho was 0.62, not Ken's 0.24, and only asserted "not predicts";
+ // its seed passed by luck (seed 1 gave "predicts"). These items reproduce Ken's numbers and the verdict is exact (audit, 2026-09-29).
+ const t=judgeTest(kenLike({seed:26,lean:0.25}),{perms:300,boots:200});
+ assert.equal(t.verdict,'weak');assert.ok(t.total.rho>=0.22&&t.total.rho<=0.26,`rho ${t.total.rho}`);assert.ok(t.total.ci[0]>0);
+ assert.ok(t.winners.auc>=0.51&&t.winners.auc<=0.55,`auc ${t.winners.auc}`);assert.ok(Math.abs(t.winners.winnersAvg-t.winners.othersAvg)<=0.05);
+});
+
+test('a judge that leans the right way but scores winners like everyone else is "weak" on every seed, never "predicts"',()=>{
+ // A stronger lean (rho 0.4 to 0.55) so only the winners check can stop "predicts": that is the rule Ken's case added.
+ for(let seed=1;seed<=8;seed++){const t=judgeTest(kenLike({seed,lean:0.5}),{perms:300,boots:200});
+  assert.equal(t.verdict,'weak',`seed ${seed}: ${t.verdict}, rho ${t.total.rho}, auc ${t.winners.auc}`);assert.ok(t.total.rho>=0.3,`seed ${seed}: rho ${t.total.rho}`);assert.ok(t.winners.auc<0.65);}
 });

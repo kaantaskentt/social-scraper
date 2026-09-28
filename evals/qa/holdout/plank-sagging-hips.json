@@ -1,0 +1,59 @@
+{
+ "hook_title": "The Right Way To Plank",
+ "caption": "Hold it longer with this cue. #Core #Fitness",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "side view of Lina on her forearms",
+     "who": "Lina",
+     "does": "holds a forearm plank with her hips sagging low toward the floor",
+     "says": "Let your hips drop toward the floor.",
+     "sound": ""
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "close-up on Lina's lower back",
+     "who": "Lina",
+     "does": "arches her lower back even more",
+     "says": "Arching your lower back works your core harder.",
+     "sound": ""
+    },
+    {
+     "from": 6,
+     "to": 10,
+     "shot": "side view",
+     "who": "Lina",
+     "does": "holds the sagging position, face calm",
+     "says": "Hold it like this for as long as you can.",
+     "sound": ""
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 5,
+     "shot": "medium shot on Lina",
+     "who": "Lina",
+     "does": "sinks her hips lower",
+     "says": "The lower the hips, the better.",
+     "sound": ""
+    },
+    {
+     "from": 5,
+     "to": 10,
+     "shot": "medium shot on Lina",
+     "who": "Lina",
+     "does": "stands up and smiles",
+     "says": "Try it for one minute tonight.",
+     "sound": ""
+    }
+   ]
+  }
+ ]
+}
