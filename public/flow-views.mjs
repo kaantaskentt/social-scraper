@@ -20,23 +20,44 @@ const next=(to,label)=>`<div class="next-row"><button type="button" class="btn b
 const head=(title,sub)=>`<header class="step-head"><h1>${esc(title)}</h1>${sub?`<p>${esc(sub)}</p>`:''}</header>`;
 
 // 1 · Scan
+// Where a scan stands. A scan that stopped (failed, paused, cut off by a restart, or never started) says why and can be
+// resumed: it read "Scanning…" forever, with no polling and no way out (audit 2026-09-29).
+const STOPPED={failed:'The scan stopped',paused:'The scan is paused',interrupted:'The scan was cut off when the app restarted',ready:'The scan has not started'};
+export function scanState(job){
+ if(!job)return null;if(['complete','partial'].includes(job.status))return {state:'done'};
+ const total=job.posts.length||job.limit||100,done=job.posts.filter(p=>p.analysis||p.excludedReason).length;
+ if(!['running','scraping'].includes(job.status))return {state:'stopped',done,total,label:STOPPED[job.status]||`The scan is ${job.status}`,error:job.error||''};
+ return {state:'running',done,total,label:job.posts.length?`Listening to and labelling reel ${done} of ${total}`:'Collecting the reels from Instagram'};
+}
+// The account list follows the loaded run: it said "0 reels · running" next to "@x is scanned" (audit 2026-09-29).
+export const syncRuns=(runs,job)=>job?runs.map(r=>r.id===job.id?{...r,count:job.posts.length,status:job.status}:r):runs;
 // One card per account: the fullest scan (most reels, then newest) stands for it.
 export function latestRuns(runs){const by=new Map();for(const r of runs){const k=r.creator,have=by.get(k);if(!have||r.count>have.count||(r.count===have.count&&String(r.createdAt)>String(have.createdAt)))by.set(k,r);}return [...by.values()];}
-export function renderScan({runs=[],run=null,progress=null,error=''}){
+export function renderScan({runs=[],run=null,progress=null,error='',scored=true,scoreError=''}){
  runs=latestRuns(runs);
  const list=runs.length?`<div class="acct-list">${runs.map(r=>`<button type="button" class="acct${run?.id===r.id?' is-on':''}" data-run="${esc(r.id)}"><b>@${esc(r.creator)}</b><span>${esc(r.count)} reels · ${esc(r.status)}</span></button>`).join('')}</div>`:'';
  const form=`<form class="card scan-form" data-form="scan"><label for="scan-handle">Instagram account</label><div class="scan-row"><span class="at">@</span><input id="scan-handle" name="handle" autocomplete="off" placeholder="ken.remedie" required><button class="btn btn-primary" type="submit">Scan 100 reels · about $0.35</button></div><p class="hint">Collects the reels, listens to them and labels what is said. Takes about 10 minutes.</p>${error?`<p class="err">${esc(error)}</p>`:''}</form>`;
- const status=run?(progress&&progress.state!=='done'?`<div class="card scan-status"><b>Scanning @${esc(run.creator)}</b><progress value="${progress.done}" max="${progress.total}"></progress><span class="hint">${esc(progress.label)}</span></div>`:`<div class="card scan-status is-done"><b>@${esc(run.creator)} is scanned</b><span class="hint">${esc(run.count)} reels</span></div>`):'';
+ const status=run?(progress?.state==='stopped'?`<div class="card scan-status is-stopped"><b>${esc(progress.label)}: @${esc(run.creator)}</b><progress value="${progress.done}" max="${progress.total}"></progress><span class="hint">${esc(progress.done)} of ${esc(progress.total)} reels done.</span>${progress.error?`<p class="err">${esc(progress.error)}</p>`:''}<div class="next-row left"><button type="button" class="btn btn-primary" data-act="scan-resume">Resume the scan</button></div><span class="hint">It picks up where it stopped: only the reels still to do are paid for.</span></div>`
+  :progress&&progress.state!=='done'?`<div class="card scan-status"><b>Scanning @${esc(run.creator)}</b><progress value="${progress.done}" max="${progress.total}"></progress><span class="hint">${esc(progress.label)}</span></div>`:`<div class="card scan-status is-done"><b>@${esc(run.creator)} is scanned</b><span class="hint">${esc(run.count)} reels</span></div>`):'';
  // The live wall and map (drawn by scan-map.mjs into this frame, kept between refreshes so tiles can fly).
  const live=run?`<section class="card scan-live"><div class="scan-top"><b>@${esc(run.creator)}</b><span class="scan-count hint"></span></div><div class="scan-grid"><div class="scan-stage" data-run="${esc(run.id)}"><svg aria-hidden="true"></svg><span class="scan-lab">Thumbnail wall</span><span class="scan-lab right">Performance map</span></div><aside class="scan-player"><p class="hint">Click any reel to play it here.</p></aside></div></section>`:'';
- return `${head('Pick an account','Scan any public Instagram account, or open one you scanned before.')}${form}${list}${status}${live}${run&&(!progress||progress.state==='done')?next('winners','See the winners'):''}`;
+ // A scan with nothing scored says why instead of a "See the winners" button that did nothing (audit 2026-09-29).
+ const done=run&&(!progress||progress.state==='done');
+ const onward=!done?'':scored?next('winners','See the winners'):`<p class="hint">${scoreError?`Could not score the reels: ${esc(scoreError)}`:'Not enough reels with view and comment counts to find winners.'}</p>`;
+ return `${head('Pick an account','Scan any public Instagram account, or open one you scanned before.')}${form}${list}${status}${live}${onward}`;
 }
 
 // 2 · Winners
+// Winners are the reels the Money view calls winners (at least 2x their normal and clearly above the usual ups and
+// downs), not every reel above 1x: "1.1× normal" sat under "many more views" (audit 2026-09-29).
+export function topWinners(posts,results,{hasVideo,limit=6}){
+ return posts.map(p=>({p,r:results?.[p.id]})).filter(({p,r})=>r&&['winner','big_winner'].includes(r.label)&&Number.isFinite(r.xNormal)&&hasVideo(p))
+  .sort((a,b)=>b.r.xNormal-a.r.xNormal).slice(0,limit).map(({p,r})=>({id:p.id,xNormal:r.xNormal,reach:r.reach}));
+}
 function reelTile(p,{badge,sub}){return `<button type="button" class="reel" data-play="${esc(p.id)}"><img src="${esc(p.image)}" alt="" loading="lazy" onerror="this.hidden=true"><span class="reel-badge">${esc(badge)}</span><span class="reel-sub">${esc(sub)}</span></button>`;}
 export function renderWinners({account,winners=[],weakest=[]}){
- if(!winners.length)return `${head('No winners yet','This account needs scored reels with a saved video.')}`;
- return `${head(`@${account}'s winners`,'These reels got many more views than this account normally gets.')}
+ if(!winners.length)return `${head('No clear winners yet','No reel with a saved video got at least 2× the views this account normally gets.')}`;
+ return `${head(`@${account}'s winners`,'These reels got at least 2× the views this account normally gets.')}
 <div class="reel-grid">${winners.map(w=>reelTile(w,{badge:`${w.xNormal.toFixed(1)}× normal`,sub:`${compact(w.reach)} views`})).join('')}</div>
 ${weakest.length?`<h2 class="sub-title">Their weakest, for contrast</h2><div class="reel-grid is-small">${weakest.map(w=>reelTile(w,{badge:`${w.xNormal.toFixed(1)}×`,sub:`${compact(w.reach)} views`})).join('')}</div>`:''}
 ${next('secret','Why do these win?')}`;
@@ -68,6 +89,13 @@ ${rows?`<ul class="card dna-list">${rows}</ul>`:''}
 ${none.length?`<p class="hint dna-none">No effect either way: ${esc(none.map(k=>DETAIL_NAME[k]||k).join(', '))}.</p>`:''}
 <details class="card dna-check"><summary>Check how the app read their top reels</summary><div class="dna-spots">${spot}</div><p class="hint">If a label is wrong, tell Claude: the test is only as good as these readings.</p></details></section>`;
 }
+// What Instagram says about itself is not research: it gets its own tag, and a sentence no source measured is said
+// the way the source says it (audit 2026-09-29; the better home for this line is secret-mechanisms.mjs).
+const PLATFORM_LINE={stop_in_3_seconds:'Instagram counts who leaves in the first 3 seconds.'};
+export function whyTag(id,m){
+ if(/^Instagram\b/.test(m.source||''))return {line:PLATFORM_LINE[id]||m.kid||m.meaning,tag:'Instagram says',cls:'platform'};
+ return {line:m.kid||m.meaning,tag:m.strength==='strong'?'Proven by research':'Backed by research',cls:m.strength};
+}
 export function renderSecret({account,status,imageFor,feedback=null,dna=null}){
  if(!status||status.state==='none'||!status.saved){
   if(status?.state==='building')return `${head('Reading the channel…',status.stage||'')}<div class="card"><progress value="${status.done||0}" max="${status.total||30}"></progress><p class="hint">Watching ${status.done||0} of ${status.total||30} reels. About 3 minutes.</p></div>`;
@@ -84,7 +112,7 @@ export function renderSecret({account,status,imageFor,feedback=null,dna=null}){
  const shown=new Set([...doMore,avoid].filter(Boolean).map(d=>`${d.question}.${d.value}`));
  const every=(st.house||[]).filter(h=>!shown.has(`${h.question}.${h.value}`)).slice(0,6).map(h=>`<span class="chip">${esc(name(h.question,h.value))}</span>`).join('');
  // Why it works: only the plain sentence, with a small tag for how solid the science is.
- const why=(sec.why||[]).slice(0,3).map(w=>{const m=MECHANISMS[w.mechanism];return m?`<li><p class="why-kid">${esc(m.kid||m.meaning)}</p><span class="tag tag-${esc(m.strength)}">${m.strength==='strong'?'Proven by research':'Backed by research'}</span></li>`:'';}).join('');
+ const why=(sec.why||[]).slice(0,3).map(w=>{const m=MECHANISMS[w.mechanism];if(!m)return '';const t=whyTag(w.mechanism,m);return `<li><p class="why-kid">${esc(t.line)}</p><span class="tag tag-${esc(t.cls)}">${t.tag}</span></li>`;}).join('');
  const risk=(sec.critique||[]).find(c=>c.kind==='risk');
  // What the system understood, in its own short labels with a picture: who, where, what happens.
  const labelOf=(q)=>{const h=(st.house||[]).find(x=>x.question===q);return h?name(q,h.value):null;};
@@ -103,13 +131,21 @@ ${next('kit','Build the look')}`;
 
 // 4 · Kit: the brand memory. The host, the place and the sound every reel shares, drawn and checked.
 const FORMAT_NAMES={ai_host:'AI host',hands_pov:'Hands only',visuals:'No person',animated:'Animated'};
+// The page's copy of estimateKit (lib/kit.mjs), for the price on each format button; a test keeps the two equal.
+const KIT_PRICE={picture:0.067,check:0.003,study:0.012,write:0.06};
+export function kitEstimate(format,cast=1){
+ const hosts=['ai_host','animated'].includes(format)?cast:0,pictures=hosts*3+2+hosts*2+(format==='hands_pov'?1:0)+1;
+ const once=pictures*(KIT_PRICE.picture+KIT_PRICE.check),P=KIT_PRICE;
+ return {pictures,usd:Math.round((3*P.study+P.write+once)*100)/100,ceiling:Math.round((3*P.study+P.write*2+once*2)*100)/100};
+}
+const usd2=v=>esc(Number(v).toFixed(2));
 const KIND={object:'Prop',colour:'Colour',action:'Move',sound:'Sound',words:'Words',effect:'Edit'};
 function kitPic(p,{big=false}={}){
  if(!p)return '';const flag=p.check&&!p.check.pass;
  return `<figure class="kit-pic${big?' is-big':''}${p.role.startsWith('turn')?' is-wide':''}">${p.url?`<a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="${esc(p.label)}" loading="lazy"></a>`:'<div class="kit-gap">Not drawn</div>'}<figcaption>${esc(p.label.replace(/^[^:]+: /,'').replace(/^./,c=>c.toUpperCase()))}${flag?`<span class="tag tag-avoid" title="${esc(p.check.problems.join('; '))}">Check: ${esc(p.check.problems[0])}</span>`:''}</figcaption></figure>`;
 }
 // Choosing the look: 3 host options and 3 places, each checked, with Jev's pick marked and why (from its scores).
-function renderChoose(k,{account,busy,pick}){
+function renderChoose(k,{account,busy,pick,estimate}){
  const o=k.options,cast=pick?.cast??o.pick.cast?.index??0,place=pick?.place??o.pick.place?.index??0;
  const bar=v=>`<i class="fit"><b style="width:${Math.round(Math.max(0,Math.min(3,v||0))/3*100)}%"></b></i>`;
  const flag=p=>p&&!p.check?.pass?`<span class="tag tag-avoid">Check: ${esc(p.check?.problems?.[0]||'')}</span>`:'';
@@ -118,14 +154,14 @@ function renderChoose(k,{account,busy,pick}){
  return `<header class="step-head"><span class="eyebrow">Your new channel, in @${esc(account)}'s style</span><h1>${esc(k.kit.name)}</h1><p>${esc(k.kit.promise)}</p></header>
 ${o.casts.length?`<section class="block"><h2 class="sub-title">1 · Pick your host${k.cast>1?'s':''}</h2>${o.pick.cast?`<p class="why-pick">${esc(o.pick.cast.why)}</p>`:''}<div class="opt-grid">${hosts}</div><p class="hint">Made-up people, not the real creators. The one you pick is locked: the same face in every reel.</p></section>`:''}
 <section class="block"><h2 class="sub-title">${o.casts.length?'2':'1'} · Pick the place</h2>${o.pick.place?`<p class="why-pick">${esc(o.pick.place.why)}</p>`:''}<div class="opt-grid">${places}</div></section>
-<div class="card kit-actions"><button type="button" class="btn btn-primary" data-act="kit-choose"${busy?' disabled':''}>Draw my look · about $${esc((((o.casts.length?k.cast*2:1)+1)*0.07).toFixed(2))}</button><button type="button" class="btn" data-act="kit-character"${busy?' disabled':''}>Show me other options</button><span class="hint">Options cost $${esc(k.costUsd.toFixed(2))} so far.</span></div>`;
+<div class="card kit-actions"><button type="button" class="btn btn-primary" data-act="kit-choose"${busy?' disabled':''}>Draw my look · about $${esc((((o.casts.length?k.cast*2:1)+1)*0.07).toFixed(2))}</button><button type="button" class="btn" data-act="kit-character"${busy?' disabled':''}>Show me other options${estimate?` · about $${usd2(estimate.usd)}`:''}</button><span class="hint">Options cost $${esc(k.costUsd.toFixed(2))} so far.</span></div>`;
 }
 // How the new channel will look on Instagram: profile, highlights (the signature things), the grid (made reels first,
 // then upcoming frames) and the hosts' voices. No invented follower counts.
 export const handleOf=name=>String(name||'channel').toLowerCase().replace(/[^a-z0-9]+/g,'.').replace(/^\.|\.$/g,'').slice(0,28)||'channel';
 export function renderChannelPreview(k,{reels=[],voices=[]}={}){
  const pics=Object.fromEntries((k.pictures||[]).filter(p=>p.url).map(p=>[p.role,p])),avatar=pics.face0||pics.hands||pics.place,kit=k.kit;
- const grid=[...reels.filter(r=>r.url).map(r=>`<a class="ig-cell" href="${esc(r.url)}" target="_blank" rel="noopener"><video src="${esc(r.url)}#t=1" muted playsinline preload="metadata"></video><span class="ig-play">▶</span></a>`),
+ const grid=[...reels.filter(r=>r.url).map(r=>`<a class="ig-cell" href="${esc(r.url)}" target="_blank" rel="noopener" aria-label="Open reel"><video src="${esc(r.url)}#t=1" muted playsinline preload="metadata"></video><span class="ig-play">▶</span></a>`),
   ...['scene','place','body0','face1','turn0','body1','face0'].map(r=>pics[r]).filter(p=>p?.url).map(p=>`<div class="ig-cell is-next"><img src="${esc(p.url)}" alt="" loading="lazy"><span class="ig-soon">Next</span></div>`)].slice(0,9).join('');
  const highlights=(kit.assets||[]).slice(0,3).map((a,i)=>`<div class="ig-hl"><i style="background:${/^#[0-9a-f]{6}$/i.test(kit.palette?.[i]?.hex||'')?kit.palette[i].hex:'#ddd'}"></i><span>${esc(String(a.what).replace(/^(a|an|the)\s+/i,'').split(/\s+/).slice(0,2).join(' '))}</span></div>`).join('');
  const hosts=kit.cast?.length?' · Our hosts are AI':'';
@@ -139,10 +175,12 @@ export function renderKit({account,status,busy=false,error='',pick=null,reels=[]
  if(status?.state==='working'){const pr=status.progress||{};return `${head('Building your look…',status.stage||'')}<div class="card"><progress${pr.total>1?` value="${pr.done||0}" max="${pr.total}"`:''}></progress><p class="hint">${pr.total>1?`Picture ${Math.min((pr.done||0)+1,pr.total)} of ${pr.total}. `:''}About 2 minutes. Every picture is checked before the next one.</p></div>`;}
  const k=status?.saved;
  if(!k)return `${head(`Your look, in @${account}'s style`,'The face, the place and the sound every reel will share, so people recognise you in the first second.')}${err}
-<div class="card cta-card"><ul class="ticks"><li>Studies 3 of their best reels, with sound</li><li>Picks the format: AI host, hands only, no person or animated</li><li>Draws your host and your place, and checks every picture</li></ul><button type="button" class="btn btn-primary" data-act="kit-build"${busy?' disabled':''}>Build my look · up to $${esc((status?.estimate?.usd??0.7).toFixed(2))}</button></div>`;
- if(k.stage==='choose')return `${err}${renderChoose(k,{account,busy,pick})}`;
+<div class="card cta-card"><ul class="ticks"><li>Studies 3 of their best reels, with sound</li><li>Picks the format: AI host, hands only, no person or animated</li><li>Draws your host and your place, and checks every picture</li></ul><button type="button" class="btn btn-primary" data-act="kit-build"${busy?' disabled':''}>Build my look · about $${usd2(status?.estimate?.usd??0.7)}</button>${status?.estimate?.ceiling?`<span class="hint">Up to $${usd2(status.estimate.ceiling)} if pictures fail their check and are drawn again.</span>`:''}</div>`;
+ if(k.stage==='choose')return `${err}${renderChoose(k,{account,busy,pick,estimate:status?.estimate})}`;
  const kit=k.kit,pics=Object.fromEntries(k.pictures.map(p=>[p.role,p])),flagged=k.pictures.filter(p=>!p.check.pass).length,hosts=kit.cast||[];
- const switches=Object.keys(FORMAT_NAMES).filter(f=>f!==k.format).map(f=>`<button type="button" class="chip chip-btn" data-kit-format="${f}"${busy?' disabled':''}>${FORMAT_NAMES[f]}</button>`).join('');
+ // Each switch builds a new look, so it shows its price (about the same host count; 2 when it cannot be known yet).
+ const castFor=f=>['ai_host','animated'].includes(k.format)?k.cast||1:2;
+ const switches=Object.keys(FORMAT_NAMES).filter(f=>f!==k.format).map(f=>`<button type="button" class="chip chip-btn" data-kit-format="${f}" data-usd="${kitEstimate(f,castFor(f)).usd}"${busy?' disabled':''}>${FORMAT_NAMES[f]} · about $${usd2(kitEstimate(f,castFor(f)).usd)}</button>`).join('');
  const format=`<article class="card kit-format"><span class="cmp-label">The format${k.byJev?' · picked by Jev':' · your choice'}</span><h3>${esc(FORMAT_NAMES[k.format])}</h3><p class="plain">${esc(k.formatWhy)}</p><div class="switch-row"><span class="hint">Switch to</span>${switches}</div></article>`;
  const cast=hosts.map((h,i)=>`<article class="card kit-host"><div class="kit-host-pics">${kitPic(pics[`face${i}`],{big:true})}${kitPic(pics[`body${i}`])}</div>${kitPic(pics[`turn${i}`])}<div class="kit-host-text"><h3>${esc(h.name)}</h3><p class="plain">${esc(h.role)}</p><dl class="kit-facts"><dt>Wears</dt><dd>${esc(h.outfit)}</dd><dt>Sounds</dt><dd>${esc(h.voice)}</dd></dl></div></article>`).join('');
  const hands=pics.hands?`<article class="card kit-host"><div class="kit-host-pics">${kitPic(pics.hands,{big:true})}</div><div class="kit-host-text"><h3>The hands</h3><p class="plain">${esc(kit.hands)}</p></div></article>`:'';
@@ -152,7 +190,7 @@ export function renderKit({account,status,busy=false,error='',pick=null,reels=[]
  const palette=(kit.palette||[]).map(c=>`<span class="swatch"><i style="background:${/^#[0-9a-f]{6}$/i.test(c.hex)?c.hex:'#ccc'}"></i>${esc(c.name)}</span>`).join('');
  const none=v=>!v||/^none$/i.test(v);
  const sound=[['Voice',kit.sound?.voice],['Music',kit.sound?.music],['Real sounds',kit.sound?.natural]].filter(([,v])=>!none(v)).map(([t,v])=>`<dt>${t}</dt><dd>${esc(v)}</dd>`).join('');
- const redo=[hosts.length?`<button type="button" class="btn" data-act="kit-character"${busy?' disabled':''}>New ${hosts.length>1?'hosts':'host'} · about $${esc(status.estimate.usd.toFixed(2))}</button>`:'',flagged?`<button type="button" class="btn" data-act="kit-pictures"${busy?' disabled':''}>Draw the ${flagged} flagged again · about $${(flagged*0.07).toFixed(2)}</button>`:''].join('');
+ const redo=[hosts.length?`<button type="button" class="btn" data-act="kit-character" data-usd="${esc(status.estimate.usd)}"${busy?' disabled':''}>New ${hosts.length>1?'hosts':'host'} · about $${esc(status.estimate.usd.toFixed(2))}</button>`:'',flagged?`<button type="button" class="btn" data-act="kit-pictures"${busy?' disabled':''}>Draw the ${flagged} flagged again · about $${(flagged*0.07).toFixed(2)}</button>`:''].join('');
  const use=k.approved?`<span class="pill pill-ok">In use ✓</span>`:`<button type="button" class="btn btn-primary" data-act="kit-approve"${busy?' disabled':''}>Use this look</button>`;
  const voices=Object.entries(k.voices||{}).map(([name,v])=>({name,url:v.sample}));
  return `<header class="step-head"><span class="eyebrow">Your new channel, in @${esc(account)}'s style</span><h1>${esc(kit.name)}</h1><p>${esc(kit.promise)}</p></header>${err}
@@ -162,7 +200,7 @@ ${hosts.length||hands?`<section class="block"><h2 class="sub-title">${hosts.leng
 <section class="block"><h2 class="sub-title">Where it happens</h2>${place}</section>
 <section class="block two-col"><article class="card"><h3 class="card-title">In every reel</h3><ul class="kit-assets">${assets}</ul><div class="palette">${palette}</div></article><article class="card"><h3 class="card-title">How it sounds</h3><dl class="kit-facts">${sound}</dl></article></section>
 <div class="card kit-actions">${use}${redo}<span class="hint">This look cost $${esc(k.costUsd.toFixed(2))}.</span></div>
-${k.approved?next('make','Make a reel with this look'):''}`;
+${k.approved?next('make','Copy their winners with this look'):''}`;
 }
 
 // 5 · Make: ideas → script and price → confirm → progress → video.
@@ -230,7 +268,7 @@ export function renderKitHero(p,{busy=false,pricing=false}={}){
  return `<div class="card hero rise"><span class="cmp-label">✦ Ready to make · Jev passed it</span><h3>${esc(s.hook_title)}</h3>
 <p class="hint">${esc(p.picked[p.chosen]?.idea?.title||'')} · ${secs} s · ${v?.mode==='talking'?'Hosts talk on camera':'Voice-over'}</p>
 <ol class="say">${sayLines(s)}</ol>
-<div class="hero-cta">${button}<span class="hint">Up to $${esc((price?.maxUsd??0).toFixed(2))} if a part is redone. Each part is checked before the next is paid for.</span></div>
+<div class="hero-cta">${button}<span class="hint">For the video. Up to $${esc((price?.maxUsd??0).toFixed(2))} if a part is redone. Each part is checked before the next is paid for; the checks and voices cost a little extra.</span></div>
 ${scriptWhy(p,{busy})}</div>`;
 }
 export function renderWriting(st){
@@ -246,7 +284,7 @@ export function renderAllBlocked(p,{busy=false}={}){
 <details class="why"><summary>Why</summary><ul class="skipped">${tried.map(b=>`<li><b>${esc(b.title)}</b>: ${esc(b.problems.join('; '))}</li>`).join('')}</ul></details></div>`;
 }
 export function renderKitPrice(price,{busy}){
- return `<div class="card price"><div class="price-kit"><span class="price-n">$${esc(price.usd.toFixed(2))}</span><span class="hint">on your Gemini key, for ${price.parts*price.partSeconds} seconds of video. Up to $${esc(price.maxUsd.toFixed(2))} if a part needs its one retry. Each part is checked before the next one is paid for.</span></div>
+ return `<div class="card price"><div class="price-kit"><span class="price-n">$${esc(price.usd.toFixed(2))}</span><span class="hint">on your Gemini key, for ${price.parts*price.partSeconds} seconds of video. Up to $${esc(price.maxUsd.toFixed(2))} if a part needs its one retry. Each part is checked before the next one is paid for. The checks and voices cost a little extra.</span></div>
 <div class="price-foot"><span class="hint">Made with Gemini Omni Flash from your look's pictures.</span><button type="button" class="btn btn-primary" data-act="make" data-usd="${price.usd}" data-max="${price.maxUsd}"${busy?' disabled':''}>Make the reel · $${esc(price.usd.toFixed(2))}</button></div></div>`;
 }
 export function renderMake({account,plan,make,balance,mode='fast',busy=false,error='',pricing=false,kit=null,fbOpen=null,showAll=false}){
@@ -256,7 +294,7 @@ export function renderMake({account,plan,make,balance,mode='fast',busy=false,err
  if(make?.state==='working')return `${top}${renderProgress(make)}`;
  if(plan?.state==='working')return `${top}${renderWriting(plan)}`;
  const p0=plan?.plan,stale=useKit&&p0&&(p0.mode!=='kit'||p0.kitAt!==kit.createdAt),p=stale?null:p0;
- if(!p)return `${top}${err}<div class="card cta-card"><ul class="ticks"><li>4 ideas ${useKit?'for your look':'in the winners\' style'}</li><li>Health claims and fake tests removed</li><li>You pick one and see the exact price</li></ul><button type="button" class="btn btn-primary" data-act="ideas"${busy?' disabled':''}>Get ideas · a few cents</button></div>`;
+ if(!p)return `${top}${err}<div class="card cta-card"><ul class="ticks"><li>${useKit?'Up to 12 ideas for your look':'Up to 8 ideas in the winners\' style'}</li><li>Health claims and fake tests removed</li><li>You pick one and see the exact price</li></ul><button type="button" class="btn btn-primary" data-act="ideas"${busy?' disabled':''}>Get ideas · a few cents</button></div>`;
  const made=madeIdeas(make?.reels,p),doneReel=(make?.reels||[]).find(r=>r.url&&ofPlan(r,p)&&ideaOf(r)===p.chosen);
  const finished=doneReel?`<div class="card done"><video src="${esc(doneReel.url)}#t=0.5" controls playsinline preload="metadata"></video><div><span class="pill pill-ok">Made ✓</span><h3>${esc(doneReel.title||'Your reel')}</h3>${renderReelScore(doneReel,{open:fbOpen===doneReel.id,judge:make?.judge})}<p class="hint">Pick another idea below to make a new reel.</p>${next('ready','Open Ready to post')}</div></div>`:'';
  if(p.mode==='kit'){
@@ -273,7 +311,7 @@ ${p.script?`<section class="block"><h2 class="sub-title">2 · Check the script</
 // The confirm pop-up before a reel is made: who and where, exactly as the video will use them (the kit's pictures).
 export function renderConfirmLook(k){
  if(!k?.pictures?.length)return '';const pics=Object.fromEntries(k.pictures.map(p=>[p.role,p])),hosts=k.kit.cast||[];
- const faces=hosts.map((h,i)=>pics[`face${i}`]?`<figure><img src="${esc(pics[`face${i}`].url)}" alt=""><figcaption>${esc(h.name)}${k.voices?.[h.name]?.sample?` <button type="button" class="chip chip-btn" data-voice="${esc(k.voices[h.name].sample)}">▶</button>`:''}</figcaption></figure>`:'').join('');
+ const faces=hosts.map((h,i)=>pics[`face${i}`]?`<figure><img src="${esc(pics[`face${i}`].url)}" alt=""><figcaption>${esc(h.name)}${k.voices?.[h.name]?.sample?` <button type="button" class="chip chip-btn" data-voice="${esc(k.voices[h.name].sample)}" aria-label="Hear ${esc(h.name)}">▶</button>`:''}</figcaption></figure>`:'').join('');
  const hands=pics.hands?`<figure><img src="${esc(pics.hands.url)}" alt=""><figcaption>The hands</figcaption></figure>`:'';
  return `<div class="confirm-look">${faces}${hands}${pics.place?`<figure><img src="${esc(pics.place.url)}" alt=""><figcaption>The place</figcaption></figure>`:''}</div>`;
 }
@@ -311,12 +349,53 @@ export function renderReelResult(t){
  const s=t?.snapshots?.at(-1);if(!s)return '';
  return `<div class="reel-result"><span>▶ <b>${n0(s.plays)}</b> plays</span><span>♥ ${n0(s.likes)}</span><span>💬 ${n0(s.comments)}</span>${Number.isFinite(s.shares)?`<span>↗ ${n0(s.shares)}</span>`:''}<span class="hint">${Number.isFinite(s.ageHours)?`${ago(s.ageHours)} after posting`:''} · <a href="${esc(t.url)}" target="_blank" rel="noopener">open</a></span></div>`;
 }
+// Only finished reels are ready: one still being made (or failed) has no video, and its Download link fetched this page
+// (audit 2026-09-29).
+export const readyReels=reels=>(reels||[]).filter(r=>r.url);
 export function renderReady({reels=[],fbOpen=null,judge=null,results=null,busy=false}){
+ reels=readyReels(reels);
  if(!reels.length)return `${head('Nothing ready yet','Make a reel first.')}`;
  return `${head('Ready to post','For each reel: download the video and the cover, copy the caption, post it on Instagram.')}<p class="ready-tip">When you post: pick the cover, then Advanced settings, turn on <b>Label as made with AI</b>. Meta asks for it on realistic AI video.</p>${''}${renderResultsCard(results,{busy})}<div class="ready-grid">${reels.map(r=>`<article class="card ready">
 <div class="ready-media"><video src="${esc(r.url)}#t=0.5" controls playsinline preload="metadata"></video>${r.cover?`<img class="ready-cover" src="${esc(r.cover)}" alt="Cover">`:`<button type="button" class="ready-cover is-empty" data-act="make-cover" data-reel="${esc(r.id)}">Make the cover · free</button>`}</div>
 <div class="ready-body"><h3>${esc(r.title||'Reel')}</h3>${renderReelResult(results?.reels?.[r.id])}${r.check&&r.check.level!=='good'&&(r.check.problems?.[0]||r.check.weaknesses?.[0])?`<p class="hint">Second opinion: ${esc(r.check.problems?.[0]||r.check.weaknesses[0])}</p>`:''}${r.rank?.sentence?`<p class="hint rank-line">${esc(r.rank.sentence)}</p>`:''}${r.review?.postable===false?`<p class="ready-warn">Not ready: ${esc(r.review.why)}</p>`:r.heard&&!r.heard.all?`<p class="ready-warn">Not ready: this line is cut off or never heard: “${esc(r.heard.missing[0])}”${r.heard.missing.length>1?` and ${r.heard.missing.length-1} more`:''}</p>`:''}<p class="caption" id="cap-${esc(r.id)}">${esc(r.caption||'')}</p>
 <div class="ready-actions"><a class="btn btn-primary" href="${esc(r.url)}" download>1 · Download the reel</a>${r.cover?`<a class="btn" href="${esc(r.cover)}" download>2 · Download the cover</a>`:''}<button type="button" class="btn" data-copy="cap-${esc(r.id)}">${r.cover?'3':'2'} · Copy the caption</button></div>
-<span class="hint">${esc(Math.round(r.seconds||0))} s · ${Number.isFinite(r.spentUsd)?`$${esc(r.spentUsd.toFixed(2))}`:`${esc(r.spent??'')} credits`}</span>${renderReelScore(r,{open:fbOpen===r.id,judge})}</div></article>`).join('')}</div>${next('make','Make another reel')}`;
+<span class="hint">${esc(Math.round(r.seconds||0))} s · ${Number.isFinite(r.spentUsd)?`video $${esc(r.spentUsd.toFixed(2))}, checks extra`:`${esc(r.spent??'')} credits`}</span>${renderReelScore(r,{open:fbOpen===r.id,judge})}</div></article>`).join('')}</div>${next('make','Make another reel')}`;
 }
 
+// Page helpers (they take DOM nodes or media elements, so tests can hand them stand-ins).
+// Swaps only what changed between the page and the new HTML (parsed into `next`): an unchanged element is kept as it is,
+// so a playing video goes on playing, focus stays and entrance animations do not replay when one copy tile changes
+// (audit 2026-09-29). Tiles and originals are matched by their key, never one into another.
+const keyOf=n=>n.nodeType===1?n.getAttribute('data-tile')??n.getAttribute('data-orig')??n.getAttribute('data-copy-pick')??n.getAttribute('id'):null;
+export function morph(a,b){
+ if(a.nodeType!==b.nodeType||a.nodeName!==b.nodeName||keyOf(a)!==keyOf(b)){a.replaceWith(b);return;}
+ if(a.nodeType!==1){if(a.nodeValue!==b.nodeValue)a.nodeValue=b.nodeValue;return;}
+ if(a.isEqualNode(b))return;
+ for(const {name} of [...a.attributes])if(!b.hasAttribute(name))a.removeAttribute(name);
+ for(const {name,value} of [...b.attributes])if(a.getAttribute(name)!==value)a.setAttribute(name,value);
+ if(a.nodeName==='INPUT')a.checked=b.hasAttribute('checked');
+ morphChildren(a,b);
+}
+export function morphChildren(a,b){
+ const old=[...a.childNodes],next=[...b.childNodes];
+ next.forEach((n,i)=>old[i]?morph(old[i],n):a.appendChild(n));
+ for(const n of old.slice(next.length))n.remove();
+}
+// "Play both together": the copy and its original from the start, the copy's sound only. Pausing or ending either stops
+// both, gives the original its sound back and unlinks them; they stayed muted and linked before (audit 2026-09-29).
+export function syncPlay(orig,copy){
+ const was=[orig.muted,copy.muted];
+ const unlink=()=>{orig.onpause=copy.onpause=orig.onended=copy.onended=null;orig.pause();copy.pause();[orig.muted,copy.muted]=was;};
+ for(const v of [orig,copy]){v.pause();v.currentTime=0;}orig.muted=true;copy.muted=false;
+ orig.onpause=copy.onpause=orig.onended=copy.onended=unlink;
+ return {unlink,started:Promise.all([orig.play(),copy.play()])};
+}
+// What a screen reader hears about the copy studio: only a new stage or a quarter more done, never every second's ETA
+// (the whole page was a live region, audit 2026-09-29).
+export function copyAnnouncement(copy){
+ if(copy?.picking?.state==='working'&&!copy.batch)return 'Picking the winners to copy.';
+ const b=copy?.batch;if(!b)return '';
+ const n=b.items.length,done=b.items.filter(i=>i.state==='done').length,failed=b.items.filter(i=>['failed','stopped'].includes(i.state)).length;
+ if(b.items.some(i=>['working','waiting'].includes(i.state)))return `Making ${n} copies: ${done} made, about ${Math.floor((b.pct||0)/25)*25}% done.`;
+ return `${done} of ${n} copies made.${failed?` ${failed} stopped.`:''}`;
+}
