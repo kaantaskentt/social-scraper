@@ -4,6 +4,8 @@ import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {DnaBuilder} from '../lib/dna-run.mjs';
+import {ReelPlanner} from '../lib/reel-plan-run.mjs';
+import {ReelMaker} from '../lib/reel-make.mjs';
 import {DETAILS} from '../lib/dna.mjs';
 
 // A run of reels with plays over time, so the money formula can score them against their normal.
@@ -39,4 +41,24 @@ test('the builder refuses too few reels and a missing key, and a failed watch fa
  const b=new DnaBuilder(root,()=>({gemini:'g'}),{gemini:async()=>{throw Object.assign(new Error('Gemini: HTTP 500'),{costUsd:0.001});},stats:fastStats,scoreRun});
  await b.start(job);const s=await until(b,job);assert.equal(s.state,'failed');assert.match(s.error,/HTTP 500/);
  await rm(root,{recursive:true});await rm(small.root,{recursive:true});
+});
+
+// A detail is "no effect either way" only when none of its values has evidence (audit, 2026-09-29): a proven calm
+// voice was listed next to "voice style: no effect" because the energetic value had none.
+test('no effect lists only details where no value has evidence',async()=>{
+ const {root,job}=await setup(1);await mkdir(join(root,'channels','r1'),{recursive:true});
+ const row=(detail,value,evidence)=>({key:`${detail}=${value}`,detail,value,plain:value,rho:evidence==='none'?0:0.4,n:10,withX:2,withoutX:1,evidence});
+ await writeFile(join(root,'channels','r1','dna.json'),JSON.stringify({details:[row('voice','calm','signal'),row('voice','energetic','none'),row('music','none','none'),row('music','song','none'),row('hook','question','hint')],validation:{verdict:'luck'}}));
+ const s=await new DnaBuilder(root,()=>({}),{scoreRun}).status(job);
+ assert.deepEqual(s.view.noEffect,['music']);assert.ok(s.view.shown.some(d=>d.detail==='voice'));
+ await rm(root,{recursive:true});
+});
+// The maker, the planner and this builder write the same spend.json; each kept its own queue, so entries were lost
+// when two wrote at once (audit, 2026-09-29).
+test('every paid entry survives when the maker, the planner and the DNA builder log at the same moment',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'ledger-'));await mkdir(join(root,'channels','r1'),{recursive:true});
+ const writers=[new DnaBuilder(root,()=>({})),new ReelPlanner(root,()=>({})),new ReelMaker(root,()=>({}))].map(w=>e=>w.spend?w.spend('r1',e):w.spendLedger('r1',e));
+ await Promise.all(Array.from({length:30},(_,i)=>writers[i%3]({step:`s${i}`,usd:0.01})));
+ const list=JSON.parse(await readFile(join(root,'channels','r1','spend.json'),'utf8'));assert.equal(list.length,30);
+ await rm(root,{recursive:true});
 });

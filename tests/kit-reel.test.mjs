@@ -6,7 +6,8 @@ import {join} from 'node:path';
 import {HEALTH_Q,PART_USD,PARTS,MAX_WORDS,kitBrief,kitIdeaPrompt,judgeKitIdeaRequest,kitScriptPrompt,remakePrompt,scriptProblems,checkKitScriptRequest,readKitScriptCheck,kitPrice,referencesFor,partPrompt,spokenText,discloseCaption,partVerdict} from '../lib/kit-reel.mjs';
 const craft={rules:[{kind:'hook',rule:'Open on a pour',how:'extreme close-up of pouring',reels:['a','b']}],voice_direction:'brisk and confident, close to the mic',shot_style:'close-ups, cut every 2 s',sound_style:'loud fizz at the reveal',ending_style:'end on the result'};
 import {ReelPlanner} from '../lib/reel-plan-run.mjs';
-import {ReelMaker} from '../lib/reel-make.mjs';
+import {ReelMaker,checkPart} from '../lib/reel-make.mjs';
+import {createHash} from 'node:crypto';
 
 const host=(name,outfit)=>({name,role:'tests a trick',look:'x',outfit,manner:'calm',voice:'warm'});
 const kit={name:'Kitchen Check',promise:'Tricks that work.',cast:[host('Leo','a navy tee'),host('Mia','a dark green long-sleeve shirt')],hands:'none',art_style:'none',place:'A bright white kitchen',places:[],camera:'Eye-level medium shot on a tripod',light:'Soft daylight',palette:[],sound:{voice:'clear and quick',music:'none',natural:'pouring water'},assets:[{what:'glass mugs',kind:'object',how:'every test'}],dont:['no health claims']};
@@ -320,4 +321,76 @@ test('copy mode: a part Google refuses is softened once (only its words) and sen
  assert.equal(softens,1);assert.equal(refused,2);const reel=m.reels[0];assert.deepEqual(reel.softened,[2]);assert.equal(reel.internal,true);assert.equal(reel.copyOf,'orig1');
  assert.equal(reel.review,undefined); // a copied "comment" line is not a blocker in copy mode
  assert.match(JSON.stringify(g.calls.post.at(-1)),/softened words/);assert.equal(reel.score,undefined); // no creative scores for a copy
+});
+
+// One part check for the maker and the QA exam (audit, 2026-09-29): both watches with the face pictures, the merge,
+// and Jev's "matters" gate, with every paid call in the ledger.
+test('the part check: two watches with the hosts\' faces, either one can fail the result, Jev decides what matters',async()=>{
+ const sent=[],spent=[];let n=0;
+ const gemini=async({parts})=>{sent.push(parts);n++;return {json:{shows:'s',match:2,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'the second glass',result_as_written:n===2?'no':'yes'},costUsd:0.003};};
+ const jev=async req=>{assert.ok(req.questions.matters);return {answers:{matters:{noul:0.8}},usage:{input_tokens:1000}};};
+ const c=await checkPart({bytes:Buffer.from('clip'),faces:[Buffer.from('F1'),Buffer.from('F2')],script:script(),index:0,gemini,jev,keys:{gemini:'g',jev:'j'},ledger:async e=>{spent.push(e);}});
+ assert.equal(sent.length,2);for(const p of sent){assert.equal(p.filter(x=>x.image).length,2);assert.match(p.at(-1).text,/reference pictures of the hosts/);}
+ assert.equal(c.pass,false);assert.ok(c.problems.includes('the result is not what the script says'),'the second watch\'s "no" counts');
+ const again=await checkPart({bytes:Buffer.from('clip'),script:script(),index:0,gemini:async()=>({json:{shows:'s',match:3,same_people:'no_people',text_or_logos:false,gear_visible:false,broken:false,missing:'a spoon'},costUsd:0}),jev,keys:{gemini:'g',jev:'j'}});
+ assert.deepEqual(again.problems,['it misses what matters: a spoon']);
+ assert.deepEqual(spent.map(e=>e.step),['check part-1','check part-1 jev']);assert.equal(spent[1].usd,0.000042);
+ // One watch fails: the other one's cost is still written down.
+ let k=0;const lost=[];const fail=async()=>{if(++k===2)throw Object.assign(new Error('Gemini: HTTP 500'),{costUsd:0.001});return {json:{},costUsd:0.003};};
+ await assert.rejects(checkPart({bytes:Buffer.from('c'),script:script(),index:0,gemini:fail,jev,keys:{gemini:'g',jev:'j'},ledger:async e=>{lost.push(e);}}),/HTTP 500/);
+ assert.equal(lost.length,1);assert.equal(Math.round(lost[0].usd*1000),4);assert.match(lost[0].failed,/HTTP 500/);
+});
+
+// A new script for an idea whose reel stopped partway used the same reel id, kept part 1 filmed from the OLD script
+// and filmed part 2 of the new one on top of it (audit, 2026-09-29).
+test('a new script for the same idea films a new reel; a reel begun before under the old id still resumes',async()=>{
+ const {root,job,ch}=await setup();const keys=()=>({gemini:'g',jev:'j',groq:'q'});
+ const plan=scriptAt=>JSON.stringify({mode:'kit',kitAt:kitSaved.createdAt,createdAt:'2026-09-28T01:00:00Z',scriptAt,chosen:0,picked:[{idea:{title:'Revive celery'}}],script:script(),check:{pass:true},price:{usd:2.17}});
+ const fine={shows:'x',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'};let part2Bad=true;
+ const g=fakeGoogle(),opts={cover:fakeCover,jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async()=>20,cut:async(i,o)=>{await writeFile(o,'c');return o;},render:async a=>{await writeFile(a.out,'R');return {seconds:22};},
+  gemini:async({parts})=>({json:part2Bad&&/part 2/.test(parts.at(-1).text||'')?{...fine,same_people:'no'}:fine,costUsd:0})};
+ await writeFile(join(ch,'plan.json'),plan('2026-09-28T01:05:00Z'));
+ const first=new ReelMaker(root,keys,opts);const a=await first.start(job,{confirmCredits:2.17});let m=await until(()=>first.status(job));assert.match(m.error,/Part 2 failed its check twice/);assert.equal(g.calls.post.length,3);
+ part2Bad=false;await writeFile(join(ch,'plan.json'),plan('2026-09-28T02:00:00Z'));
+ const second=new ReelMaker(root,keys,opts);const b=await second.start(job,{confirmCredits:2.17});m=await until(()=>second.status(job));assert.equal(m.state,'done',m.error);
+ assert.notEqual(b.reelId,a.reelId);assert.equal(g.calls.post.length,5,'both parts filmed again from the new script');assert.equal(g.calls.post[3].previous_interaction_id,undefined);
+ const made=JSON.parse(await readFile(join(ch,'reels',b.reelId,'reel.json'),'utf8'));assert.equal(made.scriptAt,'2026-09-28T02:00:00Z');
+ // A reel started under the old id (no scriptAt saved) after this script was written resumes where it is.
+ const old=`0-revive-celery-${createHash('sha256').update('2026-09-28T01:00:00Z').digest('hex').slice(0,6)}`;
+ await mkdir(join(ch,'reels',old),{recursive:true});await writeFile(join(ch,'reels',old,'reel.json'),JSON.stringify({version:1,id:old,mode:'kit',idea:0,planAt:'2026-09-28T01:00:00Z',createdAt:'2026-09-28T03:00:00Z',spentUsd:0,paid:{},parts:[]}));
+ await writeFile(join(ch,'plan.json'),plan('2026-09-28T02:30:00Z'));
+ const third=new ReelMaker(root,keys,opts);assert.equal((await third.start(job,{confirmCredits:2.17})).reelId,old);await until(()=>third.status(job));
+ await rm(root,{recursive:true});
+});
+
+// A second opinion or rank that did not run was saved as {error} or {skipped}, and the card showed nothing, as for a
+// clean reel; a failure reading the channel's reels was reported as "fewer than 3" (audit, 2026-09-29).
+test('a final check or rank that did not run says so on the reel',async()=>{
+ const {root,job,ch}=await setup();const keys=()=>({gemini:'g',jev:'j',groq:'q',anthropic:'a'});
+ await writeFile(join(ch,'plan.json'),JSON.stringify({mode:'kit',kitAt:kitSaved.createdAt,createdAt:'2026-09-28T01:00:00Z',scriptAt:'2026-09-28T01:05:00Z',chosen:0,picked:[{idea:{title:'Revive celery'}}],script:script(),check:{pass:true},price:{usd:2.17}}));
+ const fine={shows:'x',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'};
+ const maker=new ReelMaker(root,keys,{cover:fakeCover,gemini:async()=>({json:fine,costUsd:0}),jev:async()=>good,videoFetch:fakeGoogle().fetchImpl,pollMs:0,seconds:async()=>20,cut:async(i,o)=>{await writeFile(o,'c');return o;},render:async a=>{await writeFile(a.out,'R');return {seconds:22};},
+  frames:async()=>[],claude:async()=>{throw new Error('Claude check failed (529): overloaded');}});
+ const posts=job.posts;job.posts=undefined; // the channel's reels cannot be read
+ await maker.start(job,{confirmCredits:2.17});const m=await until(()=>maker.status(job));assert.equal(m.state,'done',m.error);job.posts=posts;
+ const r=m.reels[0];assert.equal(r.check.level,'unchecked');assert.match(r.check.weaknesses[0],/did not run: Claude check failed \(529\)/);
+ assert.ok(r.rank.error);assert.doesNotMatch(r.rank.sentence,/Fewer than 3/i);assert.match(r.rank.sentence,/^Not compared with their typical reels: /);
+ const skipped=await maker.finalCheck(job,'x',script(),[],null,{},async()=>{});assert.equal(skipped.level,'unchecked');assert.match(skipped.weaknesses[0],/ANTHROPIC_API_KEY/);
+ await rm(root,{recursive:true});
+});
+
+// Remakes ignored the channel's payoff decision, so a channel that teaches movements got the close-up quota and every
+// remake was blocked (audit, 2026-09-29).
+test('a remake follows the channel\'s payoff decision',async()=>{
+ const {root,job,ch}=await setup();const keys=()=>({gemini:'g',jev:'j',groq:'q'});
+ await writeFile(join(root,'secret','r1','secret.json'),JSON.stringify({account:'dz',secret:{headline:'h'},stats:{differences:[],house:[]},picked:[]}));
+ await mkdir(join(root,'videos','r1'),{recursive:true});await writeFile(join(root,'videos','r1','w1.mp4'),'v');job.posts=[{id:'w1'}];
+ await writeFile(join(ch,'dna.json'),JSON.stringify({labels:Array.from({length:30},(_,i)=>({id:`p${i}`,xNormal:1,labels:{payoffs:i<5?'1':'0',first_speaker:'voiceover',gaze:'no_person'}}))}));
+ const wide={hook_title:'Squat right',caption:'Try it? #form',parts:[0,1].map(()=>({beats:[beat(0,5,'Leo','full-body squat','Sit back.','Wide shot of Leo'),beat(5,10,'Mia','full-body squat','Drive up.','Wide shot of Mia')]}))};
+ const prompts=[];const gemini=async({schema,parts})=>schema.required.includes('first_second')?{json:{first_second:'a wide squat',beats:[]},costUsd:0.01}:(prompts.push(parts[0].text),{json:wide,costUsd:0.02});
+ const planner=new ReelPlanner(root,keys,{gemini,jev:async req=>req.questions.same_subject?{answers:{same_subject:{noul:0.9}}}:{answers:{...good.answers,payoff_closeup:{noul:0.1},gripping:{score:2.5},first_second:{score:2.5}}}});
+ await planner.startRemake(job,'w1');const s=await until(()=>planner.status(job));assert.equal(s.state,'ready',s.error);
+ assert.equal(s.plan.result.payoff,false);assert.match(prompts[0],/each movement shown clearly/);assert.match(prompts[0],/teaches movements/);
+ assert.equal(s.plan.check.pass,true,JSON.stringify(s.plan.check.problems));
+ await rm(root,{recursive:true});
 });

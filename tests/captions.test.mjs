@@ -70,4 +70,7 @@ test('a spoken promise we cannot keep is caught from what was really said',async
  assert.match(spokenPromise(w('pushing it up. Comment Egg G to get our full food safety guide.')),/Comment Egg G/);
  assert.match(spokenPromise(w('the link in bio has it')),/link in bio/);
  assert.equal(spokenPromise(w('They will snap perfectly again. Follow for the next test.')),null);
+ // Ordinary speech is not a promise; a call to action is (audit, 2026-09-29).
+ for(const t of ['My mom left a comment: this is wrong.','This trick will send you straight to sleep.','My full routine takes ten minutes.','Drop a comment if this worked for you.'])assert.equal(spokenPromise(w(t)),null,t);
+ for(const t of ['Link in the description for the guide.','Comment EGG to get our full food safety guide','Comment GUIDE','Comment below and I will send it','I will send you the guide tonight','the link below has it'])assert.ok(spokenPromise(w(t)),t);
 });
