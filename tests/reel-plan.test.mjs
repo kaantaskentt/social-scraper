@@ -63,3 +63,10 @@ test('kit ideas with a payoff score: a dramatic reveal outranks a mild one with 
  assert.deepEqual(r.picked.map(p=>p.idea.title),['whoa','mild']);assert.equal(r.picked[0].total,1);assert.equal(r.picked[1].total,0.8);
  assert.equal(rankIdeas([{title:'old'}],[{answers:{fit:{score:3},ai_ready:{score:3},hook:{score:3},health_claim:{noul:0},true_demo:{noul:1}}}]).picked[0].total,1);
 });
+
+test('novelty and a felt problem lift an idea above a well-known tip with the same craft scores',async()=>{
+ const {rankIdeas}=await import('../lib/reel-plan.mjs');
+ const j=(novel,pain)=>({answers:{fit:{score:3},ai_ready:{score:3},hook:{score:3},payoff:{score:3},novel:{score:novel},pain_point:{score:pain},health_claim:{noul:0.1},true_demo:{noul:0.9}}});
+ const {picked}=rankIdeas([{title:'Egg float'},{title:'Frozen herbs in oil'}],[j(0,1),j(3,3)]);
+ assert.deepEqual(picked.map(p=>p.idea.title),['Frozen herbs in oil','Egg float']);assert.equal(picked[0].scores.novel,3);
+});

@@ -1,0 +1,86 @@
+{
+ "hook_title": "TEST YOUR BAKING POWDER",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "extreme close-up on a clear glass",
+     "who": "Felix",
+     "does": "Pours steaming hot water from a plain glass jug into a clear glass containing baking powder.",
+     "says": "Pour hot water over your baking powder immediately.",
+     "sound": "Loud, violent fizzing and bubbling."
+    },
+    {
+     "from": 3,
+     "to": 5,
+     "shot": "medium shot on Felix and Stella",
+     "who": "Felix",
+     "does": "Points directly down at the foaming clear glass on the white quartz counter.",
+     "says": "Test number one.",
+     "sound": ""
+    },
+    {
+     "from": 5,
+     "to": 8,
+     "shot": "close-up on Felix's hands",
+     "who": "Felix",
+     "does": "Spoons fresh baking powder into an empty clear glass.",
+     "says": "Put fresh powder in a glass.",
+     "sound": "Spoon clinking against the glass."
+    },
+    {
+     "from": 8,
+     "to": 10,
+     "shot": "close-up on Stella",
+     "who": "Stella",
+     "does": "Points at the clear glass with wide, shocked eyes.",
+     "says": "Fresh powder reacts fast.",
+     "sound": ""
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "extreme close-up on the clear glass",
+     "who": "Felix",
+     "does": "Pours steaming hot water from a plain glass jug over the fresh baking powder.",
+     "says": "Pour hot water over it.",
+     "sound": "Loud splashing and rapid fizzing."
+    },
+    {
+     "from": 3,
+     "to": 6,
+     "shot": "close-up on the clear glass",
+     "who": "Stella",
+     "does": "Leans over the clear glass as the baking powder bubbles violently to the top.",
+     "says": "Listen for the violent fizzing.",
+     "sound": "Intense bubbling."
+    },
+    {
+     "from": 6,
+     "to": 8,
+     "shot": "close-up on a second clear glass",
+     "who": "Felix",
+     "does": "Pours hot water from a glass jug into a second clear glass with old baking powder.",
+     "says": "Old powder stays flat.",
+     "sound": "Dull water pouring sound, no fizz."
+    },
+    {
+     "from": 8,
+     "to": 10,
+     "shot": "medium shot on Felix",
+     "who": "Felix",
+     "does": "Points directly at the camera while tapping the white quartz counter.",
+     "says": "Did yours pass the test?",
+     "sound": ""
+    }
+   ]
+  }
+ ],
+ "caption": "Is your baking powder actually working, or just sitting flat? #BakingTips #FoodHacks #KitchenTricks"
+}

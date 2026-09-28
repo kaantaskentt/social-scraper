@@ -261,3 +261,10 @@ test('real results: ask for the handle once, then one check button; each posted 
  assert.match(row,/<b>1,500<\/b> plays/);assert.match(row,/24 h after posting/);assert.doesNotMatch(row,/↗/); // unknown shares are not shown as 0
  assert.equal(renderReelResult(undefined),'');
 });
+
+test('the gate and the rank show on the reel card',()=>{
+ const base={id:'a',url:'/r.mp4',title:'T',caption:'c',seconds:20,spentUsd:2};
+ assert.match(renderReady({reels:[{...base,check:{level:'broken',problems:['16s missing_result: spoon still black'],weaknesses:[]}}]}),/Not ready: 16s missing_result: spoon still black/);
+ const weak=renderReady({reels:[{...base,check:{level:'weak',problems:[],weaknesses:['6s missing_result: no floating egg']},rank:{sentence:'Beat 3 of 5 of their typical reels in a side-by-side watch.'}}]});
+ assert.match(weak,/Weak spot: 6s missing_result: no floating egg/);assert.match(weak,/Beat 3 of 5 of their typical reels/);assert.doesNotMatch(weak,/Not ready/);
+});

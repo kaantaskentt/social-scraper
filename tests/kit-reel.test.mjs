@@ -24,7 +24,7 @@ test('ideas and judging use the kit: hosts, place, signature things, AI-video sa
  const p=kitIdeaPrompt(kit,'ai_host',{headline:'h'});assert.match(p,/Leo and Mia\) are on camera/);assert.match(p,/"place":"A bright white kitchen"/);assert.match(p,/no brand names/);assert.match(p,/20 to 30 seconds/);assert.match(p,/payoff every 6 to 9 seconds/);assert.match(p,/pattern_used/);assert.match(p,/why_true/);assert.match(p,/honey in water/);assert.match(p,/Write 12 different/);
  assert.match(kitIdeaPrompt(kit,'ai_host',{},craft),/craft of the winners: .*Open on a pour/);
  assert.match(kitIdeaPrompt({...kit,cast:[]},'hands_pov',{}),/Only hands are on camera/);
- const req=judgeKitIdeaRequest({title:'t'},{},kit,'ai_host');assert.deepEqual(Object.keys(req.questions),['fit','ai_ready','hook','payoff','health_claim','true_demo']);assert.match(kitIdeaPrompt(kit,'ai_host',{}),/DRAMATIC to see and hear/);assert.equal(req.state.channel.hosts[0].name,'Leo');
+ const req=judgeKitIdeaRequest({title:'t'},{},kit,'ai_host');assert.deepEqual(Object.keys(req.questions),['fit','ai_ready','hook','payoff','novel','pain_point','health_claim','true_demo']);assert.match(kitIdeaPrompt(kit,'ai_host',{}),/do NOT already know/);assert.match(kitIdeaPrompt(kit,'ai_host',{}),/DRAMATIC to see and hear/);assert.equal(req.state.channel.hosts[0].name,'Leo');
  assert.equal(kitBrief(kit,'ai_host').hands,undefined);
 });
 

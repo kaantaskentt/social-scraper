@@ -1,0 +1,77 @@
+{
+ "hook_title": "Stop swinging your curls",
+ "parts": [
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 2,
+     "shot": "extreme close-up on Titan's peaking bicep gripping a dumbbell",
+     "who": "Titan",
+     "does": "Squeezes the dumbbell at the top as the bicep glows neon green",
+     "says": "Stop swinging your bicep curls.",
+     "sound": "Deep booming thud"
+    },
+    {
+     "from": 2,
+     "to": 5,
+     "shot": "medium on Titan's shoulder",
+     "who": "Titan",
+     "does": "Lowers the dumbbell and swings his shoulder forward",
+     "says": "Using momentum shifts the work away.",
+     "sound": "Rushing air whoosh"
+    },
+    {
+     "from": 5,
+     "to": 8,
+     "shot": "close-up on Titan's elbow and ribs",
+     "who": "Titan",
+     "does": "Locks his elbow tightly against his side",
+     "says": "Lock your elbows to your sides.",
+     "sound": "Mechanical click and bass thud"
+    },
+    {
+     "from": 8,
+     "to": 10,
+     "shot": "close-up on Titan's forearm and the dumbbell",
+     "who": "Titan",
+     "does": "Starts a slow strict upward curl of the dumbbell",
+     "says": "Now curl the dumbbell slowly.",
+     "sound": "Heavy wind sweep"
+    }
+   ]
+  },
+  {
+   "beats": [
+    {
+     "from": 0,
+     "to": 3,
+     "shot": "close-up on Titan's bicep",
+     "who": "Titan",
+     "does": "Curls the dumbbell to the top as the muscle flares neon green again",
+     "says": "Squeeze hard at the top.",
+     "sound": "Electric hum and bass boom"
+    },
+    {
+     "from": 3,
+     "to": 7,
+     "shot": "wide on Titan standing on the glossy dark floor",
+     "who": "Titan",
+     "does": "Slowly lowers the dumbbell downward while the floor mirrors him",
+     "says": "Lower the weight with total control.",
+     "sound": "Slow sweeping whoosh"
+    },
+    {
+     "from": 7,
+     "to": 10,
+     "shot": "close-up on Titan's hand holding the dumbbell",
+     "who": "Titan",
+     "does": "Holds the dumbbell perfectly still at the bottom position",
+     "says": "What muscle should we train next?",
+     "sound": "Low synth drone"
+    }
+   ]
+  }
+ ],
+ "caption": "Strict form equals better results. What muscle should we train next? #bicepcurl #fitnessanimation #workouttips #muscleisolation #gymform"
+}
