@@ -147,3 +147,13 @@ test('review round 2: missing measurements never become a comparison',()=>{
  const {secret}=checkEvidence({headline:'h'},new Set(),{house:[],differences:[],numbers:{secondsPerShot:{winners:3,flops:null,all:3,clear:false}}});
  assert.equal(secret.pace.text,'A new shot about every 3 s.');
 });
+
+// The count gap alone filled all three "Do these" cards in about half of simulated channels where best and weakest
+// reels did not differ; a difference now also passes a chance test across every value (audit, 2026-09-29).
+test('a count gap chance alone could make is not a difference; a strong one is, with its chance test',()=>{
+ const items=[...Array.from({length:15},(_,i)=>({id:`w${i}`,group:'winner',labels:{opening:i<6?'question':'bold_claim',format:i<12?'demonstration':'talking_head'}})),
+  ...Array.from({length:15},(_,i)=>({id:`f${i}`,group:'flop',labels:{opening:i<2?'question':'bold_claim',format:i<2?'demonstration':'talking_head'}}))];
+ const c=compare(items);
+ assert.ok(!c.differences.some(d=>d.question==='opening'),'6 of 15 against 2 of 15 happens by chance');
+ const d=c.differences.find(x=>x.question==='format'&&x.value==='demonstration');assert.deepEqual([d.winners,d.flops],[12,2]);assert.ok(d.q<=0.1&&d.p<0.001,JSON.stringify(d));
+});
