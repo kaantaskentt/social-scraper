@@ -43,7 +43,8 @@ if(command==='kit'){
  const k=await kits.approve(j);console.log(k.format,k.kit.name,'$'+k.costUsd,k.pictures.map(p=>`${p.role}:${p.check.pass?'ok':p.check.problems.join('/')}`).join(' '));
 }
 if(command==='ideas'){
- const j=await lab('ideas');await planner.startIdeas(j);const s=await until(()=>planner.status(j));if(s.state==='failed')throw new Error(s.error);
+ // ideas [@kitname]: a lab look can be used for the ideas too.
+ const kitFrom=args.find(a=>a.startsWith('@'))?.slice(1)||null,j=await lab(kitFrom?`ideas-${kitFrom}`:'ideas',kitFrom);await planner.startIdeas(j);const s=await until(()=>planner.status(j));if(s.state==='failed')throw new Error(s.error);
  // The craft study is shared: copy it back to the real account so every lab and the app reuse it.
  for(const f of ['craft.json'])if(existsSync(join(ROOT,'channels',j.id,f)))await copyFile(join(ROOT,'channels',j.id,f),join(ROOT,'channels',runId,f));
  s.plan.picked.forEach((p,i)=>console.log(`${i}\t${p.total}\t${p.idea.title}\t| ${p.idea.pattern_used||''} | ${p.idea.why_true}`));
@@ -52,11 +53,11 @@ if(command==='ideas'){
 if(command==='make'){
  // name=idea:3, name=remake:<postId>; add @kitname for a lab look and +voice for the designed voices.
  const variants=args.filter(a=>a.includes('=')).map(a=>{const [name,raw]=a.split('=');const voice=raw.endsWith('+voice'),full=raw.replace(/\+voice$/,'');const [spec,kitFrom]=full.split('@');const [kind,arg]=spec.split(':');return {name,kind,arg,kitFrom:kitFrom||null,voice};});
- const ideas=JSON.parse(await readFile(join(ROOT,'channels','lab-ideas','plan.json'),'utf8').catch(()=>'null'));
+ const ideasFor=async v=>JSON.parse(await readFile(join(ROOT,'channels',v.kitFrom?`lab-ideas-${v.kitFrom}`:'lab-ideas','plan.json'),'utf8').catch(()=>'null'));
  // 1 Scripts (cheap), all at once.
  const planned=await Promise.all(variants.map(async v=>{
   const j=await lab(v.name,v.kitFrom);
-  if(v.kind==='idea'){if(!ideas)throw new Error('Run "ideas" first');const kit=JSON.parse(await readFile(join(ROOT,'channels',j.id,'kit','kit.json'),'utf8'));
+  if(v.kind==='idea'){const ideas=await ideasFor(v);if(!ideas)throw new Error('Run "ideas" first');const kit=JSON.parse(await readFile(join(ROOT,'channels',j.id,'kit','kit.json'),'utf8'));
    await writeFile(join(ROOT,'channels',j.id,'plan.json'),JSON.stringify({...ideas,format:kit.format,kitAt:kit.createdAt,createdAt:new Date().toISOString()}));await planner.startScript(j,Number(v.arg));}
   else await planner.startRemake(j,v.arg);
   const s=await until(()=>planner.status(j));if(s.state==='failed')return {...v,j,error:s.error};

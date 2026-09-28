@@ -1,7 +1,8 @@
 // Social Scraper, the five-step app: state, data loading and clicks. Rendering lives in flow-views.mjs.
-import {reachable,renderStepper,renderScan,renderWinners,renderSecret,renderKit,renderMake,renderReady,esc} from './flow-views.mjs';
+import {reachable,renderStepper,renderScan,renderWinners,renderSecret,renderKit,renderMake,renderReady,renderConfirmLook,esc} from './flow-views.mjs';
 import {pickWinners} from './studio-view.mjs';
 import {parseHandles} from './handles.mjs';
+import {mountScanMap,reach} from './scan-map.mjs';
 
 const $=s=>document.querySelector(s);
 const S={pricing:false,runs:[],runId:null,job:null,results:null,saved:new Set(),secret:null,kit:null,plan:null,make:null,balance:null,step:'scan',mode:'fast',busy:false,error:'',feedback:null,timer:null};
@@ -45,15 +46,20 @@ function render(){
  if(S.step==='scan')html=renderScan({runs:S.runs,run:S.job?{id:S.runId,creator:S.job.creator,count:S.job.posts.length}:null,progress:scanProgress(),error:S.error});
  if(S.step==='winners')html=renderWinners({account,...winners()});
  if(S.step==='secret')html=renderSecret({account,status:S.secret,imageFor,feedback:S.feedback});
- if(S.step==='kit')html=renderKit({account,status:S.kit,busy:S.busy,error:S.error});
- if(S.step==='make')html=renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing,kit:S.kit?.saved});
- if(S.step==='ready')html=renderReady({reels:S.make?.reels||[]});
- $('#view').innerHTML=html;
+ if(S.step==='kit')html=renderKit({account,status:S.kit,busy:S.busy,error:S.error,pick:S.kitPick,reels:(S.make?.reels||[]).filter(r=>r.mode==='kit'&&r.kitAt===S.kit?.saved?.createdAt)});
+ if(S.step==='make')html=renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing,kit:S.kit?.saved,fbOpen:S.fbOpen});
+ if(S.step==='ready')html=renderReady({reels:S.make?.reels||[],fbOpen:S.fbOpen});
+ // The scan map keeps its tiles between refreshes (so they fly from the wall to the map); the rest redraws.
+ const key=S.step==='scan'?`scan:${S.runId}:${scanProgress()?.state}:${S.error}:${S.runs.length}`:null;
+ if(!(key&&key===S.viewKey&&$('#view .scan-stage')))$('#view').innerHTML=html;S.viewKey=key;
+ if(S.step==='scan'&&S.job){if(!S.scanSel)S.scanSel=[...S.job.posts].filter(p=>reach(p)).sort((a,b)=>reach(b)-reach(a))[0]?.id||null;
+  mountScanMap($('#view'),{posts:S.job.posts,imageFor,videoFor,selected:S.scanSel,onSelect:id=>{S.scanSel=id;render();}});}
 }
+addEventListener('resize',()=>{if(S.step==='scan')render();});
 
 // Loads everything for one account; later refreshes only fetch what is still running.
 async function loadRun(id,{keepStep=false}={}){
- S.runId=id;store.set('flow.run',id);S.error='';
+ S.runId=id;store.set('flow.run',id);S.error='';S.scanSel=null;
  const base=`/api/runs/${encodeURIComponent(id)}`;
  const [job,videos,secret,kit,plan,make,money]=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(()=>({results:{}}))]);
  if(S.runId!==id)return;
@@ -91,7 +97,7 @@ async function reprice(){
 async function loadBalance(){try{S.balance=(await api('/api/higgsfield/balance')).credits;}catch(e){S.balance=null;S.error=e.message;}render();}
 
 document.addEventListener('click',async e=>{
- const t=e.target.closest('[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close],[data-kit-format]');if(!t||t.disabled)return;
+ const t=e.target.closest('[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close],[data-kit-format],[data-kit-cast],[data-kit-place],[data-voice],[data-fb],[data-fb-reason]');if(!t||t.disabled)return;
  const base=`/api/runs/${encodeURIComponent(S.runId)}`;
  if(t.dataset.step){S.step=t.dataset.step;store.set(`flow.step.${S.runId}`,S.step);render();scrollTo({top:0,behavior:'smooth'});if(S.step==='make')prepareMake();return;}
  if(t.dataset.run){loadRun(t.dataset.run).catch(err=>toast(err.message));return;}
@@ -104,6 +110,17 @@ document.addEventListener('click',async e=>{
  // The kit: build, new host, redraw flagged pictures, switch format (each shows its price on the button), use it.
  const kitGo=body=>act(async()=>{await api(`${base}/kit`,{confirm:true,...body});S.kit=await api(`${base}/kit`);});
  if(t.dataset.kitFormat){kitGo({redo:'format',format:t.dataset.kitFormat});return;}
+ // Picking an option only marks it (no cost); "Draw my look" draws the chosen host and place.
+ if(t.dataset.kitCast!==undefined||t.dataset.kitPlace!==undefined){const o=S.kit?.saved?.options;S.kitPick={cast:S.kitPick?.cast??o?.pick?.cast?.index??0,place:S.kitPick?.place??o?.pick?.place?.index??0,...(t.dataset.kitCast!==undefined?{cast:Number(t.dataset.kitCast)}:{place:Number(t.dataset.kitPlace)})};render();return;}
+ // The feedback loop: 👍 saves at once; 👎 opens the reasons, and each tapped reason is saved.
+ if(t.dataset.fb||t.dataset.fbReason){const id=t.dataset.reel,r=(S.make?.reels||[]).find(x=>x.id===id);if(!r)return;
+  let verdict=t.dataset.fb||'down',reasons=r.feedback?.verdict==='down'?[...r.feedback.reasons]:[];
+  if(t.dataset.fbReason){const k=t.dataset.fbReason;reasons=reasons.includes(k)?reasons.filter(x=>x!==k):[...reasons,k];}
+  if(verdict==='up')reasons=[];S.fbOpen=verdict==='down'?id:null;
+  act(async()=>{const saved=await api(`${base}/reel-feedback`,{reelId:id,verdict,reasons});S.make.reels=S.make.reels.map(x=>x.id===id?saved:x);});return;}
+ if(t.dataset.voice){const a=(S.audio??=new Audio());a.src=t.dataset.voice;a.play().catch(()=>toast('Could not play the voice.'));return;}
+ if(t.dataset.act==='kit-voices'){act(async()=>{await api(`${base}/kit/voices`,{confirm:true});S.kit=await api(`${base}/kit`);});return;}
+ if(t.dataset.act==='kit-choose'){act(async()=>{await api(`${base}/kit/choose`,{confirm:true,...(S.kitPick||{})});S.kitPick=null;S.kit=await api(`${base}/kit`);});return;}
  const a=t.dataset.act;
  if(a==='kit-build')kitGo({});if(a==='kit-character')kitGo({redo:'character'});if(a==='kit-pictures')kitGo({redo:'pictures'});
  if(a==='kit-approve')act(async()=>{await api(`${base}/kit/approve`,{confirm:true});S.kit=await api(`${base}/kit`);});
@@ -111,6 +128,7 @@ document.addEventListener('click',async e=>{
  if(a==='ideas')act(async()=>{S.plan=await api(`${base}/reel-plan/ideas`,{confirm:true});});
  if(a==='make'){
   const usd=t.dataset.usd!==undefined,credits=Number(usd?t.dataset.usd:t.dataset.credits),max=Number(t.dataset.max);
+  $('#confirm-look').innerHTML=usd?renderConfirmLook(S.kit?.saved):'';
   $('#confirm-text').textContent=usd?`This spends about $${credits.toFixed(2)} on your Gemini key (up to $${max.toFixed(2)} if a part needs its one retry). Each part is checked before the next one is paid for.`:`This spends ${credits} Higgsfield credits (up to ${max} if shots need their one retry). You have ${S.balance??'?'} credits. Each shot is checked before the next one is paid for.`;
   $('#confirm').returnValue='';$('#confirm').showModal();
   $('#confirm').addEventListener('close',()=>{if($('#confirm').returnValue!=='ok')return;act(async()=>{S.make={...(await api(`${base}/reel-make`,{confirm:true,mode:S.mode,confirmCredits:credits})),reels:S.make?.reels||[]};});},{once:true});

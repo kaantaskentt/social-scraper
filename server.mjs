@@ -75,15 +75,23 @@ const server=http.createServer(async(req,res)=>{
    if(req.method==='POST'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm the price first');json(res,202,await maker.start(job,{mode:data.mode,confirmCredits:Number(data.confirmCredits)}));return;}
    json(res,405,{error:'Method not allowed'});return;}
   // The channel kit (costs a few cents per picture): POST {confirm:true, redo?, format?} builds it; /approve marks it used.
-  const kitRoute=path.match(/^\/api\/runs\/([\w-]+)\/kit(?:\/(approve))?$/);
+  const kitRoute=path.match(/^\/api\/runs\/([\w-]+)\/kit(?:\/(approve|choose|voices))?$/);
   if(kitRoute){const job=pipeline.jobs.get(kitRoute[1]);if(!job){json(res,404,{error:'Run not found'});return;}
    if(req.method==='GET'&&!kitRoute[2]){json(res,200,await kits.status(job));return;}
    if(req.method==='POST'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm the price first');
-    if(kitRoute[2]){json(res,200,await kits.approve(job));return;}json(res,202,await kits.start(job,{redo:data.redo,format:data.format}));return;}
+    if(kitRoute[2]==='approve'){json(res,200,await kits.approve(job));return;}
+    // The hosts' designed voices (a few cents), for the preview; reels reuse them.
+    if(kitRoute[2]==='voices'){const k=await readFile(join(kits.dir(job.id),'kit.json'),'utf8').then(JSON.parse).catch(()=>null);if(!k?.pictures?.length)throw new Error('Draw your look first');const keys2=keys();if(!keys2.gemini)throw new Error('Add your Gemini key first (GEMINI_API_KEY)');
+     await maker.channelVoices(job.id,k,keys2,entry=>kits.spend(job.id,entry));json(res,200,{done:true});return;}
+    if(kitRoute[2]==='choose'){json(res,202,await kits.choose(job,{cast:Number.isInteger(data.cast)?data.cast:null,place:Number.isInteger(data.place)?data.place:null}));return;}json(res,202,await kits.start(job,{redo:data.redo,format:data.format}));return;}
    json(res,405,{error:'Method not allowed'});return;}
-  const kitFile=path.match(/^\/channels\/([\w-]+)\/kit\/((?:face|turn|body)\d-[0-9a-f]{12}\.jpg|(?:hands|place|scene)-[0-9a-f]{12}\.jpg)$/);
+  const kitFile=path.match(/^\/channels\/([\w-]+)\/kit\/((?:opt\d-)?(?:face|turn|body)\d-[0-9a-f]{12}\.jpg|(?:opt\d-)?(?:hands|place|scene)-[0-9a-f]{12}\.jpg|voice-[a-z0-9-]{1,40}\.wav)$/);
   if(kitFile){const file=join(kits.dir(kitFile[1]),kitFile[2]);let bytes;try{bytes=await readFile(file);}catch{res.writeHead(404);res.end();return;}
-   res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=31536000, immutable'});res.end(bytes);return;}
+   res.writeHead(200,{'Content-Type':kitFile[2].endsWith('.wav')?'audio/wav':'image/jpeg','Cache-Control':kitFile[2].endsWith('.wav')?'no-cache':'public, max-age=31536000, immutable'});res.end(bytes);return;}
+  // The feedback loop: one tap on a finished reel (👍 or 👎 with reasons).
+  const fb=path.match(/^\/api\/runs\/([\w-]+)\/reel-feedback$/);
+  if(fb){const job=pipeline.jobs.get(fb[1]);if(!job){json(res,404,{error:'Run not found'});return;}if(req.method!=='POST'){json(res,405,{error:'Method not allowed'});return;}
+   const data=await body(req);json(res,200,await maker.feedback(job,String(data.reelId||''),{verdict:data.verdict,reasons:Array.isArray(data.reasons)?data.reasons.map(String):[]}));return;}
   const made=path.match(/^\/channels\/([\w-]+)\/([\w-]+)\/(reel\.mp4|kit\.png|shot-[\w-]+\.mp4)$/);
   if(made){const file=join(pipeline.root,'channels',made[1],'reels',made[2],made[3]);let info;try{info=await stat(file);}catch{res.writeHead(404);res.end();return;}
    res.writeHead(200,{'Content-Type':made[3].endsWith('.png')?'image/png':'video/mp4','Content-Length':info.size,'Accept-Ranges':'bytes','Cache-Control':'no-cache'});streamFile(res,file);return;}
@@ -114,7 +122,7 @@ const server=http.createServer(async(req,res)=>{
    res.writeHead(200,{'Content-Type':'video/mp4','Accept-Ranges':'bytes','Content-Length':info.size,'Cache-Control':'no-cache'});streamFile(res,file);return;}
   const art=path.match(/^\/demo-art\/(\d+)\.svg$/);if(art){res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'});res.end(artwork(Number(art[1])));return;}
   const thumb=path.match(/^\/media\/([\w-]+)\/([\w-]+)$/);if(thumb){const job=pipeline.jobs.get(thumb[1]),post=job?.posts.find(p=>p.id===thumb[2]);if(!post?.thumbnailUrl){res.writeHead(404);res.end();return;}const file=join(pipeline.root,'media',post.id+'.img');let bytes;try{bytes=await readFile(file);}catch{if(!mediaPending.has(file))mediaPending.set(file,mediaTask(async()=>{const result=await download(post.thumbnailUrl,8*1024*1024);if(!/^image\/(jpeg|png|webp)/.test(result.type))throw new Error('Unsupported thumbnail format');await writeFile(file,result.bytes);return result.bytes;}).finally(()=>mediaPending.delete(file)));bytes=await mediaPending.get(file);}const type=bytes[0]===0x89?'image/png':bytes.toString('ascii',8,12)==='WEBP'?'image/webp':'image/jpeg';res.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=86400'});res.end(bytes);return;}
-  const files={'/record':'record.html','/record.js':'record.js','/record.css':'record.css','/':'flow.html','/lab':'index.html','/flow.js':'flow.js','/flow.css':'flow.css','/flow-views.mjs':'flow-views.mjs','/app.js':'app.js','/research.mjs':'research.mjs','/money-view.mjs':'money-view.mjs','/anatomy-view.mjs':'anatomy-view.mjs','/replicate-view.mjs':'replicate-view.mjs','/studio-view.mjs':'studio-view.mjs','/reel-plan-view.mjs':'reel-plan-view.mjs','/shotlist-text.mjs':'shotlist-text.mjs','/shot-lines.mjs':'shot-lines.mjs','/secret-view.mjs':'secret-view.mjs','/secret-labels.mjs':'secret-labels.mjs','/secret-mechanisms.mjs':'secret-mechanisms.mjs','/handles.mjs':'handles.mjs','/styles.css':'styles.css','/theme.css':'theme.css','/money/index.mjs':'money/index.mjs','/money/1.0.mjs':'money/1.0.mjs'};
+  const files={'/record':'record.html','/record.js':'record.js','/record.css':'record.css','/':'flow.html','/lab':'index.html','/flow.js':'flow.js','/flow.css':'flow.css','/flow-views.mjs':'flow-views.mjs','/scan-map.mjs':'scan-map.mjs','/app.js':'app.js','/research.mjs':'research.mjs','/money-view.mjs':'money-view.mjs','/anatomy-view.mjs':'anatomy-view.mjs','/replicate-view.mjs':'replicate-view.mjs','/studio-view.mjs':'studio-view.mjs','/reel-plan-view.mjs':'reel-plan-view.mjs','/shotlist-text.mjs':'shotlist-text.mjs','/shot-lines.mjs':'shot-lines.mjs','/secret-view.mjs':'secret-view.mjs','/secret-labels.mjs':'secret-labels.mjs','/secret-mechanisms.mjs':'secret-mechanisms.mjs','/handles.mjs':'handles.mjs','/styles.css':'styles.css','/theme.css':'theme.css','/money/index.mjs':'money/index.mjs','/money/1.0.mjs':'money/1.0.mjs'};
   if(files[path]){const file=join(ROOT,'public',files[path]);const content=await readFile(file);res.writeHead(200,{'Content-Type':path.endsWith('.css')?'text/css':path.endsWith('.js')||path.endsWith('.mjs')?'text/javascript':'text/html','Cache-Control':'no-cache'});res.end(content);return;}
   json(res,404,{error:'Not found'});
  }catch(e){json(res,400,{error:e.message||'Request failed'});}

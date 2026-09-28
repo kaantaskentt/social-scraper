@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,readFile,readdir,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {FORMATS,winnerCounts,formatRequest,formatWhy,expertLook,castSize,kitPrompt,checkKit,picturePlan,checkVerdict,estimateKit,STUDY_PROMPT} from '../lib/kit.mjs';
+import {FORMATS,winnerCounts,formatRequest,formatWhy,expertLook,castSize,kitPrompt,checkKit,picturePlan,checkVerdict,estimateKit,STUDY_PROMPT,kitOptions,optionsRequest,pickBest} from '../lib/kit.mjs';
 import {KitBuilder} from '../lib/kit-run.mjs';
 
 const winner=(id,labels,x=5)=>({id,group:'winner',xNormal:x,labels});
@@ -84,11 +84,21 @@ test('picture check: code decides from what Gemini saw',()=>{
  assert.deepEqual(checkVerdict({...ok,people_count:3},turn).problems,[]); // a sheet shows the same person three times
  assert.deepEqual(checkVerdict({...ok,people_count:1},place).problems,['1 people instead of 0']);
  assert.deepEqual(checkVerdict({...ok,people_count:2},scene).problems,['2 people instead of 1']);
+ assert.deepEqual(checkVerdict({...ok,people_count:1},{...face,role:'opt2-face0'}).problems,[]);assert.deepEqual(checkVerdict({...ok,people_count:1},{...place,role:'opt1-place'}).problems,['1 people instead of 0']);
 });
 
-test('the price covers every picture with a check, and the limit allows one retry each',()=>{
- const e=estimateKit('ai_host',1);assert.equal(e.pictures,5);assert.ok(e.usd>0.35&&e.usd<0.5);assert.ok(e.ceiling>e.usd*1.8);
- assert.equal(estimateKit('ai_host',2).pictures,8);assert.equal(estimateKit('hands_pov').pictures,3);assert.equal(estimateKit('visuals').pictures,2);
+test('the price covers the options, the chosen sheet and a check each; the limit allows one retry each',()=>{
+ const e=estimateKit('ai_host',1);assert.equal(e.pictures,3+2+2+1);assert.ok(e.usd>0.55&&e.usd<0.7);assert.ok(e.ceiling>e.usd*1.8);
+ assert.equal(estimateKit('ai_host',2).pictures,6+2+4+1);assert.equal(estimateKit('hands_pov').pictures,2+1+1);assert.equal(estimateKit('visuals').pictures,2+1);
+});
+
+test('options: up to 3 host options of the right size and 3 places; Jev picks the best that passed its checks',()=>{
+ const k=kit({alt_casts:[[{...host,name:'Ada'}],[{...host,name:'Bo'},{...host,name:'Cy'}]],alt_places:['A green tiled kitchen','']});
+ const o=kitOptions(k,'ai_host',1);assert.deepEqual(o.casts.map(c=>c[0].name),['Mira','Ada']);assert.equal(o.places.length,2);
+ assert.deepEqual(kitOptions(k,'hands_pov',1).casts,[]);
+ const req=optionsRequest(k,{name:'n'},o.casts,o.places.map(t=>({text:t})));assert.deepEqual(Object.keys(req.questions),['cast_0','cast_1','place_0','place_1']);
+ assert.deepEqual(pickBest([2.1,2.8,1],[true,true,true]),{index:1,score:2.8,why:"Jev's pick: the best fit for the channel (2.8 of 3; next best 2.1)."});
+ assert.equal(pickBest([2.1,2.8],[true,false]).index,0);
 });
 
 // The builder, end to end with fake models.
@@ -100,14 +110,17 @@ async function setup(){
 }
 const study={people:[{role:'host',look:'a man',manner:'calm'}],place:'kitchen',camera:'handheld',light:'daylight',colors:['white'],props:['jar'],voice:'calm',music:'none',natural_sounds:'crunch',text_style:'captions',edit:'fast',signature:'a snap',style:'real_footage'};
 const seenOk={shows:'fine',match:3,text_visible:false,broken:false,people_count:1,same_person:'yes',looks_like_original:'no'};
-function fakes({kits=[kit()],checks=()=>seenOk,format='ai_host'}={}){
- const calls={watch:0,write:0,image:0,check:0,jev:0,prompts:[],imageRefs:[]};let k=0;
+const optKit=(o={})=>kit({alt_casts:[[{...host,name:'Ada',look:'woman in her twenties, tall, long black curly hair'}],[{...host,name:'Bo',look:'man in his fifties, stocky, grey buzz cut'}]],alt_places:['A green tiled kitchen','A wooden farmhouse kitchen'],...o});
+// People in a picture follow its prompt: none in a place, one in a face or sheet, the cast in a scene.
+const people=t=>/Empty, ready for filming/.test(t)?0:/single frame/.test(t)?1:1;
+function fakes({kits=[optKit()],checks=t=>({...seenOk,people_count:people(t)}),format='ai_host',scores={cast_0:2.1,cast_1:2.8,cast_2:1.5,place_0:2.6,place_1:2,place_2:1}}={}){
+ const calls={watch:0,write:0,image:0,check:0,jev:0,prompts:[],imageRefs:[],jevStates:[]};let k=0;
  const gemini=async({model,parts,schema})=>{
   if(schema.required.includes('signature')){calls.watch++;return {json:study,costUsd:0.01};}
   if(schema.required.includes('assets')){calls.write++;calls.prompts.push(parts[0].text);return {json:kits[Math.min(k++,kits.length-1)],costUsd:0.05};}
-  calls.check++;const people=parts[parts.length-1].text;return {json:checks(people,calls.check),costUsd:0.002};};
- const image=async({prompt,refs})=>{calls.image++;calls.imageRefs.push(refs.length);return {data:Buffer.from(`img ${calls.image} ${prompt.slice(0,20)}`),mime:'image/jpeg',costUsd:0.067};};
- const jev=async()=>{calls.jev++;return {answers:{format:{choice:format}}};};
+  calls.check++;return {json:checks(parts[parts.length-1].text,calls.check),costUsd:0.002};};
+ const image=async({prompt,refs})=>{calls.image++;calls.imageRefs.push(refs.length);return {data:Buffer.from(`img ${calls.image} ${prompt.slice(0,40)}`),mime:'image/jpeg',costUsd:0.067};};
+ const jev=async req=>{calls.jev++;calls.jevStates.push(req.state);return req.questions.format?{answers:{format:{choice:format}}}:{answers:Object.fromEntries(Object.keys(req.questions).map(q=>[q,{score:scores[q]??1}]))};};
  const frame=async()=>Buffer.from('original frame');
  return {calls,opts:{gemini,image,jev,frame}};
 }
@@ -115,67 +128,69 @@ function fakes({kits=[kit()],checks=()=>seenOk,format='ai_host'}={}){
 const until=async(b,job)=>{const end=Date.now()+10000;while(Date.now()<end){const s=await b.status(job);if(s.state!=='working')return s;await new Promise(r=>setTimeout(r,5));}throw new Error('stuck');};
 const keys=()=>({gemini:'g',jev:'j'});
 
-test('build: studies 3 winners, Jev picks the format, writes the kit, draws and checks every picture, saves it',async()=>{
- const {root,job}=await setup();const {calls,opts}=fakes();
- // The last test-scene check sees 1 person: pass. Place sees 0.
- opts.gemini=((g)=>async a=>{const r=await g(a);if(a.schema.required.includes('looks_like_original')&&/Empty, ready for filming/.test(a.parts.at(-1).text))r.json={...r.json,people_count:0};return r;})(opts.gemini);
- const b=new KitBuilder(root,keys,opts);await b.start(job);const s=await until(b,job);
- assert.equal(s.state,'done',s.error);const k=s.saved;
- assert.equal(calls.watch,3);assert.equal(calls.jev,1);assert.equal(calls.write,1);assert.equal(calls.image,5);assert.equal(calls.check,5);
- assert.deepEqual(calls.imageRefs,[0,1,1,0,2]);
- assert.equal(k.format,'ai_host');assert.equal(k.byJev,true);assert.equal(k.expert,true);assert.equal(k.formatWhy,'In 2 of their 3 best reels, people are on camera.');
- assert.deepEqual(k.pictures.map(p=>p.role),['face0','turn0','body0','place','scene']);assert.ok(k.pictures.every(p=>p.check.pass&&p.attempts===1));
- assert.match(k.pictures[0].url,/^\/channels\/r1\/kit\/face0-[0-9a-f]{12}\.jpg$/);
- assert.match(calls.prompts[0],/never with a white coat/);
- const ledger=JSON.parse(await readFile(join(root,'channels','r1','spend.json'),'utf8'));assert.equal(ledger.length,3+1+5+5);
- assert.equal(Math.round(k.costUsd*1000),Math.round((0.03+0.05+5*0.067+5*0.002)*1000));
+test('build: study, Jev picks the format, the look is written with 3 host and 3 place options, each drawn and checked, Jev picks one',async()=>{
+ const {root,job}=await setup();const {calls,opts}=fakes();const b=new KitBuilder(root,keys,opts);
+ await b.start(job);const s=await until(b,job);assert.equal(s.state,'done',s.error);const k=s.saved;
+ assert.equal(k.stage,'choose');assert.equal(calls.watch,3);assert.equal(calls.write,1);assert.equal(calls.image,6);assert.equal(calls.check,6);
+ assert.deepEqual(k.options.casts.map(c=>c.hosts[0].name),['Mira','Ada','Bo']);assert.deepEqual(k.options.casts.map(c=>c.score),[2.1,2.8,1.5]);
+ assert.equal(k.options.pick.cast.index,1);assert.match(k.options.pick.cast.why,/2\.8 of 3; next best 2\.1/);assert.equal(k.options.pick.place.index,0);
+ assert.match(k.options.casts[0].hosts[0].picture.url,/^\/channels\/r1\/kit\/opt0-face0-[0-9a-f]{12}\.jpg$/);assert.equal(calls.jevStates[1].casts[1][0].name,'Ada');
+ await assert.rejects(b.approve(job),/Choose your host and place first/);
  await rm(root,{recursive:true});
 });
 
-test('a failed picture is drawn once more with its problems; a second failure is kept and flagged, not hidden',async()=>{
- const {root,job}=await setup();const {calls,opts}=fakes({checks:(t)=>/Plain light grey background, soft even light/.test(t)?{...seenOk,text_visible:true}:{...seenOk,people_count:/Empty, ready/.test(t)?0:1}});
- const b=new KitBuilder(root,keys,opts);await b.start(job);const s=await until(b,job);
- const face=s.saved.pictures[0];assert.equal(face.attempts,2);assert.equal(face.check.pass,false);assert.deepEqual(face.check.problems,['letters or a logo are visible']);
- assert.equal(calls.image,6);await rm(root,{recursive:true});
+test('choose: the full sheet is drawn for the chosen host and place; their option pictures are reused, not paid again',async()=>{
+ const {root,job}=await setup();const {calls,opts}=fakes();const b=new KitBuilder(root,keys,opts);
+ await b.start(job);await until(b,job);await assert.rejects(b.choose(job,{cast:7}),/Choose one of the host options/);
+ await b.choose(job,{cast:1,place:2});const s=await until(b,job);assert.equal(s.state,'done',s.error);const k=s.saved;
+ assert.equal(k.stage,'ready');assert.deepEqual(k.chose,{cast:1,place:2});assert.equal(k.kit.cast[0].name,'Ada');assert.equal(k.kit.place,'A wooden farmhouse kitchen');
+ assert.deepEqual(k.pictures.map(p=>p.role),['face0','turn0','body0','place','scene']);
+ assert.equal(calls.image,6+3); // face and place reused; every angle, full outfit and a scene are new
+ assert.equal(k.kit.cast[0].picture,undefined);assert.equal((await b.approve(job)).approved,true);
+ await rm(root,{recursive:true});
 });
 
-test('new character: same format without Jev, the old hosts are named to avoid, the place picture is reused, the old kit is kept',async()=>{
- const {root,job}=await setup();const placeFix=g=>async a=>{const r=await g(a);if(a.schema.required.includes('looks_like_original')&&/Empty, ready/.test(a.parts.at(-1).text))r.json={...r.json,people_count:0};return r;};
- const first=fakes();first.opts.gemini=placeFix(first.opts.gemini);const b=new KitBuilder(root,keys,first.opts);await b.start(job);await until(b,job);
- const second=fakes({kits:[kit({cast:[{...host,name:'Lale',look:'woman in her forties, tall, long black curly hair'}]})]});second.opts.gemini=placeFix(second.opts.gemini);
- const b2=new KitBuilder(root,keys,second.opts);await b2.start(job,{redo:'character'});const s=await until(b2,job);
- assert.equal(s.state,'done',s.error);assert.equal(second.calls.jev,0);assert.equal(second.calls.watch,0);assert.match(second.calls.prompts[0],/clearly different.*Mira/);
- assert.equal(second.calls.image,4); // face, sheet, body, scene; the place is unchanged
- assert.equal(s.saved.kit.cast[0].name,'Lale');assert.equal(s.saved.approved,false);
+test('choose without a choice takes Jev\'s pick; a failed picture is drawn once more, a second failure is kept and flagged',async()=>{
+ const {root,job}=await setup();const {calls,opts}=fakes({checks:t=>/three views side by side/.test(t)?{...seenOk,text_visible:true}:{...seenOk,people_count:people(t)}});
+ const b=new KitBuilder(root,keys,opts);await b.start(job);await until(b,job);await b.choose(job);const s=await until(b,job);
+ assert.equal(s.saved.kit.cast[0].name,'Ada');const turn=s.saved.pictures.find(p=>p.role==='turn0');assert.equal(turn.attempts,2);assert.deepEqual(turn.check.problems,['letters or a logo are visible']);
+ assert.equal(calls.image,6+4);await rm(root,{recursive:true});
+});
+
+test('new host: same format without Jev\'s format question, every earlier option is named to avoid, the old look is kept',async()=>{
+ const {root,job}=await setup();const first=fakes();const b=new KitBuilder(root,keys,first.opts);await b.start(job);await until(b,job);await b.choose(job);await until(b,job);
+ const second=fakes({format:'nonsense'});const b2=new KitBuilder(root,keys,second.opts);await b2.start(job,{redo:'character'});const s=await until(b2,job);
+ assert.equal(s.state,'done',s.error);assert.equal(s.saved.stage,'choose');assert.match(second.calls.prompts[0],/clearly different.*Mira.*Ada.*Bo/);assert.equal(second.calls.watch,0);
  assert.ok((await readdir(join(root,'channels','r1','kit'))).some(f=>/^kit-.*\.json$/.test(f)));
  await rm(root,{recursive:true});
 });
 
 test('format switch uses Kaan\'s choice; a kit that misfits twice stops loudly; guards before paying',async()=>{
  const {root,job}=await setup();
- const bad=fakes({kits:[kit()]});const b=new KitBuilder(root,keys,bad.opts);
+ const bad=fakes({kits:[optKit()]});const b=new KitBuilder(root,keys,bad.opts);
  await assert.rejects(b.start(job,{redo:'format',format:'hands_pov'}),/Build the kit first/);
  await assert.rejects(b.start(job,{redo:'format',format:'nonsense'}),/Choose a format/);
  await assert.rejects(new KitBuilder(root,()=>({jev:'j'}),bad.opts).start(job),/Gemini key/);
  await assert.rejects(new KitBuilder(root,keys,bad.opts).start({id:'none',creator:'x'}),/Secret first/);
- const hands=fakes({format:'hands_pov',kits:[kit()]});const b2=new KitBuilder(root,keys,hands.opts);await b2.start(job);const s=await until(b2,job);
+ const hands=fakes({format:'hands_pov',kits:[optKit()]});const b2=new KitBuilder(root,keys,hands.opts);await b2.start(job);const s=await until(b2,job);
  assert.equal(s.state,'failed');assert.match(s.error,/did not fit the format twice.*no hosts/);assert.equal(hands.calls.write,2);assert.equal(hands.calls.image,0);
  await rm(root,{recursive:true});
 });
 
-test('approve marks the kit as the one to use',async()=>{
- const {root,job}=await setup();const {opts}=fakes();const b=new KitBuilder(root,keys,opts);
- await assert.rejects(b.approve(job),/Build the kit first/);await b.start(job);await until(b,job);
- assert.equal((await b.approve(job)).approved,true);assert.equal((await b.status(job)).saved.approved,true);
+test('hands only: no host options, 3 places, then the hands, place and scene',async()=>{
+ const {root,job}=await setup();const handsKit=kit({cast:[],hands:'slim hands, grey sleeves',alt_casts:[],alt_places:['A marble counter','A butcher block']});
+ const {calls,opts}=fakes({format:'hands_pov',kits:[handsKit],checks:t=>({...seenOk,people_count:0})});const b=new KitBuilder(root,keys,opts);
+ await b.start(job);let s=await until(b,job);assert.equal(s.saved.options.casts.length,0);assert.equal(s.saved.options.pick.cast,null);assert.equal(calls.image,3);
+ await b.choose(job,{place:1});s=await until(b,job);assert.equal(s.saved.kit.place,'A marble counter');assert.deepEqual(s.saved.pictures.map(p=>p.role),['hands','place','scene']);assert.equal(calls.image,3+2);
  await rm(root,{recursive:true});
 });
 
-test('draw flagged pictures again: same kit text, no study, Jev or writing; only the failed picture is paid again',async()=>{
- const {root,job}=await setup();const first=fakes({checks:t=>/single frame/.test(t)?{...seenOk,text_visible:true}:{...seenOk,people_count:/Empty, ready/.test(t)?0:1}});
- const b=new KitBuilder(root,keys,first.opts);await b.start(job);const s1=await until(b,job);assert.equal(s1.saved.pictures.at(-1).check.pass,false);
- const second=fakes({checks:t=>({...seenOk,people_count:/Empty, ready/.test(t)?0:1})});const b2=new KitBuilder(root,keys,second.opts);
- await b2.start(job,{redo:'pictures'});const s=await until(b2,job);
+test('draw flagged pictures again: same look and choice; only the failed picture is paid again',async()=>{
+ const {root,job}=await setup();const first=fakes({checks:t=>/single frame/.test(t)?{...seenOk,text_visible:true}:{...seenOk,people_count:people(t)}});
+ const b=new KitBuilder(root,keys,first.opts);await b.start(job);await until(b,job);await assert.rejects(b.start(job,{redo:'pictures'}),/Choose your host and place first/);
+ await b.choose(job);const s1=await until(b,job);assert.equal(s1.saved.pictures.at(-1).check.pass,false);
+ const second=fakes();const b2=new KitBuilder(root,keys,second.opts);await b2.start(job,{redo:'pictures'});const s=await until(b2,job);
  assert.equal(s.state,'done',s.error);assert.equal(second.calls.write,0);assert.equal(second.calls.jev,0);assert.equal(second.calls.watch,0);
- assert.equal(second.calls.image,1);assert.equal(s.saved.pictures.at(-1).check.pass,true);assert.deepEqual(s.saved.kit,s1.saved.kit);
+ assert.equal(second.calls.image,1);assert.equal(s.saved.pictures.at(-1).check.pass,true);assert.deepEqual(s.saved.kit,s1.saved.kit);assert.deepEqual(s.saved.chose,s1.saved.chose);
  await rm(root,{recursive:true});
 });

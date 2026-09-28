@@ -99,9 +99,15 @@ test('kit path: ideas and script use the kit; the maker films two parts, checks 
  await planner.startIdeas(job);let s=await until(()=>planner.status(job));assert.equal(s.plan.mode,'kit');assert.equal(s.plan.kitAt,kitSaved.createdAt);
  await planner.startScript(job,0);s=await until(()=>planner.status(job));assert.equal(s.state,'ready',s.error);assert.equal(s.plan.check.pass,true);assert.equal(s.plan.price.usd,2.17);
  const g=fakeGoogle(),checks=[];let rendered;
- const watch=async({parts})=>{checks.push(parts.length);return {json:{shows:'ok',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'},costUsd:0.003};};
+ // The judge answers the scoring rubric: the winners 7 everywhere, our reel 6 with a weak hook (4).
+ const scoreOf=n=>({first_second:'x',stops_scroll:n,visuals:n,sound:n,voice:n,payoff:n,pace:n,looks_real:n,keep_watching:n,best_moment:'b',weakest_moment:'w',fix:'Open on the fizz.'});
+ const scored=[];const watch=async({parts,schema})=>{if(schema.required.includes('keep_watching')){const f=String(parts[0].video);scored.push(f);return {json:f==='v'?scoreOf(7):{...scoreOf(6),stops_scroll:4},costUsd:0.001};}
+  checks.push(parts.length);return {json:{shows:'ok',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'},costUsd:0.003};};
  let seconds=20;const spoken=[];const voices={design:async({name})=>({id:`voice_${name}`,sample:null,costUsd:0.02}),speak:async({voice,text})=>{spoken.push(text);return {wav:Buffer.from('w'),costUsd:0.001};},mix:async a=>{await writeFile(a.out,'MIX');return a.out;}};
  const maker=new ReelMaker(root,keys,{gemini:watch,jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async f=>/line-/.test(f)?1:seconds,voices,cut:async(i,o)=>{await writeFile(o,'cut');return o;},render:async a=>{rendered=a;await writeFile(a.out,'REEL');return {seconds:22.5};}});
+ // Two winners with saved videos, to score against.
+ await writeFile(join(root,'secret','r1','secret.json'),JSON.stringify({account:'ken',secret:{headline:'h'},stats:{differences:[],house:[]},picked:[{id:'w1',group:'winner',xNormal:9},{id:'w2',group:'winner',xNormal:8}]}));
+ await mkdir(join(root,'videos','r1'),{recursive:true});for(const id of ['w1','w2'])await writeFile(join(root,'videos','r1',`${id}.mp4`),'v');
  await assert.rejects(maker.start(job,{confirmCredits:1.5}),/price changed to \$2\.17/);
  const started=await maker.start(job,{confirmCredits:2.17});assert.equal(started.ceiling,4.34);
  await assert.rejects(maker.start(job,{confirmCredits:2.17}),/already being made/);
@@ -113,6 +119,8 @@ test('kit path: ideas and script use the kit; the maker films two parts, checks 
  assert.equal(m.reels[0].voiceMode,'designed');assert.equal(spoken.length,4);assert.match(g.calls.post[0].input.at(-1).text,/No dialogue/);
  assert.equal(rendered.sayText,spokenText(script()));assert.equal(rendered.endCard.title,'Kitchen Check');assert.equal(rendered.endCard.subtitle,'Follow for the next one');
  const reel=m.reels[0];assert.equal(reel.mode,'kit');assert.equal(reel.idea,0);assert.match(reel.caption,/Our hosts are AI\.$/);assert.match(reel.url,/^\/channels\/r1\/0-revive-celery-[0-9a-f]{6}\/reel\.mp4$/);
+ // Scored against the winners: 2 winners × 3 + our reel × 3; winners cached for the next reel.
+ assert.equal(scored.length,9);assert.equal(reel.score.share,83); // 5.8 of 10 (shown rounded) against the winners 7assert.equal(reel.score.weakest,'stops_scroll');assert.equal(reel.score.fix,'Open on the fizz.');
  const partCost=(1000*1.5+57920*17.5)/1e6;assert.ok(Math.abs(reel.spentUsd-2*partCost)<1e-3);
  const ledger=JSON.parse(await readFile(join(ch,'spend.json'),'utf8')).map(x=>x.step);assert.deepEqual(ledger.filter(x=>/part/.test(x)),['reel part-1','check part-1','reel part-2','check part-2']);
  // Asked again after it is done: nothing new is filmed or paid.

@@ -57,7 +57,8 @@ test('every answer Jev can give has a plain sentence, and the cards show it',()=
  const html=renderSecret({account:'ken',status:{state:'done',saved},imageFor:img});assert.match(html,/It goes step by step, like a recipe\./);assert.match(html,/The action is already happening in the first second\./);
 });
 
-import {latestRuns,madeIdeas,renderKitScript} from '../public/flow-views.mjs';
+import {latestRuns,madeIdeas,renderKitScript,compareSentence,renderChannelPreview,handleOf,renderReelScore,renderLearned,FB_REASONS,renderConfirmLook} from '../public/flow-views.mjs';
+import {REASONS} from '../lib/feedback.mjs';
 test('one card per account (the fullest scan); made ideas are marked and show their video instead of a price',()=>{
  assert.deepEqual(latestRuns([{id:'a',creator:'ken',count:20,createdAt:'1'},{id:'b',creator:'ken',count:100,createdAt:'0'},{id:'c',creator:'nude',count:5,createdAt:'2'}]).map(r=>r.id),['b','c']);
  assert.deepEqual([...madeIdeas([{id:'0-celery'},{id:'2-eggs'}])],[0,2]);
@@ -138,4 +139,51 @@ test('make with a look: an old hands-only plan asks for new ideas; made badges o
 test('ready: kit reels show dollars, older reels show credits',()=>{
  const html=renderReady({reels:[{id:'a',url:'/a.mp4',seconds:22.4,spentUsd:2.07,caption:'x'},{id:'b',url:'/b.mp4',seconds:30,spent:76,caption:'y'}]});
  assert.match(html,/22 s · \$2\.07/);assert.match(html,/30 s · 76 credits/);
+});
+
+test('secret comparison reads as one plain sentence, never as numbers soup',()=>{
+ assert.equal(compareSentence({winners:12,flops:5,perSide:15}),'12 of their 15 best reels do this, but only 5 of their 15 weakest.');
+ assert.equal(compareSentence({winners:3,flops:9,perSide:15}),'Only 3 of their 15 best reels do this, but 9 of their 15 weakest do.');
+});
+
+test('kit choosing: 3 host and place options, Jev\'s pick marked and preselected, a tap only marks, one button draws',()=>{
+ const opt=(name,score,pass=true)=>({hosts:[{name,outfit:`${name}'s navy tee`,picture:{url:`/channels/r/kit/opt0-face0-${'a'.repeat(12)}.jpg`,check:{pass,problems:pass?[]:['letters or a logo are visible']}}}],score});
+ const saved={stage:'choose',format:'ai_host',cast:1,costUsd:0.45,kit:{name:'Kitchen Check',promise:'Tricks.'},options:{casts:[opt('Mira',2.1),opt('Ada',2.8),opt('Bo',1.5,false)],places:[{text:'White kitchen',score:2.6,picture:{url:'/p0.jpg',check:{pass:true}}},{text:'Green kitchen',score:2,picture:{url:'/p1.jpg',check:{pass:true}}}],
+  pick:{cast:{index:1,score:2.8,why:"Jev's pick: the best fit for the channel (2.8 of 3; next best 2.1)."},place:{index:0,score:2.6,why:"Jev's pick: the best fit for the channel (2.6 of 3; next best 2.0)."}}}};
+ const html=renderKit({account:'ken',status:{state:'done',saved}});
+ assert.match(html,/1 · Pick your host/);assert.match(html,/2 · Pick the place/);assert.match(html,/2\.8 of 3; next best 2\.1/);
+ assert.match(html,/data-kit-cast="1" aria-pressed="true"><span class="pill pill-ok opt-pick">Jev's pick/);assert.match(html,/data-kit-place="0" aria-pressed="true">/);
+ assert.match(html,/Check: letters or a logo are visible/);assert.match(html,/data-act="kit-choose"[^>]*>Draw my look · about \$0\.21/);assert.match(html,/locked: the same face in every reel/);
+ assert.doesNotMatch(html,/kit-approve/);
+ const mine=renderKit({account:'ken',status:{state:'done',saved},pick:{cast:2,place:1}});assert.match(mine,/data-kit-cast="2" aria-pressed="true"/);assert.match(mine,/data-kit-place="1" aria-pressed="true"/);
+ const hands=renderKit({account:'ken',status:{state:'done',saved:{...saved,options:{...saved.options,casts:[],pick:{cast:null,place:saved.options.pick.place}}}}});
+ assert.doesNotMatch(hands,/Pick your host/);assert.match(hands,/1 · Pick the place/);assert.match(hands,/Draw my look · about \$0\.14/);
+});
+
+test('channel preview: a profile with the host as avatar, the promise, AI disclosed, made reels then upcoming frames, voices',()=>{
+ const k={kit:{name:'Food Fact Check!',promise:'Real tricks, tested.',cast:[{name:'Felix'}],assets:[{what:'Clear glass mugs'},{what:'Shocked point'}],palette:[{hex:'#112233'},{hex:'bad'}]},
+  pictures:[{role:'face0',url:'/f.jpg'},{role:'scene',url:'/s.jpg'},{role:'place',url:'/p.jpg'}]};
+ const html=renderChannelPreview(k,{reels:[{url:'/r1.mp4'}],voices:[{name:'Felix',url:'/v.wav'}]});
+ assert.equal(handleOf('Food Fact Check!'),'food.fact.check');assert.match(html,/@food\.fact\.check/);assert.match(html,/class="ig-avatar" src="\/f\.jpg"/);
+ assert.match(html,/Real tricks, tested\. · Our hosts are AI/);assert.match(html,/<b>1<\/b> posts/);assert.doesNotMatch(html,/followers/);
+ assert.ok(html.indexOf('/r1.mp4')<html.indexOf('/s.jpg'));assert.match(html,/data-voice="\/v\.wav"[^>]*>▶ Hear Felix/);
+ assert.match(html,/background:#112233/);assert.match(html,/background:#ddd/);
+ assert.match(renderChannelPreview(k,{}),/data-act="kit-voices"/);
+});
+
+test('feedback loop on screen: the score against the winners, one-tap verdict, reasons after 👎, what was learned',()=>{
+ assert.deepEqual(FB_REASONS,REASONS); // the page and the engine use the same reasons
+ const r={id:'0-fizz-abc',mode:'kit',score:{share:96,weakest:'stops_scroll'}};
+ const html=renderReelScore(r);assert.match(html,/<b>96%<\/b> of their winners' score · weakest: the first second/);assert.match(html,/data-fb="up"[^>]*>👍 Post it/);assert.doesNotMatch(html,/data-fb-reason/);
+ const down=renderReelScore({...r,feedback:{verdict:'down',reasons:['voice']}});assert.match(down,/data-fb-reason="voice" data-reel="0-fizz-abc">The voice/);assert.match(down,/chip chip-btn is-on" data-fb-reason="voice"/);
+ assert.match(renderReelScore(r,{open:true}),/data-fb-reason="boring_start"/);
+ assert.match(renderReelScore({...r,score:null,scoreError:'Gemini busy'}),/Not scored: Gemini busy/);assert.doesNotMatch(renderReelScore({id:'x',score:null}),/data-fb/);
+ const learned=renderLearned([{feedback:{verdict:'up'}},{feedback:{verdict:'down',reasons:['voice','too_slow']}},{feedback:{verdict:'down',reasons:['voice']}}]);
+ assert.match(learned,/1 reel you liked\. The next scripts fix: The voice \(2×\), Too slow \(1×\)\./);assert.equal(renderLearned([]),'');
+});
+
+test('the confirm pop-up shows the hosts, their voices and the place the video will use',()=>{
+ const k={kit:{cast:[{name:'Felix'},{name:'Stella'}]},voices:{Felix:{sample:'/v.wav'}},pictures:[{role:'face0',url:'/f0.jpg'},{role:'face1',url:'/f1.jpg'},{role:'place',url:'/p.jpg'},{role:'scene',url:'/s.jpg'}]};
+ const html=renderConfirmLook(k);assert.match(html,/src="\/f0\.jpg".*Felix <button[^>]*data-voice="\/v\.wav"/s);assert.match(html,/src="\/f1\.jpg".*Stella<\/figcaption>/s);assert.match(html,/src="\/p\.jpg".*The place/s);assert.doesNotMatch(html,/s\.jpg/);
+ assert.equal(renderConfirmLook(null),'');
 });

@@ -17,8 +17,12 @@ test('server: the kit needs a confirm and a Secret, serves only kit pictures, an
   assert.match((await (await post('',{})).json()).error,/Confirm/);
   assert.match((await (await post('',{confirm:true})).json()).error,/Secret first/);
   assert.match((await (await post('/approve',{confirm:true})).json()).error,/Build the kit first/);
+  assert.match((await (await post('/voices',{confirm:true})).json()).error,/Draw your look first/);
+  assert.match((await (await post('/choose',{confirm:true})).json()).error,/no options to choose from/);
   assert.equal((await fetch(`${base}/api/runs/run1/kit`,{method:'POST',body:'{"confirm":true}'})).status,403);
   const pic=await fetch(`${base}/channels/run1/kit/face0-0123456789ab.jpg`);assert.equal(pic.status,200);assert.equal(pic.headers.get('content-type'),'image/jpeg');assert.equal(await pic.text(),'JPEG');
+  await writeFile(join(root,'channels','run1','kit','voice-leo.wav'),'RIFF');const wav=await fetch(`${base}/channels/run1/kit/voice-leo.wav`);assert.equal(wav.headers.get('content-type'),'audio/wav');
+  const opt=join(root,'channels','run1','kit','opt2-face0-0123456789ab.jpg');await writeFile(opt,'J');assert.equal((await fetch(`${base}/channels/run1/kit/opt2-face0-0123456789ab.jpg`)).status,200);
   assert.equal((await fetch(`${base}/channels/run1/kit/study.json`)).status,404);
   assert.equal((await fetch(`${base}/channels/run1/kit/..%2Fspend.json`)).status,404);
  }finally{child.kill();await rm(root,{recursive:true,force:true});}
