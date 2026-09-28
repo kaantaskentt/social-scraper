@@ -2,6 +2,7 @@
 // node scripts/make-reel.mjs <runId>        → prints each stage, then the finished reel with its checks
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
+import {lockChannel} from './lock.mjs';
 import {parseEnv} from 'node:util';
 import {ReelMaker} from '../lib/reel-make.mjs';
 
@@ -10,6 +11,7 @@ const read=p=>readFile(new URL(p,import.meta.url),'utf8').then(parseEnv).catch((
 const env={...await read('../../office/.env.local'),...await read('../../JEV/.env.local'),...process.env};
 const [runId]=process.argv.slice(2);
 const job=JSON.parse(await readFile(join(ROOT,'runs',`${runId}.json`),'utf8'));
+lockChannel(ROOT,runId,'make reel');
 const plan=JSON.parse(await readFile(join(ROOT,'channels',runId,'plan.json'),'utf8'));
 if(!plan.check?.pass)throw new Error('The current script has not passed Jev\'s check');
 const maker=new ReelMaker(ROOT,()=>({gemini:env.GEMINI_API_KEY,jev:env.TYPESAFE_API_KEY,groq:env.GROQ_API_KEY,anthropic:env.ANTHROPIC_API_KEY}));

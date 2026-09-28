@@ -299,3 +299,11 @@ test('a channel that teaches movements has no close-up quota and no payoff close
  assert.ok(readKitScriptCheck(raw,sc,kit,'animated','voiceover',true).problems.some(p=>/close-up right after/.test(p)));assert.ok(!readKitScriptCheck(raw,sc,kit,'animated','voiceover',false).problems.some(p=>/close-up right after/.test(p)));
  assert.match(kitScriptPrompt({title:'t'},kit,'animated',{},null,'voiceover',false),/teaches movements/);assert.doesNotMatch(kitScriptPrompt({title:'t'},kit,'animated',{},null,'voiceover',false),/Every payoff is shown in a close-up/);
 });
+
+test('a script that invents a pointless test is stopped (code: "Test Number" only in a reel about a test)',()=>{
+ const sc=(hook,says)=>({hook_title:hook,caption:'c?',parts:[0,1].map(()=>({beats:[{from:0,to:5,who:'Leo',does:'grates carrots',says,shot:'close-up'},{from:5,to:10,who:'Leo',does:'stirs oats',says:'Stir.',shot:'close-up'}]}))});
+ const kit={cast:[{name:'Leo'}],name:'k'};
+ assert.ok(scriptProblems(sc('Carrot cake oatmeal','Test Number One.'),kit,'ai_host').includes('It adds a pointless test the idea does not need'));
+ assert.ok(!scriptProblems(sc('Test your baking soda','Test Number One.'),kit,'ai_host').includes('It adds a pointless test the idea does not need'));
+ assert.ok(!scriptProblems(sc('Carrot cake oatmeal','Grate them.'),kit,'ai_host').includes('It adds a pointless test the idea does not need'));
+});

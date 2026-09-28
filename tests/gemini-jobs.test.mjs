@@ -72,3 +72,14 @@ test('a job Google refuses while it is polled is marked failed, so the next try 
  await assert.rejects(jobs.run('part-1',{input:[]}),/prohibited/);assert.equal(posts,2);
  await rm(dir,{recursive:true});
 });
+
+test('a refused prompt keeps its words (not the pictures) for diagnosis',async()=>{
+ const {mkdtemp,rm,readFile}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
+ const dir=await mkdtemp(join(tmpdir(),'gj-'));
+ try{
+  const fetchImpl=async()=>({ok:false,status:400,json:async()=>({error:{message:'Request blocked due to prohibited content guidelines.'}}),text:async()=>'{"error":{"message":"Request blocked due to prohibited content guidelines."}}'});
+  const jobs=new VideoJobs(dir,{key:'k',model:'m',fetchImpl,pollMs:0,sleep:async()=>{}});
+  await assert.rejects(jobs.run('part-1',{input:[{type:'image',data:'xx'},{type:'text',text:'Vance holds a plank'}]}));
+  const rec=JSON.parse(await readFile(join(dir,'jobs','part-1.json'),'utf8'));assert.equal(rec.status,'failed');assert.equal(rec.prompt,'Vance holds a plank');
+ }finally{await rm(dir,{recursive:true,force:true});}
+});

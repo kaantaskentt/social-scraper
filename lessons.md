@@ -16,3 +16,5 @@
 - 2026-09-28: Our reel judge scored reels consistently but picked winners at a coin flip on all 3 channels (43-53%, 209 reels). Test any scorer against real views before showing its number; a score that looks precise is not a prediction.
 - 2026-09-28: Rules written from one channel (Ken's "result up close") blocked every script of another (drzen teaches form, 70 of 90 reels have no result). Rules about format come from each channel's own data, never from the channel we built on first.
 - 2026-09-28: Gemini missed a cut-off voice line that code caught by comparing the transcript with the script. Anything checkable against the script is checked by code, not by asking a model.
+- 2026-09-28: Two makers on one channel at once: my manual run resumed a reel the batch was also making and paid $1.03 for a part twice. One maker per channel at a time; check `ps` before starting another.
+- 2026-09-28: An AI checker that looked good in one exam run flipped its verdict on 5 of 10 reels across three runs. Run any judge at least 3 times before trusting it, and keep deterministic code as the gate.
