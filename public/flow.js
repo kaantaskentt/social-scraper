@@ -118,23 +118,19 @@ async function refresh(){
   if(S.dna?.state==='working')S.dna=await currentApi(`${base}/dna`);
   // When the script is ready the answer is at the top of the page: bring it into view.
   if(S.plan?.state==='working'){S.plan=await currentApi(`${base}/reel-plan`);if(S.plan.state!=='working')scrollTo({top:0,behavior:'smooth'});}
-  if(S.make?.state==='working'){S.make=await currentApi(`${base}/reel-make`);if(S.make.state!=='working')S.balance=null;}
+  if(S.make?.state==='working'){S.make=await currentApi(`${base}/reel-make`);}
   if(S.copy?.picking?.state==='working'||S.copy?.batch?.items.some(i=>['working','waiting'].includes(i.state))){const was=S.copy;S.copy=await currentApi(`${base}/copy`);if(was?.picking?.state==='working'&&S.copy.picking?.state==='done')S.copyUnpicked=new Set();if(S.copy.batch&&!S.copy.batch.items.some(i=>['working','waiting'].includes(i.state)))S.make=await currentApi(`${base}/reel-make`);}
  }catch(e){if(S.runId!==id)return;S.error=e.message;}
  if(S.runId===id){render();poll();}
 }
 async function act(fn){if(S.busy)return;S.busy=true;S.error='';render();try{await fn();}catch(e){S.error=e.message;if($('#analysis').open&&$('#analysis-error'))$('#analysis-error').textContent=e.message+' Try again.';toast(e.message);}finally{S.busy=false;render();poll();}}
-// The Make step needs a current price and the balance; both are free to check.
+// The Make step needs a current price (free to check). It opens only with an approved look; reels are made on the Gemini key.
 async function prepareMake(){
- // With a look in use, reels are made on the Gemini key: no Higgsfield balance, and an old hands-only plan is not re-priced.
- const p=S.plan?.plan;if(p?.mode==='kit'||S.kit?.saved?.approved){if(p?.mode==='kit'&&p.script&&!Number.isFinite(p.price?.usd)&&!S.pricing)await reprice();return;}
- if(S.balance===null)loadBalance();
- if(!p?.script||(p.price&&p.price.kit!==undefined)||S.pricing)return;await reprice();
+ const p=S.plan?.plan;if(p?.mode==='kit'&&p.script&&!Number.isFinite(p.price?.usd)&&!S.pricing)await reprice();
 }
 async function reprice(){
  S.pricing=true;render();try{S.plan=await api(`/api/runs/${encodeURIComponent(S.runId)}/reel-plan/price`,{confirm:true});}catch(e){S.error=e.message;}finally{S.pricing=false;render();}
 }
-async function loadBalance(){try{S.balance=(await api('/api/higgsfield/balance')).credits;}catch(e){S.balance=null;S.error=e.message;}render();}
 
 async function handleClick(e,confirmed=false){
  const t=e.target.closest('[data-caption],[data-download],[data-preview],[data-copy-engine],[data-copy-pick],[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close],[data-kit-format],[data-kit-cast],[data-kit-place],[data-voice],[data-fb],[data-fb-reason],[data-voice-mode]');if(!t||t.disabled)return;

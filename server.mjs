@@ -22,7 +22,6 @@ import {DnaBuilder} from './lib/dna-run.mjs';
 import {ResultsTracker} from './lib/results.mjs';
 import {CopyStudio} from './lib/copy-run.mjs';
 import {Prep} from './lib/prep.mjs';
-import {higgsfieldBalance} from './lib/higgsfield-balance.mjs';
 import {score,LATEST} from './public/money/index.mjs';
 const ROOT=dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||5190),HOST='127.0.0.1';
@@ -74,7 +73,6 @@ const server=http.createServer(async(req,res)=>{
   if(path==='/api/connections'&&req.method==='POST'){const data=await body(req);for(const name of ['apify','groq','fireworks','jev','gemini'])if(typeof data[name]==='string'&&data[name].trim()){sessionKeys[name]=data[name].trim();verified[name]=false;}json(res,200,{saved:true});return;}
   if(path==='/api/connections/check'&&req.method==='POST'){const results=Object.fromEntries(await Promise.all(Object.entries(keys()).map(async([name,key])=>[name,await checkProvider(name,key)])));for(const [name,r]of Object.entries(results))verified[name]=r.verified;json(res,200,results);return;}
   if(path==='/api/events'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache',Connection:'keep-alive'});res.write(': connected\n\n');clients.add(res);req.on('close',()=>clients.delete(res));return;}
-  if(path==='/api/higgsfield/balance'){json(res,200,await higgsfieldBalance());return;}
   if(path==='/api/demo'){json(res,200,demo());return;}
   if(path==='/api/runs'&&req.method==='POST'){const data=await body(req);const job=await pipeline.create(data,data.rows);json(res,201,publicJob(job));return;}
   if(await handleReplicate({req,res,path,url,root:pipeline.root,jobs:pipeline.jobs,replicator,json,body}))return;
