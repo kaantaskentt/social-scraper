@@ -136,7 +136,7 @@ const server=http.createServer(async(req,res)=>{
   const fb=path.match(/^\/api\/runs\/([\w-]+)\/reel-feedback$/);
   if(fb){const job=pipeline.jobs.get(fb[1]);if(!job){json(res,404,{error:'Run not found'});return;}if(req.method!=='POST'){json(res,405,{error:'Method not allowed'});return;}
    const data=await body(req);json(res,200,await maker.feedback(job,String(data.reelId||''),{verdict:data.verdict,reasons:Array.isArray(data.reasons)?data.reasons.map(String):[]}));return;}
-  const made=path.match(/^\/channels\/([\w-]+)\/([\w-]+)\/(reel\.mp4|cover\.jpg|kit\.png|shot-[\w-]+\.mp4)$/);
+  const made=path.match(/^\/channels\/([\w-]+)\/([\w-]+)\/(reel\.mp4|cover\.jpg|kit\.png|shot-[\w-]+\.mp4|part-\d+-a\d+(?:-full)?\.mp4)$/);
   if(made){const file=join(pipeline.root,'channels',made[1],'reels',made[2],made[3]);let info;try{info=await stat(file);}catch{res.writeHead(404);res.end();return;}
    res.writeHead(200,{'Content-Type':made[3].endsWith('.png')?'image/png':made[3].endsWith('.jpg')?'image/jpeg':'video/mp4','Content-Length':info.size,'Accept-Ranges':'bytes','Cache-Control':'no-cache'});streamFile(res,file);return;}
   const vids=path.match(/^\/api\/runs\/([\w-]+)\/videos(?:\/(save|delete))?$/);

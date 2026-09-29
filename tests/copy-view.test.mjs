@@ -69,3 +69,13 @@ test('Veo defaults to one engine; long or missing Omni prices never become a fre
  const absent=renderCopyStudio({copy:{runId:'r',picks:{picks:[{id:'old',xNormal:3}]}}});
  assert.match(absent,/price unavailable/);assert.match(absent,/data-act="copy-start"[^>]*disabled/);
 });
+// Keep people engaged while a copy is filmed (Kaan, 2026-09-29): each part plays in its tile as soon as it passed its
+// check, so the reel visibly grows; a new part redraws the tile, a moving percent does not.
+test('a copy being made plays its latest filmed part in the tile and says how many are done',()=>{
+ const withPart=item({preview:{url:'/channels/r/copy-a-1/part-2-a1.mp4',parts:2,of:4}});
+ const html=renderCopyStudio({copy:{batch:{id:'B',usd:1,pct:40,left:90,items:[withPart]}}});
+ assert.match(html,/copy-tile is-working has-preview[\s\S]*<video class="tile-preview" src="\/channels\/r\/copy-a-1\/part-2-a1\.mp4" autoplay muted loop playsinline/);
+ assert.match(html,/2 of 4 parts filmed/);assert.doesNotMatch(html,/<img src="\/media\/r\/a"/);
+ const shape=c=>copyShape({batch:{id:'B',items:[c]}});
+ assert.notEqual(shape(withPart),shape(item({preview:{url:'/channels/r/copy-a-1/part-3-a1.mp4',parts:3,of:4}})));assert.equal(shape(withPart),shape({...withPart,pct:55}));
+});

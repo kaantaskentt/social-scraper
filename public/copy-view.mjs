@@ -42,7 +42,9 @@ function tile(it,i){
  const tag=`<span class="engine-tag">${esc(ENGINE_LABEL[it.engine]||'Gemini Omni')}</span>`;
  if(it.reel&&it.state==='done')return `<div class="ig-cell copy-tile is-done" data-tile="${esc(it.key||it.postId)}">${tag}<video src="${esc(it.reel.url)}#t=1" ${it.reel.cover?`poster="${esc(it.reel.cover)}"`:''} playsinline preload="metadata" controls></video>${badge}</div>`;
  const state=it.state==='failed'||it.state==='stopped'?'is-failed':it.state==='working'?'is-working':'';
- return `<div class="ig-cell copy-tile ${state}" data-tile="${esc(it.key||it.postId)}" style="--p:${it.pct};--i:${i}">${tag}<img src="${esc(it.originalImage)}" alt="" loading="lazy"><div class="ring-wrap"><div class="ring" aria-hidden="true"></div><b class="ring-n" data-live="pct">${it.state==='failed'||it.state==='stopped'?'!':`${it.pct}%`}</b></div>
+ // The latest filmed part plays in the tile as soon as it passed its check, so the reel visibly grows.
+ const pv=it.preview?.url,media=pv?`<video class="tile-preview" src="${esc(pv)}" autoplay muted loop playsinline></video><span class="tile-parts">${esc(it.preview.parts)} of ${esc(it.preview.of)} parts filmed</span>`:`<img src="${esc(it.originalImage)}" alt="" loading="lazy">`;
+ return `<div class="ig-cell copy-tile ${state}${pv?' has-preview':''}" data-tile="${esc(it.key||it.postId)}" style="--p:${it.pct};--i:${i}">${tag}${media}<div class="ring-wrap"><div class="ring" aria-hidden="true"></div><b class="ring-n" data-live="pct">${it.state==='failed'||it.state==='stopped'?'!':`${it.pct}%`}</b></div>
 <span class="tile-stage" data-live="stage">${esc(it.state==='failed'||it.state==='stopped'?it.error:it.stage||'Waiting')}</span>${(it.state==='failed'||it.state==='stopped')&&Number.isFinite(it.retryUsd)?`<button type="button" class="tile-retry" data-act="copy-retry" data-post="${esc(it.key||it.postId)}" data-usd="${esc(it.retryUsd)}">Try again · $${esc(it.retryUsd.toFixed(2))}</button>`:''}<span class="tile-eta" data-live="eta">${it.state==='working'?`${clock(it.left)} left`:''}</span></div>`;
 }
 // Under each winner: the original once, then each model's copy with how close it is, beat by beat.
@@ -81,4 +83,4 @@ export function copyLive(copy){
  return {items:b.items.map(i=>({key:i.key||i.postId,postId:i.postId,pct:i.pct,stage:i.state==='failed'||i.state==='stopped'?i.error:i.stage||'Waiting',eta:i.state==='working'?`${clock(i.left)} left`:'',state:i.state})),pct:b.pct,eta:`${b.pct}% · about ${clock(b.left)} left`};
 }
 // The page's shape: when this changes the page is redrawn; otherwise only the live numbers move.
-export const copyShape=copy=>JSON.stringify([copy?.picking?.state,copy?.picking?.at,!!copy?.picks,copy?.picks?.createdAt,copy?.batch?.id,copy?.batch?.items.map(i=>[i.key,i.state,i.reel?.url,i.fidelity?.score??i.fidelity?.error??null,i.retryUsd??null])]);
+export const copyShape=copy=>JSON.stringify([copy?.picking?.state,copy?.picking?.at,!!copy?.picks,copy?.picks?.createdAt,copy?.batch?.id,copy?.batch?.items.map(i=>[i.key,i.state,i.reel?.url,i.preview?.url??null,i.fidelity?.score??i.fidelity?.error??null,i.retryUsd??null])]);
