@@ -290,13 +290,13 @@ test('scored reels unlock Winners immediately; Secret waits; Look and Copy wait 
  const ready=reachable({scored:true,winnersReady:true,kit:true});assert.equal(ready.kit,true);assert.equal(ready.make,true);assert.equal(ready.secret,false);
  assert.equal(reachable({scanned:true,scored:true}).kit,true);
 });
-test('scan summary distinguishes the median, best reel and scoring baseline',()=>{
- assert.deepEqual(scanSummary([{plays:100},{plays:200},{plays:900}],{a:{reach:900,xNormal:3}}),[['Reels',3],['Median plays',200],['Best reel',900],['Usual plays',300]]);
+test('scan summary: reels, winners (at least 2x their usual), best reel and the usual plays',()=>{
+ assert.deepEqual(scanSummary([{plays:100},{plays:200},{plays:900}],{a:{reach:900,xNormal:3}}),[['Reels',3],['Winners',1],['Best reel',900],['Usual plays',300]]);
  assert.equal(scanSummary([])[1][1],null);
 });
 test('winner metrics put plays before relative reach and engagement, with inline muted preview',()=>{
  const html=renderWinners({account:'a',winners:[{id:'w',image:'/w.jpg',video:'/w.mp4',reach:14.3e6,xNormal:397,engagement:22}],secretOpen:false,lookOpen:false});
- assert.match(html,/14.3M <span>plays[\s\S]*397× their usual[\s\S]*22 likes and comments per 1,000 plays/);
+ assert.match(html,/14.3M <span>plays[\s\S]*397× their usual[\s\S]*Engagement 22 per 1K plays/);
  assert.match(html,/data-src="\/w.mp4" muted playsinline loop/);assert.match(html,/data-step="secret" disabled/);assert.match(html,/data-step="kit" disabled/);
 });
 test('one primary action is docked with its hooks, cost, disabled state and optional secondary',()=>{

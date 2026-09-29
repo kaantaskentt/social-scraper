@@ -7,14 +7,14 @@ export const mappable=p=>analysed(p)&&reach(p)!==null&&Number.isFinite(p.likes)&
 const median=v=>{if(!v.length)return null;const s=[...v].sort((a,b)=>a-b),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
 
 // Positions for a wall of `width` × `height` (left) and a map beside it. Returns tiles in wall order.
-export function layout(posts,{wallW,wallH,mapX,mapW,mapH,pad={l:44,r:14,t:18,b:34}}){
+export function layout(posts,{wallW,wallH,mapX,mapW,mapH,top=0,pad={l:44,r:14,t:18,b:34}}){
  const n=Math.max(1,posts.length),cols=Math.max(5,Math.ceil(Math.sqrt(n*wallW/Math.max(1,wallH)*0.8))),gap=3;
  const tw=Math.max(8,(wallW-(cols-1)*gap)/cols),th=Math.max(10,Math.min(tw*1.3,(wallH-(Math.ceil(n/cols)-1)*gap)/Math.ceil(n/cols)));
  const points=posts.filter(mappable).map(p=>({id:p.id,x:reach(p),y:p.likes/reach(p)*1000}));
  const lo=points.length?Math.floor(Math.log10(Math.min(...points.map(p=>p.x)))):3,hi=Math.max(lo+1,points.length?Math.ceil(Math.log10(Math.max(...points.map(p=>p.x)))):5);
  const ymax=Math.max(10,Math.ceil(Math.max(1,...points.map(p=>p.y))/10)*10),pw=Math.max(1,mapW-pad.l-pad.r),ph=Math.max(1,mapH-pad.t-pad.b);
  const X=v=>mapX+pad.l+(Math.log10(v)-lo)/(hi-lo)*pw,Y=v=>pad.t+(1-v/ymax)*ph,byId=new Map(points.map(p=>[p.id,p])),mt=points.length>150?14:20;
- const tiles=posts.map((p,i)=>{const wall={x:(i%cols)*(tw+gap),y:Math.floor(i/cols)*(th+gap),w:tw,h:th},pt=byId.get(p.id);
+ const tiles=posts.map((p,i)=>{const wall={x:(i%cols)*(tw+gap),y:top+Math.floor(i/cols)*(th+gap),w:tw,h:th},pt=byId.get(p.id);
   return {id:p.id,analysed:analysed(p),wall,map:pt?{x:X(pt.x)-mt/2,y:Y(pt.y)-mt*0.65,w:mt,h:mt*1.3}:null};});
  const mx=median(points.map(p=>p.x)),my=median(points.map(p=>p.y));
  return {tiles,cols,axes:{lo,hi,ymax,x:Array.from({length:hi-lo+1},(_,k)=>({v:10**(lo+k),at:X(10**(lo+k))})),y:[0,1,2,3,4].map(k=>({v:ymax*k/4,at:Y(ymax*k/4)})),median:mx===null?null:{x:X(mx),y:Y(my)},box:{l:mapX+pad.l,r:mapX+mapW-pad.r,t:pad.t,b:mapH-pad.b}},plotted:points.length};
@@ -25,7 +25,8 @@ export const compact=n=>Number.isFinite(n)?new Intl.NumberFormat('en',{notation:
 export function mountScanMap(root,{posts,imageFor,videoFor,selected,onSelect}){
  const stage=root.querySelector('.scan-stage');if(!stage)return;
  const w=stage.clientWidth,h=stage.clientHeight,stacked=w<640,wallW=stacked?w:Math.floor(w*0.42),wallH=stacked?Math.floor(h*0.42):h;
- const L=layout(posts,{wallW,wallH,mapX:stacked?0:wallW+24,mapW:stacked?w:w-wallW-24,mapH:stacked?h-wallH-16:h});
+ // The wall starts under its label (the label covered the first row, 2026-09-29).
+ const L=layout(posts,{wallW,wallH:wallH-22,top:22,mapX:stacked?0:wallW+24,mapW:stacked?w:w-wallW-24,mapH:stacked?h-wallH-16:h});
  const mapLabel=stage.querySelector('.scan-lab.right');if(mapLabel){mapLabel.style.top=stacked?`${wallH}px`:'0';mapLabel.style.right=stacked?'auto':'0';mapLabel.style.left=stacked?'0':'auto';}
  const offY=stacked?wallH+16:0,svg=stage.querySelector('svg');
  const a=L.axes;svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
