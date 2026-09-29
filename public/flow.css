@@ -325,3 +325,7 @@ dialog{color:var(--ink);background:var(--card);border:1px solid var(--line);bord
 @property --p{syntax:"<number>";inherits:true;initial-value:0}.copy-tile{transition:--p 220ms ease-out}.scan-status progress{margin-block:var(--s4)}
 
 *{transition-timing-function:ease-out}button:disabled{transform:none}.view>*,.pick-body,.ready-body{min-width:0;overflow-wrap:anywhere}.caption-more{min-height:24px}
+
+/* Prep ahead: one quiet line on the Winners step */
+.prep-line{display:flex;align-items:center;gap:var(--s2);margin:calc(var(--s4)*-1) 0 var(--s6);font-size:var(--t-sm);color:var(--muted)}.prep-line.is-done{color:var(--good)}.prep-line.is-done::before{content:"✓"}.prep-line.is-failed{color:var(--warn)}
+.prep-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:prep-pulse 1.2s ease-in-out infinite}@keyframes prep-pulse{50%{opacity:.3}}@media(prefers-reduced-motion:reduce){.prep-dot{animation:none}}

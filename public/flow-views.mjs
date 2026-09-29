@@ -57,9 +57,16 @@ export function topWinners(posts,results,{hasVideo,limit=6}){
   .sort((a,b)=>b.r.xNormal-a.r.xNormal).slice(0,limit).map(({p,r})=>({id:p.id,xNormal:r.xNormal,reach:r.reach}));
 }
 function reelTile(p,{small=false,index=0}={}){return `<article class="winner-card rise" style="--i:${index}"><button type="button" class="reel" data-preview="${esc(p.id)}" aria-label="Play reel with ${compact(p.reach)} plays"><img src="${esc(p.image)}" alt="" loading="lazy" onerror="this.hidden=true">${p.video?`<video data-src="${esc(p.video)}" muted playsinline loop preload="none"></video>`:''}<span class="reel-play" aria-hidden="true">↗</span></button><div class="winner-copy"><h2>${compact(p.reach)} <span>plays</span></h2><p>${Number(p.xNormal).toFixed(1).replace(/\.0$/,'')}× their usual</p>${small?'':`<span class="hint">${Number.isFinite(p.engagement)?`Engagement ${Math.round(p.engagement)} per 1K plays`:'Engagement unavailable'}</span>`}</div></article>`;}
-export function renderWinners({account,winners=[],weakest=[],secretOpen=true,lookOpen=true}){
+// Prep ahead's one quiet line: the next steps are being readied in the background, are ready, or could not be.
+export function prepLine(prep){
+ if(prep?.state==='working')return '<p class="prep-line is-working"><span class="prep-dot" aria-hidden="true"></span>Getting your Look and Copy ready in the background</p>';
+ if(prep?.state==='done')return '<p class="prep-line is-done">Look and Copy are ready to start</p>';
+ if(prep?.state==='failed')return `<p class="prep-line is-failed">Could not prepare ahead (${esc(prep.error||'unknown error')}). The next steps still work, a little slower.</p>`;
+ return '';
+}
+export function renderWinners({account,winners=[],weakest=[],secretOpen=true,lookOpen=true,prep=null}){
  if(!winners.length)return `${head('No clear winners yet','No saved reel got at least twice this account’s usual plays. Try a larger scan.')}<button class="btn btn-primary" data-act="new-analysis">New analysis →</button>`;
- return `${head(`@${account}’s winners`,'Proven ideas. Now imagine them with your hosts.')}<div class="reel-grid">${winners.map((w,index)=>reelTile(w,{index})).join('')}</div>${weakest.length?`<section class="weak-section"><h2 class="sub-title">Their weakest, for perspective</h2><div class="reel-grid is-small">${weakest.map(w=>reelTile(w,{small:true})).join('')}</div></section>`:''}<div class="next-row"><button type="button" class="btn btn-ghost" data-step="secret"${secretOpen?'':' disabled'}>Why do these win?${secretOpen?'':' · listening'}</button><button type="button" class="btn btn-primary" data-step="kit"${lookOpen?'':' disabled'}>${lookOpen?'Make your look →':'Listening to the winners…'}</button></div>`;
+ return `${head(`@${account}’s winners`,'Proven ideas. Now imagine them with your hosts.')}${prepLine(prep)}<div class="reel-grid">${winners.map((w,index)=>reelTile(w,{index})).join('')}</div>${weakest.length?`<section class="weak-section"><h2 class="sub-title">Their weakest, for perspective</h2><div class="reel-grid is-small">${weakest.map(w=>reelTile(w,{small:true})).join('')}</div></section>`:''}<div class="next-row"><button type="button" class="btn btn-ghost" data-step="secret"${secretOpen?'':' disabled'}>Why do these win?${secretOpen?'':' · listening'}</button><button type="button" class="btn btn-primary" data-step="kit"${lookOpen?'':' disabled'}>${lookOpen?'Make your look →':'Listening to the winners…'}</button></div>`;
 }
 
 // 3 · Secret, readable by a 10-year-old: 3 things to do, 1 to avoid, what every reel has, why it works, a check.

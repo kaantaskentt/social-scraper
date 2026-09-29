@@ -21,6 +21,7 @@ import {KitBuilder} from './lib/kit-run.mjs';
 import {DnaBuilder} from './lib/dna-run.mjs';
 import {ResultsTracker} from './lib/results.mjs';
 import {CopyStudio} from './lib/copy-run.mjs';
+import {Prep} from './lib/prep.mjs';
 import {higgsfieldBalance} from './lib/higgsfield-balance.mjs';
 import {score,LATEST} from './public/money/index.mjs';
 const ROOT=dirname(fileURLToPath(import.meta.url));
@@ -45,12 +46,18 @@ const secrets=new SecretBuilder(pipeline.root,keys);
 const planner=new ReelPlanner(pipeline.root,keys);
 const maker=new ReelMaker(pipeline.root,keys);
 // Look builds the Secret itself when it is missing (the page goes Winners → Look): start it, wait, hand it over.
-const ensureSecret=async job=>{const {results}=score(job,LATEST);await secrets.start(job,results);
+const ensureSecret=async job=>{const {results}=score(job,LATEST);if((await secrets.status(job,results)).state!=='building')await secrets.start(job,results);
  for(;;){const st=await secrets.status(job,results);if(st.state==='done')return st.saved;if(st.state!=='building')throw new Error(st.error||'Studying their winners stopped');await new Promise(r=>setTimeout(r,2000));}};
 const kits=new KitBuilder(pipeline.root,keys,{ensureSecret});
 const dnas=new DnaBuilder(pipeline.root,keys);
 const results=new ResultsTracker(pipeline.root,keys);
 const copies=new CopyStudio(pipeline.root,keys,{planner,maker});
+// Prep ahead: when a scan finishes while the app runs (never for old runs at startup), the next steps' cheap analysis
+// runs in the background once its videos are saved.
+const prep=new Prep({keys,kits,copies,ensureSecret:async job=>await readFile(join(pipeline.root,'secret',job.id,'secret.json'),'utf8').then(JSON.parse,()=>null)||ensureSecret(job)});
+const liveScans=new Set();
+pipeline.listeners.add(id=>{const j=pipeline.jobs.get(id);if(!j)return;if(['running','scraping'].includes(j.status)){liveScans.add(id);return;}
+ if(j.status==='complete'&&liveScans.delete(id))Promise.resolve(videoJobs.get(id)?.done).then(()=>prep.run(j));});
 const clients=new Set();pipeline.listeners.add(id=>{for(const res of clients)res.write(`data: ${JSON.stringify({id})}\n\n`);});
 const publicJob=j=>{const copy=structuredClone(j);for(const p of copy.posts){if(p.transcript)delete p.transcript.raw;if(p.analysis)delete p.analysis.raw;}return copy;};
 const summary=j=>({id:j.id,creator:j.creator,status:j.status,createdAt:j.createdAt,count:j.posts.length,completed:j.posts.filter(p=>p.analysis).length});
@@ -101,6 +108,7 @@ const server=http.createServer(async(req,res)=>{
    res.writeHead(200,{'Content-Type':kitFile[2].endsWith('.wav')?'audio/wav':'image/jpeg','Cache-Control':kitFile[2].endsWith('.wav')?'no-cache':'public, max-age=31536000, immutable'});res.end(bytes);return;}
   // Winner DNA (about half a cent a reel): every detail of every scored reel tested against the creator's own normal.
   // The copy studio: pick the five most copyable winners (cents), then make the chosen copies (the confirmed price).
+  const prepRoute=path.match(/^\/api\/runs\/([\w-]+)\/prep$/);if(prepRoute&&req.method==='GET'){json(res,200,prep.status(prepRoute[1]));return;}
   const copyRoute=path.match(/^\/api\/runs\/([\w-]+)\/copy(?:\/(pick|start|retry|compare))?$/);
   if(copyRoute){const job=pipeline.jobs.get(copyRoute[1]);if(!job){json(res,404,{error:'Run not found'});return;}
    if(req.method==='GET'&&!copyRoute[2]){json(res,200,await copies.status(job));return;}

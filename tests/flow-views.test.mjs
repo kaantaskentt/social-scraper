@@ -326,3 +326,10 @@ test('download bundle contains both intact files and standard ZIP checksums',asy
  assert.equal(v.getUint32(bytes.length-22,true),0x06054b50);assert.equal(v.getUint16(bytes.length-12,true),2);
  assert.equal(v.getUint32(v.getUint32(bytes.length-6,true),true),0x02014b50,'central directory points to the entries');
 });
+test('prep ahead shows one quiet line on the Winners step: working, ready, or why it could not',async()=>{
+ const {prepLine,renderWinners}=await import('../public/flow-views.mjs');
+ assert.equal(prepLine(null),'');assert.equal(prepLine({state:'none'}),'');
+ assert.match(prepLine({state:'working'}),/Getting your Look and Copy ready/);assert.match(prepLine({state:'done'}),/ready to start/);
+ assert.match(prepLine({state:'failed',error:'Gemini <out>'}),/Gemini &lt;out&gt;.*still work/);
+ assert.match(renderWinners({account:'a',winners:[{id:'w',image:'/w.jpg',reach:1e6,xNormal:9}],prep:{state:'working'}}),/winners<\/h1>[\s\S]*prep-line is-working[\s\S]*reel-grid/);
+});

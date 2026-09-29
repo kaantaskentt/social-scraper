@@ -211,3 +211,12 @@ test('both models: each winner copied once by Omni and once by Veo 3.1 Fast, Veo
   assert.notEqual(s.batch.items[0].reelId,s.batch.items[1].reelId);assert.match(s.batch.items[1].reelId,/^copy-chk-veo-fast-/);
  }finally{await rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:50});}
 });
+// Prep ahead (Kaan, 2026-09-29: "pre-load or get prepped before moving to the next stage"): right after a scan, the
+// candidates' breakdowns are made and cached, so "Find the 5 to copy" only asks Jev. It needs no look yet.
+test('prepare: breaks down every copy candidate ahead of time, without a look, and skips one that fails',async()=>{
+ const {root,studio}=await setup();const seen=[];
+ studio.planner={...studio.planner,approvedKit:async()=>null,breakdown:async(j,id)=>{seen.push(id);if(id==='bad')throw new Error('no video');return {breakdown};}};
+ studio.reels=()=>[{id:'chk',xNormal:104,seconds:22,plays:5800000,text,timed:true},{id:'bad',xNormal:40,seconds:30,plays:900000,text:'Here is another thing you should try at home today with your family and friends',timed:true}];
+ try{const r=await studio.prepare(job);assert.deepEqual(seen.sort(),['bad','chk']);assert.deepEqual(r,{candidates:2,ready:1});}
+ finally{await rm(root,{recursive:true,force:true});}
+});
