@@ -4,7 +4,7 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {buildRequest,parseResult,cacheKey} from '../lib/schema.mjs';
-import {deduplicate,metrics} from '../lib/data.mjs';
+import {deduplicate} from '../lib/data.mjs';
 import {Pipeline} from '../lib/pipeline.mjs';
 import {mediaURL,request} from '../lib/providers.mjs';
 const transcript={text:'Why keep waiting? Pick one task. Finish it today.',segments:[{start:0,end:3,text:'Why keep waiting?'},{start:3,end:8,text:'Pick one task. Finish it today.'}]};
@@ -16,8 +16,8 @@ test('classification uses only speech and covers the full script',()=>{
 });
 test('invalid answers are rejected and missing usage stays unknown',()=>{const req=buildRequest(transcript),raw=response(req);assert.equal(parseResult(raw,req).costUsd,0.000042);delete raw.usage;assert.equal(parseResult(raw,req).costUsd,null);raw.answers.mechanism.choice='guaranteed_viral';assert.throws(()=>parseResult(raw,req),/Invalid/);});
 test('cache changes with speech',()=>{assert.notEqual(cacheKey(transcript),cacheKey({...transcript,text:'Different speech'}));});
-test('normalization preserves unknowns and graph excludes missing and recent metrics',()=>{
- const old=new Date(Date.now()-30*864e5).toISOString();const ps=deduplicate([{id:'one',videoViewCount:100,likesCount:10,timestamp:old},{id:'one',videoViewCount:200},{id:'two',videoPlayCount:500,likesCount:-1,timestamp:old},{id:'three',videoViewCount:1000,likesCount:30,timestamp:new Date().toISOString()}]);assert.equal(ps.length,3);assert.equal(ps[1].views,null);assert.equal(ps[1].likes,null);for(const p of ps)p.analysis={labels:{mechanism:{value:'curiosity',confidence:.9}}};const result=metrics(ps);assert.equal(result.total,2);assert.equal(result.excluded,1);assert.equal(result.medianRate,100);assert.equal(result.groups[0].n,1);
+test('normalization keeps one row per reel and preserves unknown numbers',()=>{
+ const old=new Date(Date.now()-30*864e5).toISOString();const ps=deduplicate([{id:'one',videoViewCount:100,likesCount:10,timestamp:old},{id:'one',videoViewCount:200},{id:'two',videoPlayCount:500,likesCount:-1,timestamp:old},{id:'three',videoViewCount:1000,likesCount:30,timestamp:new Date().toISOString()}]);assert.equal(ps.length,3);assert.equal(ps[1].views,null);assert.equal(ps[1].likes,null);
 });
 test('media downloads reject local network and arbitrary hosts',()=>{for(const url of ['http://127.0.0.1/','https://localhost/','https://example.com/a.mp4','https://fbcdn.net.evil.com/a','file:///etc/passwd'])assert.throws(()=>mediaURL(url));assert.equal(mediaURL('https://scontent.cdninstagram.com/video.mp4'),'https://scontent.cdninstagram.com/video.mp4');});
 test('import -> Groq -> Jev -> persisted results -> cache reuse',async()=>{

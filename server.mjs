@@ -6,7 +6,7 @@ import {randomBytes} from 'node:crypto';
 import {parseEnv} from 'node:util';
 import {Pipeline} from './lib/pipeline.mjs';
 import {dimensions,roles,VERSION} from './lib/schema.mjs';
-import {metrics,slimPost} from './lib/data.mjs';
+import {slimPost} from './lib/data.mjs';
 import {checkProvider,download} from './lib/providers.mjs';
 import {demo,artwork} from './lib/demo.mjs';
 import {moneyReport} from './lib/money-report.mjs';
@@ -143,12 +143,11 @@ const server=http.createServer(async(req,res)=>{
    else if(vids[2]==='delete'&&req.method==='POST'){if(state?.running){json(res,409,{error:'Videos are still being saved. Try again when saving finishes.'});return;}videoJobs.delete(job.id);json(res,200,await deleteVideos(pipeline.root,job));return;}
    else if(vids[2]){json(res,405,{error:'Method not allowed'});return;}
    const now=videoJobs.get(job.id);json(res,200,{...await videoInfo(pipeline.root,job),saving:Boolean(now?.running),progress:now?.progress||null,lastResult:now?.result||null,error:now?.error||null});return;}
-  const match=path.match(/^\/api\/runs\/([\w-]+)(?:\/(run|pause|export|metrics|attach|money|secret|secret-feedback))?$/);
+  const match=path.match(/^\/api\/runs\/([\w-]+)(?:\/(run|pause|export|attach|money|secret|secret-feedback))?$/);
   if(match){const [,id,action]=match;const job=pipeline.jobs.get(id);if(!job){json(res,404,{error:'Run not found'});return;}
    if(action==='run'&&req.method==='POST'){const settings=await body(req);if(settings.concurrency!==undefined){const n=Number(settings.concurrency);if(!Number.isInteger(n)||n<1||n>12)throw new Error('Concurrency must be 1 to 12');job.concurrency=n;}await pipeline.run(id);json(res,200,publicJob(job));return;}
    if(action==='pause'&&req.method==='POST'){await pipeline.pause(id);json(res,200,{paused:true});return;}
    if(action==='attach'&&req.method==='POST'){await pipeline.attachScrape(id,(await body(req)).runId);json(res,200,{attached:true});return;}
-   if(action==='metrics'){json(res,200,metrics(job.posts,{dimension:url.searchParams.get('dimension')||'mechanism',metric:url.searchParams.get('metric')||'views',minAgeDays:Number(url.searchParams.get('minAgeDays')??7)}));return;}
    if(action==='money'){json(res,200,await moneyReport(job,url.searchParams.get('version'),pipeline.root));return;}
    // Channel Secret: GET shows the saved page, the build in progress, or the estimate; POST starts a paid build.
    if(action==='secret-feedback'&&req.method==='POST'){const {answer}=await body(req);json(res,200,await secrets.feedback(job,answer));return;}
