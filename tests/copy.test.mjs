@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PART_USD,EXTEND_USD} from '../lib/kit-reel.mjs';
-import {formatKey,copyCandidates,pickCopies,timedWords,copyScript,wordsKept,copyPrice,stageKey,plannedStages,progressOf,learnStage,fidelityScore,fidelityVerdict,hasTimedWords,COPY_MAX_PARTS} from '../lib/copy.mjs';
+import {copyMode,visualScript,formatKey,copyCandidates,pickCopies,timedWords,copyScript,wordsKept,copyPrice,stageKey,plannedStages,progressOf,learnStage,fidelityScore,fidelityVerdict,hasTimedWords,COPY_MAX_PARTS} from '../lib/copy.mjs';
 
 const reel=(id,xNormal,seconds,text,timed=true,plays=null,engagement=null)=>({id,xNormal,seconds,text,timed,plays,engagement});
 
@@ -136,4 +136,21 @@ test('stricter comparison: a wide shot of the right action scores its framing; a
  const f=fidelityScore({wordsKept:1,lengthRatio:1,beats:seen.beats,count:3});assert.equal(f.shots,78);
  const v=fidelityVerdict(95,seen,beats);assert.equal(v.faithful,false);assert.deepEqual(v.resultMissing,[2]);assert.equal(v.redo,'part_1');
  assert.equal(fidelityVerdict(95,{...seen,beats:seen.beats.map(b=>({...b,result_visible:'yes'}))},beats).faithful,true);
+});
+
+// Kaan, 2026-09-29, @saywaybrand: every winner is a person seen from behind in a store, wearing a shirt with a funny
+// printed line, over a song. The transcript held the song's lyrics, and the picker would have had our host speak them.
+test('visual copy: a winner whose sound is a song (or that has no speech) is copied by its shots and printed line',()=>{
+ const sung={voice:{delivery:'Rhythmic, confident hip-hop singing/rapping over a heavy beat.'},hook_words:"DON'T TALK TO ME I HAVE A CRAZY GIRLFRIEND",beats:[{from:0,to:5.4,shot:'Medium shot from behind',happens:'He stands showing the print on his hoodie',says:'All I need in this life is me and my girlfriend',sound:'Hip-hop beat'}]};
+ assert.equal(copyMode({post:{status:'complete'},breakdown:sung}),'visual');
+ assert.equal(copyMode({post:{status:'music'},breakdown:{voice:{delivery:'Calm, close voice'},beats:[]}}),'visual');
+ assert.equal(copyMode({post:{status:'no_speech'},breakdown:{beats:[]}}),'visual');
+ assert.equal(copyMode({post:{status:'complete'},breakdown:{voice:{delivery:'Warm, fast narration to camera'},beats:[]}}),'spoken');
+ const s=visualScript({breakdown:sung,seconds:6,lengths:[8],cast:[{who:'Leo',does:'Leo stands in a store aisle, back to the camera'}],caption:'c'});
+ assert.equal(s.visual,true);assert.equal(s.print,"DON'T TALK TO ME I HAVE A CRAZY GIRLFRIEND");assert.equal(s.hook_title,'');
+ assert.deepEqual(s.parts.flatMap(p=>p.beats.map(b=>b.says)),['']);assert.equal(s.parts[0].beats[0].who,'Leo');assert.equal(s.parts[0].seconds,8);
+});
+test('candidates: a silent or song-only winner is offered too, most played first',()=>{
+ const c=copyCandidates([{id:'song',xNormal:113,seconds:6,text:'',timed:false,silent:true,plays:750412,engagement:57},{id:'talk',xNormal:5,seconds:30,text:'Here is why your bananas go brown so fast and what stops it',timed:true,plays:40000,engagement:20}]);
+ assert.deepEqual(c.map(x=>x.id),['song','talk']);
 });

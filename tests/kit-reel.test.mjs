@@ -461,3 +461,12 @@ test('Omni copy: every 4 parts a fresh chain starts with the pictures (Google ex
  assert.deepEqual(g.calls.post.map(hasImages),[true,false,false,false,true]);assert.deepEqual(g.calls.post.map(b=>Boolean(b.previous_interaction_id)),[false,true,true,true,false]);
  assert.deepEqual(joined.map(f=>f.split('/').pop()),['part-4-a1.mp4','part-5-a1.mp4']);assert.equal(usd,Math.round((2*PART_USD+3*1.13)*100)/100);
 });
+
+test('visual copy prompt: only the garment\'s printed line may show, no speech, room sound only; its text does not fail the check',async()=>{
+ const {veoPrompt,partVerdict}=await import('../lib/kit-reel.mjs');
+ const sc={visual:true,print:"DON'T TALK TO ME",parts:[{seconds:8,beats:[{from:0,to:8,shot:'Medium shot from behind',who:'Leo',does:'Leo walks down a store aisle, back to the camera',says:'',sound:''}]}]};
+ const p=veoPrompt(sc,0,kitSaved);
+ assert.match(p,/printed large on the back of Leo's top: "DON'T TALK TO ME"/);assert.match(p,/No one speaks/);assert.match(p,/no music/i);assert.doesNotMatch(p,/No text, captions, logos or labels on screen;/);
+ const seen={match:3,same_people:'yes',text_or_logos:true,gear_visible:false,broken:false,lips_match:'no_speech_on_camera',result_as_written:'yes'};
+ assert.equal(partVerdict(seen,{talking:false,allowText:true}).pass,true);assert.equal(partVerdict(seen,{talking:false}).pass,false);
+});

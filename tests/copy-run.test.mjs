@@ -220,3 +220,20 @@ test('prepare: breaks down every copy candidate ahead of time, without a look, a
  try{const r=await studio.prepare(job);assert.deepEqual(seen.sort(),['bad','chk']);assert.deepEqual(r,{candidates:2,ready:1});}
  finally{await rm(root,{recursive:true,force:true});}
 });
+// @saywaybrand (2026-09-29): a winner over a song is copied visually: nothing spoken, the printed line kept, the song
+// left for Instagram; its match score is the shots and the length (no words to keep).
+test('a winner over a song is made as a visual copy: no spoken words, the printed line kept, scored without words',async()=>{
+ const {root,studio}=await setup();
+ const sung={...breakdown,hook_words:"DON'T TALK TO ME",voice:{delivery:'Hip-hop singing over a heavy beat.'}};
+ studio.planner={...studio.planner,breakdown:async()=>({breakdown:sung})};
+ const songJob={...job,posts:[{...post,transcript:{text:'All I need in this life is me and my girlfriend, me and my girlfriend',segments:[{start:0,end:5,text:'All I need in this life is me and my girlfriend'}]}},job.posts[1]]};
+ try{
+  await studio.pickStart(songJob);await until(()=>studio.status(songJob),s=>s.picking?.state!=='working');
+  await studio.start(songJob,{ids:['chk'],confirmUsd:3.3});
+  const s=await until(()=>studio.status(songJob),s=>['done','failed'].includes(s.batch.items[0].state));const it=s.batch.items[0];
+  assert.equal(it.state,'done',it.error);assert.equal(it.fidelity.words,null);assert.ok(Number.isFinite(it.fidelity.score));
+  const plan=JSON.parse(await readFile(join(root,'channels',RUN,'copies','chk.plan.json'),'utf8'));
+  assert.equal(plan.script.visual,true);assert.equal(plan.script.print,"DON'T TALK TO ME");assert.deepEqual([...new Set(plan.script.parts.flatMap(p=>p.beats.map(b=>b.says)))],['']);
+  assert.match(plan.sound,/Add a sound on Instagram: the original plays hip-hop singing/);assert.match(plan.picked[0].idea.title,/Copy · DON'T TALK TO ME/);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
