@@ -22,6 +22,7 @@ import {DnaBuilder} from './lib/dna-run.mjs';
 import {ResultsTracker} from './lib/results.mjs';
 import {CopyStudio} from './lib/copy-run.mjs';
 import {Prep} from './lib/prep.mjs';
+import {ErrorLog} from './lib/errors.mjs';
 import {score,LATEST} from './public/money/index.mjs';
 const ROOT=dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||5190),HOST='127.0.0.1';
@@ -53,6 +54,12 @@ const kits=new KitBuilder(pipeline.root,keys,{ensureSecret});
 const dnas=new DnaBuilder(pipeline.root,keys);
 const results=new ResultsTracker(pipeline.root,keys);
 const copies=new CopyStudio(pipeline.root,keys,{planner,maker});
+// The error log: every background failure (the modules report them as "Social Scraper: ...") and every failed request
+// is written to data/errors.jsonl for the hourly fixer (scripts/errors.mjs).
+const errorLog=new ErrorLog(pipeline.root),RUN_ID=/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+const logError=(source,where,message,extra={})=>{const runId=extra.runId||String(message).match(RUN_ID)?.[0]||null;errorLog.add({source,where,message,runId,account:runId?pipeline.jobs.get(runId)?.creator||null:null,...extra,runId}).catch(()=>{});};
+const consoleError=console.error.bind(console);
+console.error=(...args)=>{consoleError(...args);const text=args.map(String).join(' ');if(text.startsWith('Social Scraper: '))logError('server','background',text.slice(16));};
 // Prep ahead: when a scan finishes while the app runs (never for old runs at startup), the next steps' cheap analysis
 // runs in the background once its videos are saved.
 const prep=new Prep({keys,kits,copies,ensureSecret:async job=>await readFile(join(pipeline.root,'secret',job.id,'secret.json'),'utf8').then(JSON.parse,()=>null)||ensureSecret(job)});
@@ -108,6 +115,7 @@ const server=http.createServer(async(req,res)=>{
    res.writeHead(200,{'Content-Type':kitFile[2].endsWith('.wav')?'audio/wav':'image/jpeg','Cache-Control':kitFile[2].endsWith('.wav')?'no-cache':'public, max-age=31536000, immutable'});res.end(bytes);return;}
   // Winner DNA (about half a cent a reel): every detail of every scored reel tested against the creator's own normal.
   // The copy studio: pick the five most copyable winners (cents), then make the chosen copies (the confirmed price).
+  if(path==='/api/errors'&&req.method==='POST'){const b=await body(req);logError('page',String(b.where||'page').slice(0,200),String(b.message||'').slice(0,1000),{runId:RUN_ID.test(b.runId||'')?b.runId:null,detail:b.detail?String(b.detail).slice(0,2000):null});res.writeHead(204);res.end();return;}
   const prepRoute=path.match(/^\/api\/runs\/([\w-]+)\/prep$/);if(prepRoute&&req.method==='GET'){json(res,200,prep.status(prepRoute[1]));return;}
   const copyRoute=path.match(/^\/api\/runs\/([\w-]+)\/copy(?:\/(pick|start|retry|compare))?$/);
   if(copyRoute){const job=pipeline.jobs.get(copyRoute[1]);if(!job){json(res,404,{error:'Run not found'});return;}
@@ -169,6 +177,6 @@ const server=http.createServer(async(req,res)=>{
   const files={'/record':'record.html','/record.js':'record.js','/record.css':'record.css','/':'flow.html','/lab':'index.html','/flow.js':'flow.js','/flow.css':'flow.css','/flow-views.mjs':'flow-views.mjs','/scan-map.mjs':'scan-map.mjs','/copy-view.mjs':'copy-view.mjs','/app.js':'app.js','/research.mjs':'research.mjs','/money-view.mjs':'money-view.mjs','/anatomy-view.mjs':'anatomy-view.mjs','/replicate-view.mjs':'replicate-view.mjs','/studio-view.mjs':'studio-view.mjs','/reel-plan-view.mjs':'reel-plan-view.mjs','/shotlist-text.mjs':'shotlist-text.mjs','/shot-lines.mjs':'shot-lines.mjs','/secret-view.mjs':'secret-view.mjs','/secret-labels.mjs':'secret-labels.mjs','/secret-mechanisms.mjs':'secret-mechanisms.mjs','/handles.mjs':'handles.mjs','/styles.css':'styles.css','/theme.css':'theme.css','/money/index.mjs':'money/index.mjs','/money/1.0.mjs':'money/1.0.mjs'};
   if(files[path]){const file=join(ROOT,'public',files[path]);const content=await readFile(file);res.writeHead(200,{'Content-Type':path.endsWith('.css')?'text/css':path.endsWith('.js')||path.endsWith('.mjs')?'text/javascript':'text/html','Cache-Control':'no-cache'});res.end(content);return;}
   json(res,404,{error:'Not found'});
- }catch(e){json(res,400,{error:e.message||'Request failed'});}
+ }catch(e){const where=String(req.url||'').split('?')[0];logError('request',`${req.method} ${where.replace(RUN_ID,'<run>')}`,e.message||'Request failed',{runId:where.match(RUN_ID)?.[0]||null});json(res,400,{error:e.message||'Request failed'});}
 });
 server.listen(PORT,HOST,()=>console.log(`Social Scraper ready at http://${HOST}:${PORT}`));

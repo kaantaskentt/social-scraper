@@ -11,8 +11,13 @@ const store={get:k=>{try{return localStorage.getItem(k);}catch{return null;}},se
 async function api(path,data){
  const r=await fetch(path,data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-Lab-Token':token},body:JSON.stringify(data)});
  const text=await r.text();let v;try{v=JSON.parse(text);}catch{throw new Error(r.ok?'The app sent an unreadable answer. Refresh the page.':`Request failed (${r.status})`);}
- if(!r.ok)throw new Error(v.error||'Request failed');return v;
+ if(!r.ok)throw Object.assign(new Error(v.error||'Request failed'),{logged:true});return v; // the server logged it
 }
+// Errors the server cannot see (a page crash, a lost connection) go to the error log for the hourly fixer.
+const reported=new Map();
+function reportError(e,where){if(!e||e.logged)return;const message=String(e.message||e);if(Date.now()-(reported.get(message)||0)<60000)return;reported.set(message,Date.now());
+ fetch('/api/errors',{method:'POST',headers:{'Content-Type':'application/json','X-Lab-Token':token},body:JSON.stringify({message,where:`${where} (step: ${S.step})`,runId:S.runId,detail:e.stack||null})}).catch(()=>{});}
+addEventListener('error',ev=>reportError(ev.error||ev.message,'page crash'));addEventListener('unhandledrejection',ev=>reportError(ev.reason,'page crash'));
 // One small polite status for screen readers, said only when its text changes (the whole page was a live region).
 function announce(text){const el=$('#live');if(el&&text&&el.textContent!==text)el.textContent=text;}
 function toast(text){const t=$('#toast');t.textContent=text;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>{t.hidden=true;},4000);}
@@ -124,7 +129,7 @@ async function refresh(){
  }catch(e){if(S.runId!==id)return;S.error=e.message;}
  if(S.runId===id){render();poll();}
 }
-async function act(fn){if(S.busy)return;S.busy=true;S.error='';render();try{await fn();}catch(e){S.error=e.message;if($('#analysis').open&&$('#analysis-error'))$('#analysis-error').textContent=e.message+' Try again.';toast(e.message);}finally{S.busy=false;render();poll();}}
+async function act(fn){if(S.busy)return;S.busy=true;S.error='';render();try{await fn();}catch(e){reportError(e,'action');S.error=e.message;if($('#analysis').open&&$('#analysis-error'))$('#analysis-error').textContent=e.message+' Try again.';toast(e.message);}finally{S.busy=false;render();poll();}}
 // The Make step needs a current price (free to check). It opens only with an approved look; reels are made on the Gemini key.
 async function prepareMake(){
  const p=S.plan?.plan;if(p?.mode==='kit'&&p.script&&!Number.isFinite(p.price?.usd)&&!S.pricing)await reprice();
