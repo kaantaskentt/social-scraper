@@ -46,3 +46,14 @@ test('winners are transcribed first, and a scan cut off by a restart resumes by 
   assert.equal(again.jobs.get(run.id).status,'complete');assert.deepEqual(order.map(u=>u.split('/').pop().split('.')[0]),['viral','big','flop','mid','mid2']);
  }finally{global.fetch=realFetch;await rm(root,{recursive:true,force:true});}
 });
+// The flow page polls the run every 3 s during a scan; the full run with transcripts and labels was 0.9 to 1.6 MB per
+// call (audit, 2026-09-29). The flow gets only what it shows; /lab keeps the full run.
+test('the flow view of a run keeps what the page shows and drops transcripts and labels',async()=>{
+ const {slimPost}=await import('../lib/data.mjs');
+ const p={id:'a',url:'u',creator:'c',caption:'cap',publishedAt:'t',likes:5,comments:1,views:9,plays:10,duration:6,videoUrl:'v',thumbnailUrl:'th',audioUrl:'au',status:'complete',error:null,excludedReason:null,duplicateOf:null,
+  transcript:{text:'x'.repeat(5000),segments:[{start:0,end:1,text:'x'}]},analysis:{schemaVersion:3,labels:{a:1},anatomy:[1,2,3]},music:{song:'s'},lyrics:{isLyrics:false}};
+ const s=slimPost(p);
+ assert.deepEqual(Object.keys(s).sort(),['analysis','caption','comments','creator','duplicateOf','duration','error','excludedReason','id','likes','plays','publishedAt','status','thumbnailUrl','url','videoUrl','views']);
+ assert.deepEqual(s.analysis,{schemaVersion:3});assert.equal(slimPost({...p,analysis:null}).analysis,null);
+ assert.ok(JSON.stringify(s).length<JSON.stringify(p).length/10);
+});

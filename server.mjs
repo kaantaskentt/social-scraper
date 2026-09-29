@@ -6,7 +6,7 @@ import {randomBytes} from 'node:crypto';
 import {parseEnv} from 'node:util';
 import {Pipeline} from './lib/pipeline.mjs';
 import {dimensions,roles,VERSION} from './lib/schema.mjs';
-import {metrics} from './lib/data.mjs';
+import {metrics,slimPost} from './lib/data.mjs';
 import {checkProvider,download} from './lib/providers.mjs';
 import {demo,artwork} from './lib/demo.mjs';
 import {moneyReport} from './lib/money-report.mjs';
@@ -158,6 +158,8 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==='POST'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm the cost first');json(res,202,await secrets.start(job,results,{rewrite:data.rewrite===true}));return;}
     json(res,200,await secrets.status(job,results));return;}
    if(action==='export'){res.setHeader('Content-Disposition',`attachment; filename="${job.creator}-${id}.json"`);json(res,200,publicJob(job));return;}
+   // ?view=flow: the flow page's slim run (it polls every 3 s during a scan); /lab and exports keep the full run.
+   if(url.searchParams.get('view')==='flow'){const {posts,...rest}=job;json(res,200,{...rest,posts:posts.map(slimPost)});return;}
    json(res,200,publicJob(job));return;
   }
   const video=path.match(/^\/videos\/([\w-]+)\/([\w-]+)$/);

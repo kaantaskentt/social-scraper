@@ -87,7 +87,7 @@ async function loadRun(id,{keepStep=false}={}){
  const switching=S.runId!==id;S.runId=id;store.set('flow.run',id);S.error='';S.scanSel=null;
  if(switching){clearTimeout(S.timer);S.job=null;S.sync?.unlink();Object.assign(S,{kitPick:null,makeView:null,copyCompare:false,copyEngine:'veo-fast',showAllIdeas:false,fbOpen:null,sync:null});render();}
  const base=`/api/runs/${encodeURIComponent(id)}`;
- let loaded;try{loaded=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(e=>({results:{},error:e.message})),api(`${base}/dna`).catch(e=>({state:'none',error:e.message})),api(`${base}/results`).catch(()=>null),api(`${base}/copy`).catch(()=>null),api(`${base}/prep`).catch(()=>({state:'none'}))]);}
+ let loaded;try{loaded=await Promise.all([api(`${base}?view=flow`),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(e=>({results:{},error:e.message})),api(`${base}/dna`).catch(e=>({state:'none',error:e.message})),api(`${base}/results`).catch(()=>null),api(`${base}/copy`).catch(()=>null),api(`${base}/prep`).catch(()=>({state:'none'}))]);}
  // A channel that cannot load goes back to the account list with the reason, never a spinner forever.
  // It is not remembered either, so a reload does not open it again (audit 2026-09-29).
  catch(e){if(S.runId===id){S.runId=null;S.step='scan';S.error=e.message;store.del('flow.run');render();}throw e;}
@@ -111,7 +111,7 @@ async function refresh(){
  const id=S.runId,base=`/api/runs/${encodeURIComponent(id)}`;
  const currentApi=async(...args)=>{const value=await api(...args);if(S.runId!==id)throw new Error('Account changed');return value;};
  try{
-  if(scanning()){const count=S.job.posts.length,job=await currentApi(base);if(S.runId!==id)return;S.job=job;S.runs=syncRuns(S.runs,S.job);if(count!==job.posts.length||S.moneyError){const money=await currentApi(`${base}/money`).catch(e=>({results:S.results,error:e.message}));if(S.runId!==id)return;S.results=money.results||{};S.moneyError=money.error||'';}if(scanned()){S.prepWatch=Date.now();await loadRun(id,{keepStep:true});return;}}
+  if(scanning()){const count=S.job.posts.length,job=await currentApi(`${base}?view=flow`);if(S.runId!==id)return;S.job=job;S.runs=syncRuns(S.runs,S.job);if(count!==job.posts.length||S.moneyError){const money=await currentApi(`${base}/money`).catch(e=>({results:S.results,error:e.message}));if(S.runId!==id)return;S.results=money.results||{};S.moneyError=money.error||'';}if(scanned()){S.prepWatch=Date.now();await loadRun(id,{keepStep:true});return;}}
   if(S.prep?.state==='working'||(S.prepWatch&&S.prep?.state!=='done'&&S.prep?.state!=='failed'))S.prep=await currentApi(`${base}/prep`).catch(()=>S.prep);
   if(S.secret?.state==='building')S.secret=await currentApi(`${base}/secret`);
   if(S.kit?.state==='working')S.kit=await currentApi(`${base}/kit`);

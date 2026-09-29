@@ -13,7 +13,8 @@ async function boot({routes,stored={}}){
  const mem=new Map(Object.entries(stored)),calls=[];
  Object.assign(globalThis,{document:doc,addEventListener(){},scrollTo(){},scrollBy(){},innerHeight:800,CSS:{escape:s=>s},
   localStorage:{getItem:k=>mem.has(k)?mem.get(k):null,setItem:(k,v)=>mem.set(k,String(v)),removeItem:k=>mem.delete(k)},
-  fetch:async(path,init={})=>{const body=init.body?JSON.parse(init.body):undefined;calls.push({method:init.method||'GET',path,body,headers:init.headers});
+  // Like a real server, routes ignore the query (the flow asks for ?view=flow); calls keep it.
+  fetch:async(url,init={})=>{const body=init.body?JSON.parse(init.body):undefined,path=String(url).split('?')[0];calls.push({method:init.method||'GET',path,query:String(url).split('?')[1]||'',body,headers:init.headers});
    try{const v=await routes(init.method||'GET',path,body);return {ok:true,status:200,text:async()=>JSON.stringify(v)};}catch(e){return {ok:false,status:500,text:async()=>JSON.stringify({error:e.message})};}}});
  await import(`../public/flow.js?page=${++n}`);await settle();
  const click=async(data,text='')=>{const target={dataset:data,disabled:false,textContent:text,closest(){return this;}};await doc.handlers.click({target});await settle();};
