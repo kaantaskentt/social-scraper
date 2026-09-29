@@ -10,7 +10,7 @@ test('server: the kit needs a confirm and a Secret, serves only kit pictures, an
  await mkdir(join(root,'runs'),{recursive:true});await writeFile(join(root,'runs','run1.json'),JSON.stringify({id:'run1',creator:'tester',status:'complete',createdAt:'2026-09-25T00:00:00Z',posts:[],events:[]}));
  await mkdir(join(root,'channels','run1','kit'),{recursive:true});await writeFile(join(root,'channels','run1','kit','face0-0123456789ab.jpg'),'JPEG');await writeFile(join(root,'channels','run1','kit','study.json'),'{}');
  const child=spawn(process.execPath,['server.mjs'],{cwd:new URL('..',import.meta.url),env:{PATH:process.env.PATH,PORT:String(port),LAB_DATA_DIR:root,GEMINI_API_KEY:'g',TYPESAFE_API_KEY:'j'},stdio:['ignore','pipe','pipe']});
- try{await new Promise((ok,fail)=>{child.stdout.on('data',d=>String(d).includes('ready')&&ok());child.on('exit',c=>fail(new Error('server exited '+c)));setTimeout(()=>fail(new Error('timeout')),8000);});
+ try{await new Promise((ok,fail)=>{child.stdout.on('data',d=>String(d).includes('ready')&&ok());child.on('exit',c=>fail(new Error('server exited '+c)));setTimeout(()=>fail(new Error('timeout')),8000).unref();});
   const base=`http://127.0.0.1:${port}`;const s=await (await fetch(`${base}/api/runs/run1/kit`)).json();
   assert.equal(s.state,'none');assert.ok(s.estimate.usd>0);assert.deepEqual(Object.keys(s.formats),['ai_host','hands_pov','visuals','animated']);
   const {token}=await (await fetch(`${base}/api/bootstrap`)).json();

@@ -14,7 +14,7 @@ test('server: shot list opens from a saved video, frames are served, lines need 
  const run={id:'run1',creator:'tester',status:'complete',createdAt:'2026-09-25T00:00:00Z',posts:[{id:'a',url:'https://www.instagram.com/reel/a/',publishedAt:'2026-09-01T00:00:00Z',plays:1000,caption:'',videoUrl:'',analysis:{anatomy:[{start:0,end:0.9,text:'Stop doing this.',value:'hook'}]}}],events:[]};
  await writeFile(join(root,'runs','run1.json'),JSON.stringify(run));
  const child=spawn(process.execPath,['server.mjs'],{cwd:new URL('..',import.meta.url),env:{PATH:process.env.PATH,PORT:String(port),LAB_DATA_DIR:root},stdio:['ignore','pipe','pipe']});
- try{await new Promise((ok,fail)=>{child.stdout.on('data',d=>String(d).includes('ready')&&ok());child.on('exit',c=>fail(new Error('server exited '+c)));setTimeout(()=>fail(new Error('timeout')),8000);});
+ try{await new Promise((ok,fail)=>{child.stdout.on('data',d=>String(d).includes('ready')&&ok());child.on('exit',c=>fail(new Error('server exited '+c)));setTimeout(()=>fail(new Error('timeout')),8000).unref();});
   const base=`http://127.0.0.1:${port}`;
   const list=await (await fetch(`${base}/api/runs/run1/shotlist/a`)).json();
   assert.equal(list.pace.shots,2);assert.equal(list.parts[0].role,'hook');assert.equal(list.parts[0].said,'Stop doing this.');

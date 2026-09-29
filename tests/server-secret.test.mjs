@@ -11,7 +11,7 @@ test('server: the Secret shows why it cannot build yet, and never starts without
  const run={id:'run1',creator:'tester',status:'complete',createdAt:'2026-09-25T00:00:00Z',posts:[{id:'a',publishedAt:'2026-09-01T00:00:00Z',plays:1000,comments:2,caption:'',videoUrl:''}],events:[]};
  await writeFile(join(root,'runs','run1.json'),JSON.stringify(run));
  const child=spawn(process.execPath,['server.mjs'],{cwd:new URL('..',import.meta.url),env:{PATH:process.env.PATH,PORT:String(port),LAB_DATA_DIR:root},stdio:['ignore','pipe','pipe']});
- try{await new Promise((ok,fail)=>{child.stdout.on('data',d=>String(d).includes('ready')&&ok());child.on('exit',c=>fail(new Error('server exited '+c)));setTimeout(()=>fail(new Error('timeout')),8000);});
+ try{await new Promise((ok,fail)=>{child.stdout.on('data',d=>String(d).includes('ready')&&ok());child.on('exit',c=>fail(new Error('server exited '+c)));setTimeout(()=>fail(new Error('timeout')),8000).unref();});
   const base=`http://127.0.0.1:${port}`;
   const status=await (await fetch(`${base}/api/runs/run1/secret`)).json();assert.equal(status.state,'none');assert.match(status.plan.error,/at least 8/);
   const {token,connections}=await (await fetch(`${base}/api/bootstrap`)).json();assert.equal(connections.gemini.configured,false);

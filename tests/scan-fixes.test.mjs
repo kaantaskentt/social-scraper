@@ -13,7 +13,7 @@ const jevAnswer=(req,lyricsP)=>({model:req.model,answers:Object.fromEntries(Obje
 const words='Why keep waiting when you can pick one task and finish it today';
 const song={musicInfo:{song_name:'Black Beatles',artist_name:'Rae Sremmurd',uses_original_audio:false}};
 async function withPipeline(fetchImpl,fn){const root=await mkdtemp(join(tmpdir(),'cl-fix-'));const real=global.fetch;global.fetch=fetchImpl;
- try{await fn(await new Pipeline(root,keys).init(),root);}finally{global.fetch=real;await rm(root,{recursive:true,force:true});}}
+ try{await fn(await new Pipeline(root,keys,{groqRpm:60000}).init(),root);}finally{global.fetch=real;await rm(root,{recursive:true,force:true});}}
 
 test('the reel records which song it uses',()=>{
  assert.deepEqual(normalize({id:'a',...song}).music,{song:'Black Beatles',artist:'Rae Sremmurd',original:false});
@@ -42,7 +42,7 @@ test('runs scanned before the fix get the lyrics check on resume, without paying
  await withPipeline(async(url,opts)=>{const req=JSON.parse(opts.body);if(req.questions.lyrics){checks++;return Response.json(jevAnswer(req,0.8));}classify++;return Response.json(jevAnswer(req));},async(p,root)=>{
   const j=await p.create({creator:'tester'},[{id:'lyric',ownerUsername:'tester',transcript:'Black Beatles in the city be back immediately to confiscate the money',...song}]);
   const post=j.posts[0];delete post.music;await p.run(j.id);await settle(p);assert.equal(post.status,'complete');assert.equal(classify,1);assert.equal(checks,0);
-  await p.persist(j);const again=await new Pipeline(root,keys).init();const old=again.jobs.get(j.id);assert.equal(old.posts[0].music.original,false,'backfilled from the raw rows');
+  await p.persist(j);const again=await new Pipeline(root,keys,{groqRpm:60000}).init();const old=again.jobs.get(j.id);assert.equal(old.posts[0].music.original,false,'backfilled from the raw rows');
   await again.run(j.id);await settle(again);assert.equal(old.posts[0].status,'music');assert.equal(checks,1);assert.equal(classify,1);
  });
 });

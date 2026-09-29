@@ -15,7 +15,7 @@ async function importsOf(file,seen=new Set()){
 test('server: every module reachable from app.js is served',async()=>{
  const root=await mkdtemp(join(tmpdir(),'cl-srv-a-'));const port=await freePort();
  const child=spawn(process.execPath,['server.mjs'],{cwd:new URL('..',import.meta.url),env:{PATH:process.env.PATH,PORT:String(port),LAB_DATA_DIR:root},stdio:['ignore','pipe','pipe']});
- try{await new Promise((ok,fail)=>{child.stdout.on('data',d=>String(d).includes('ready')&&ok());child.on('exit',c=>fail(new Error('server exited '+c)));setTimeout(()=>fail(new Error('timeout')),8000);});
+ try{await new Promise((ok,fail)=>{child.stdout.on('data',d=>String(d).includes('ready')&&ok());child.on('exit',c=>fail(new Error('server exited '+c)));setTimeout(()=>fail(new Error('timeout')),8000).unref();});
   const files=[...new Set([...await importsOf('app.js'),...await importsOf('flow.js'),'flow.css','flow.js'])];assert.ok(files.length>8,files.join(','));
   for(const f of files){const r=await fetch(`http://127.0.0.1:${port}/${f}`);assert.equal(r.status,200,`/${f} is not served`);assert.match(r.headers.get('content-type'),f.endsWith('.css')?/css/:/javascript/);}
   for(const page of ['/','/lab']){const r=await fetch(`http://127.0.0.1:${port}${page}`);assert.equal(r.status,200,page);}

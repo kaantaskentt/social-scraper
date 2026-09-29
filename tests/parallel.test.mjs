@@ -10,7 +10,7 @@ const jevOk=req=>({model:req.model,answers:Object.fromEntries(Object.entries(req
 test('up to three runs can be active at once; a fourth is refused until one finishes',async()=>{
  const root=await mkdtemp(join(tmpdir(),'cl-par-'));const real=global.fetch;let release;const gate=new Promise(r=>release=r);
  global.fetch=async(url,opts)=>{if(String(url).includes('typesafe.ai')){await gate;return Response.json(jevOk(JSON.parse(opts.body)));}throw new Error('unexpected '+url);};
- try{const p=await new Pipeline(root,()=>({jev:'j',groq:'g'})).init();const jobs=[];
+ try{const p=await new Pipeline(root,()=>({jev:'j',groq:'g'}),{groqRpm:60000}).init();const jobs=[];
   for(const name of ['a','b','c','d'])jobs.push(await p.create({creator:`brand_${name}`},[{id:`r_${name}`,ownerUsername:`brand_${name}`,transcript:'one two three four five six seven'}]));
   for(const j of jobs.slice(0,3))await p.run(j.id);
   assert.equal(p.active.size,3);
