@@ -5,16 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Social Scraper</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
 <link rel="stylesheet" href="/flow.css">
 </head>
 <body>
-<header class="top"><a class="brand" href="/"><span class="brand-mark"></span>Social Scraper</a><span class="acct-now" id="acct-now"></span><a class="top-link" href="/lab">Research view</a></header>
+<header class="top"><div class="top-inner"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>Social Scraper</a><div id="acct-now" class="acct-now"></div><button class="btn new-analysis" data-act="new-analysis">New analysis</button><a class="top-link" href="/lab">Research view</a></div></header>
 <div id="stepper"></div>
 <main id="view" class="view"></main>
+<footer id="actions" class="action-bar" aria-label="Next action"></footer>
+<dialog id="analysis" class="analysis-sheet" aria-labelledby="analysis-title"></dialog>
 <p id="live" class="sr-only" role="status" aria-live="polite"></p>
 <dialog id="player" class="player"><button type="button" class="x" data-close aria-label="Close">×</button><video controls playsinline></video></dialog>
-<dialog id="confirm" class="confirm"><form method="dialog"><h2 id="confirm-title">Make this reel?</h2><div id="confirm-look"></div><p id="confirm-text"></p><div class="confirm-row"><button value="cancel" class="btn">Cancel</button><button value="ok" class="btn btn-primary" id="confirm-ok">Make it</button></div></form></dialog>
+<dialog id="confirm" class="confirm" aria-labelledby="confirm-title"><form method="dialog"><h2 id="confirm-title">Make this reel?</h2><div id="confirm-look"></div><p id="confirm-text"></p><div class="confirm-row"><button value="cancel" class="btn">Cancel</button><button value="ok" class="btn btn-primary" id="confirm-ok">Make it</button></div></form></dialog>
 <div id="toast" class="toast" role="status" hidden></div>
 <script type="module" src="/flow.js"></script>
 </body>

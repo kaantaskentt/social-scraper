@@ -58,3 +58,14 @@ test('a stopped copy points to its Try again button',()=>{
  const html=renderCopyStudio({copy:{batch:batch({items:[item({state:'stopped',error:'The app restarted while this copy was being made. Parts already made are kept: press Try again to pay only for the rest.',retryUsd:1.13})]})}});
  assert.match(html,/press Try again/);assert.match(html,/data-act="copy-retry" data-post="a" data-usd="1.13">Try again · \$1\.13/);
 });
+
+test('Veo defaults to one engine; long or missing Omni prices never become a free copy',()=>{
+ const long={id:'long',seconds:50,plays:1000,xNormal:3,usd:null,veo:{usd:6,parts:7},why:'Strong hook'};
+ const copy={runId:'r',picks:{picks:[long]}};
+ const html=renderCopyStudio({copy});
+ assert.match(html,/data-copy-engine="veo-fast" aria-pressed="true"/);assert.match(html,/data-usd="6" data-engines="veo-fast"/);
+ assert.match(html,/Gemini Omni unavailable · longer than 40 s/);assert.doesNotMatch(html,/NaN|\$null/);
+ for(const engine of ['omni','both'])assert.match(renderCopyStudio({copy,engine}),/data-act="copy-start"[^>]*disabled/);
+ const absent=renderCopyStudio({copy:{runId:'r',picks:{picks:[{id:'old',xNormal:3}]}}});
+ assert.match(absent,/price unavailable/);assert.match(absent,/data-act="copy-start"[^>]*disabled/);
+});
