@@ -49,13 +49,13 @@ function render(){
  if(S.step==='kit')html=renderKit({account,status:S.kit,busy:S.busy,error:S.error,pick:S.kitPick,reels:(S.make?.reels||[]).filter(r=>r.mode==='kit'&&r.kitAt===S.kit?.saved?.createdAt)});
  // Make: the copy studio first (copy their proven winners, Kaan 2026-09-29); new ideas one tap away.
  if(S.step==='make'&&S.makeView!=='ideas'&&S.kit?.saved?.approved){
-  const shape=`copy:${S.runId}:${copyShape(S.copy)}:${S.copyCompare}:${[...(S.copyUnpicked||[])].join()}:${S.busy}:${S.error}`;
+  const shape=`copy:${S.runId}:${copyShape(S.copy)}:${S.copyCompare}:${S.copyEngine||'both'}:${[...(S.copyUnpicked||[])].join()}:${S.busy}:${S.error}`;
   announce(copyAnnouncement(S.copy));
   // Only the numbers move while copies are made, so a playing video is never reset by the once-a-second refresh.
   if(shape===S.viewKey&&$('#view .copy-grid')){patchCopy(copyLive(S.copy));return;}
   // The intro card already says what copying is, so the header says it only once the intro is gone (audit 2026-09-29).
   const intro=!S.copy?.batch&&(!S.copy?.picks||S.copy?.picking?.state==='working');
-  const page=`<header class="step-head"><h1>Copy @${esc(account)}'s winners</h1><p>${intro?'':'Same shots, words and sounds as their proven reels, with your hosts. '}<button type="button" class="link-btn" data-act="make-ideas">Or make a new idea instead</button></p></header><p class="err"${S.error?'':' hidden'}>${esc(S.error)}</p>${renderCopyStudio({copy:S.copy,kit:S.kit?.saved,busy:S.busy,unpicked:S.copyUnpicked||new Set(),compareOpen:S.copyCompare})}`;
+  const page=`<header class="step-head"><h1>Copy @${esc(account)}'s winners</h1><p>${intro?'':'Same shots, words and sounds as their proven reels, with your hosts. '}<button type="button" class="link-btn" data-act="make-ideas">Or make a new idea instead</button></p></header><p class="err"${S.error?'':' hidden'}>${esc(S.error)}</p>${renderCopyStudio({copy:S.copy,kit:S.kit?.saved,busy:S.busy,unpicked:S.copyUnpicked||new Set(),compareOpen:S.copyCompare,engine:S.copyEngine||'both'})}`;
   // A new shape on the same page (a tile done, a pick ticked, picking moving on) swaps only the parts that changed, so a
   // playing video is not reset and nothing re-animates (audit 2026-09-29); a page from another step is replaced.
   if(S.viewKey?.startsWith(`copy:${S.runId}:`)){const t=document.createElement('template');t.innerHTML=page;morphChildren($('#view'),t.content);}else $('#view').innerHTML=page;
@@ -74,7 +74,7 @@ addEventListener('resize',()=>{if(S.step==='scan')render();});
 // The live numbers of the copy studio, written into the page in place.
 function patchCopy(live){
  if(!live)return;const set=(el,v)=>{if(el&&el.textContent!==v)el.textContent=v;};
- for(const i of live.items){const t=$(`#view [data-tile="${CSS.escape(i.postId)}"]`);if(!t)continue;t.style.setProperty('--p',i.pct);set(t.querySelector('[data-live="pct"]'),`${i.pct}%`);set(t.querySelector('[data-live="stage"]'),i.stage);set(t.querySelector('[data-live="eta"]'),i.eta);}
+ for(const i of live.items){const t=$(`#view [data-tile="${CSS.escape(i.key||i.postId)}"]`);if(!t)continue;t.style.setProperty('--p',i.pct);set(t.querySelector('[data-live="pct"]'),`${i.pct}%`);set(t.querySelector('[data-live="stage"]'),i.stage);set(t.querySelector('[data-live="eta"]'),i.eta);}
  const bar=$('#view [data-live="batch-bar"]');if(bar)bar.style.width=`${live.pct}%`;set($('#view [data-live="batch-eta"]'),live.eta);
 }
 
@@ -130,7 +130,7 @@ async function reprice(){
 async function loadBalance(){try{S.balance=(await api('/api/higgsfield/balance')).credits;}catch(e){S.balance=null;S.error=e.message;}render();}
 
 document.addEventListener('click',async e=>{
- const t=e.target.closest('[data-copy-pick],[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close],[data-kit-format],[data-kit-cast],[data-kit-place],[data-voice],[data-fb],[data-fb-reason],[data-voice-mode]');if(!t||t.disabled)return;
+ const t=e.target.closest('[data-copy-engine],[data-copy-pick],[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close],[data-kit-format],[data-kit-cast],[data-kit-place],[data-voice],[data-fb],[data-fb-reason],[data-voice-mode]');if(!t||t.disabled)return;
  const base=`/api/runs/${encodeURIComponent(S.runId)}`;
  // An error belongs to the step it happened on (audit 2026-09-29).
  if(t.dataset.step){S.error='';S.step=t.dataset.step;store.set(`flow.step.${S.runId}`,S.step);render();scrollTo({top:0,behavior:'smooth'});if(S.step==='make')prepareMake();return;}
@@ -168,16 +168,18 @@ document.addEventListener('click',async e=>{
  if(t.dataset.act==='copy-pick'){act(async()=>{S.copy=await api(`${base}/copy/pick`,{confirm:true});S.copyUnpicked=new Set();S.copyCompare=false;});return;}
  if(t.dataset.act==='copy-compare'){S.copyCompare=!S.copyCompare;render();if(S.copyCompare)setTimeout(()=>$('#view .cmp-grid')?.scrollIntoView({behavior:'smooth',block:'start'}),50);return;}
  if(t.dataset.act==='copy-new'){act(async()=>{S.copy=await api(`${base}/copy/pick`,{confirm:true});S.copyUnpicked=new Set();S.copyCompare=false;});return;}
- if(t.dataset.act==='copy-sync'){const id=t.dataset.post,a=$(`#view [data-orig="${CSS.escape(id)}"]`),b=$(`#view [data-tile="${CSS.escape(id)}"] video`);if(!a||!b)return;
+ if(t.dataset.act==='copy-sync'){const id=t.dataset.post,a=$(`#view [data-orig="${CSS.escape(t.dataset.origOf||id)}"]`),b=$(`#view [data-tile="${CSS.escape(id)}"] video`);if(!a||!b)return;
   // Both in view when they fit; on a small screen the copy, whose sound plays, is the one brought into view.
   const r=[a,b].map(v=>v.getBoundingClientRect()),top=Math.min(...r.map(x=>x.top)),bottom=Math.max(...r.map(x=>x.bottom));
   if(bottom-top<=innerHeight-24)scrollBy({top:(top+bottom)/2-innerHeight/2,behavior:'smooth'});else b.scrollIntoView({block:'center',behavior:'smooth'});
   S.sync?.unlink();S.sync=syncPlay(a,b);const pair=S.sync;pair.started.catch(()=>{pair.unlink();toast('Press play on each video once, then try again.');});return;}
  if(t.dataset.act==='copy-retry'){const usd=Number(t.dataset.usd),ids=[t.dataset.post];
   ask('Try this copy again?',usd?`Parts already made are kept. The parts still to film cost about $${usd.toFixed(2)} (up to twice that with a retry).`:'Every part is already made: this only edits and compares it (a few cents).',()=>act(async()=>{S.copy=await api(`${base}/copy/retry`,{ids,confirmUsd:usd});}));return;}
- if(t.dataset.act==='copy-start'){const usd=Number(t.dataset.usd),ids=t.dataset.ids.split(',').filter(Boolean);
-  ask(ids.length>1?`Make these ${ids.length} copies?`:'Make this copy?',`This makes ${ids.length} cop${ids.length>1?'ies':'y'} at once for about $${usd.toFixed(2)} on your Gemini key (up to twice that if parts need their one retry). Copies are word for word from their originals: internal tests, check claims before posting.`,
-   ()=>act(async()=>{S.copy=await api(`${base}/copy/start`,{ids,confirmUsd:usd});S.copyCompare=false;}),{look:renderConfirmLook(S.kit?.saved)});return;}
+ // The video model for the copies (Kaan, 2026-09-29: try Veo 3.1 Fast, and both side by side).
+ if(t.dataset.copyEngine){S.copyEngine=t.dataset.copyEngine;render();return;}
+ if(t.dataset.act==='copy-start'){const usd=Number(t.dataset.usd),ids=t.dataset.ids.split(',').filter(Boolean),engines=(t.dataset.engines||'omni').split(',').filter(Boolean),n=ids.length*engines.length;
+  ask(n>1?`Make these ${n} copies?`:'Make this copy?',`This makes ${n} cop${n>1?'ies':'y'}${engines.length>1?' (each winner with Gemini Omni and with Veo 3.1 Fast)':engines[0]==='veo-fast'?' with Veo 3.1 Fast':' with Gemini Omni'} at once for about $${usd.toFixed(2)} on your Gemini key (up to twice that if parts need their one retry). Copies are word for word from their originals: internal tests, check claims before posting.`,
+   ()=>act(async()=>{S.copy=await api(`${base}/copy/start`,{ids,confirmUsd:usd,engines});S.copyCompare=false;}),{look:renderConfirmLook(S.kit?.saved)});return;}
  if(t.dataset.act==='scan-resume'){act(async()=>{await api(`${base}/run`,{});S.job=await api(base);S.runs=syncRuns(S.runs,S.job);});return;}
  if(t.dataset.act==='ideas-all'){S.showAllIdeas=true;render();return;}
  const a=t.dataset.act;

@@ -97,3 +97,11 @@ test('fidelity counts every beat of the original once; a beat the watch left out
  const seen={beats:[{beat:1,match:3},{beat:2,match:3}],same_feel:3},f=fidelityScore({wordsKept:1,lengthRatio:1,beats:seen.beats,count:5});
  assert.ok(f.score<75,`score ${f.score}`);assert.deepEqual(fidelityVerdict(f.score,seen,beats),{faithful:false,redo:'part_2'});
 });
+
+test('Veo lengths: the same words cut into an 8 s clip and 7 s extensions, every part ending at its own length',()=>{
+ const breakdown={beats:[{from:0,to:5,shot:'close',happens:'pour',says:'',sound:''},{from:5,to:20,shot:'foam',happens:'foam',says:'',sound:''}]};
+ const segments=[{start:0,end:4,text:'Pour boiling water over raw chicken.'},{start:6,end:14,text:'If white foam comes out, that is what they pumped into it.'},{start:15,end:21,text:'If it holds firm it is clean.'}];
+ const s=copyScript({breakdown,segments,seconds:22,cast:[{who:'Felix',does:'pours'},{who:'Felix',does:'foam'}],hook:'h',caption:'c',lengths:[8,7,7]});
+ assert.deepEqual(s.parts.map(p=>p.seconds),[8,7,7]);assert.deepEqual(s.parts.map(p=>p.beats.at(-1).to),[8,7,7]);
+ assert.equal(wordsKept(segments.map(x=>x.text).join(' '),s.parts.flatMap(p=>p.beats.map(b=>b.says)).join(' ')),1);
+});

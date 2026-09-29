@@ -296,3 +296,7 @@ details.why[open]>:not(summary){animation:rise .25s ease both}
 /* Audit 2026-09-29: screen-reader-only text; on phones long buttons wrap inside their card and the track row fits. */
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @media(max-width:600px){.kit-actions .btn,.hero-cta .btn{white-space:normal;text-align:center}.track-row{width:100%}}
+/* Video model choice and per-model tiles (2026-09-29) */
+.engine-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.engine-row .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;flex-wrap:wrap}
+.engine-row .seg button{border:0;background:var(--card);color:var(--muted);padding:8px 12px;font:500 13px var(--sans);cursor:pointer}.engine-row .seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.engine-tag{position:absolute;right:6px;top:6px;z-index:2;font-size:10.5px;font-weight:600;color:#fff;background:rgba(0,0,0,.55);padding:3px 7px;border-radius:99px}

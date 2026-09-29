@@ -394,3 +394,31 @@ test('a remake follows the channel\'s payoff decision',async()=>{
  assert.equal(s.plan.check.pass,true,JSON.stringify(s.plan.check.problems));
  await rm(root,{recursive:true});
 });
+
+test('the Veo prompt names who is which picture, keeps every quoted line, and stays under Veo\'s limit',async()=>{
+ const {veoPrompt}=await import('../lib/kit-reel.mjs');
+ const sc={parts:[{seconds:8,beats:[{from:0,to:4,shot:'Close shot, chicken large in the foreground',who:'Leo',does:'Leo pours boiling water',says:'Pour boiling water over raw chicken.',sound:'pour'},{from:4,to:8,shot:'close on the chicken',who:'Leo',does:'white foam bubbles out',says:'If white foam comes out,',sound:''}]},{seconds:7,beats:[{from:0,to:7,shot:'x'.repeat(5000),who:'Mia',does:'Mia reacts',says:'that is what they pumped into it.',sound:''}]}]};
+ const p0=veoPrompt(sc,0,kitSaved);assert.match(p0,/Leo \(reference image 1/);assert.match(p0,/Mia \(reference image 2/);assert.match(p0,/reference image 3\)/);assert.match(p0,/Leo says: "Pour boiling water over raw chicken\."/);
+ const p1=veoPrompt(sc,1,kitSaved);assert.match(p1,/^Continue the same video/);assert.match(p1,/Mia says: "that is what they pumped into it\."/);assert.ok(p1.length<=3600);
+});
+
+test('Veo copy: the 8 s clip carries our pictures, the 7 s extension carries the video so far, each is checked, priced per second',async()=>{
+ const {root,job,ch}=await setup();const keys=()=>({gemini:'g',jev:'j',groq:'q'});
+ const vs={hook_title:'H',caption:'c',parts:[{seconds:8,beats:[{from:0,to:8,shot:'close',who:'Leo',does:'Leo pours',says:'Pour boiling water.',sound:'pour'}]},{seconds:7,beats:[{from:0,to:7,shot:'close',who:'Mia',does:'foam',says:'That is the foam.',sound:''}]}]};
+ await writeFile(join(ch,'plan.json'),JSON.stringify({mode:'kit',source:'copy',engine:'veo-fast',copyOf:'o1',kitAt:kitSaved.createdAt,createdAt:'2026-09-29T02:00:00Z',chosen:0,picked:[{idea:{title:'Copy'}}],script:vs,check:{pass:true},price:{usd:1.5}}));
+ const posts=[];let n=0;const veoFetch=async(url,o={})=>{
+  if(o.method==='POST'){posts.push({url,body:JSON.parse(o.body)});return Response.json({name:`models/x/operations/op${posts.length}`});}
+  if(url.includes(':download'))return new Response('VEO'+posts.length);
+  return Response.json({done:true,response:{generateVideoResponse:{generatedSamples:[{video:{uri:'https://generativelanguage.googleapis.com/v1beta/files/v:download?alt=media'}}]}}});};
+ const bad={shows:'x',match:1,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'the foam'},fine={...bad,match:3,missing:'nothing'};
+ // Part 2's first film is off (both watches say so), its retry passes.
+ const gemini=async()=>{n++;return {json:n===3||n===4?bad:fine,costUsd:0};};
+ const lengths=[8,15,15];let k=0;
+ const maker=new ReelMaker(root,keys,{cover:fakeCover,gemini,jev:async()=>good,veoFetch,pollMs:0,seconds:async()=>lengths[Math.min(k++,2)],cut:async(i,o)=>{await writeFile(o,'c');return o;},render:async a=>{await writeFile(a.out,'R');return {seconds:17.5,spoken:[]};}});
+ await maker.start(job,{confirmCredits:1.5});const m=await until(()=>maker.status(job));assert.equal(m.state,'done',m.error);
+ assert.equal(posts.length,3);assert.match(posts[0].url,/veo-3\.1-fast-generate-preview:predictLongRunning/);
+ assert.ok(posts[0].body.instances[0].referenceImages.length>=1);assert.equal(posts[0].body.instances[0].video,undefined);
+ assert.ok(posts[1].body.instances[0].video.bytesBase64Encoded);assert.equal(posts[1].body.instances[0].referenceImages,undefined);
+ const reel=m.reels[0];assert.equal(reel.engine,'veo-fast');assert.deepEqual(Object.keys(reel.paid),['part-1#1','part-2#1','part-2#2']);assert.equal(reel.spentUsd,0.8+0.7+0.7);
+ assert.equal(reel.parts[1].attempt,2);assert.equal(reel.copyOf,'o1');
+});

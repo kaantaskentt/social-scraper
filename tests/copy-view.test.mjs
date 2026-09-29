@@ -11,17 +11,20 @@ test('first: one clear button to find the five; picking shows what is happening'
  assert.match(renderCopyStudio({copy:{picking:{state:'working',stage:'Studying 8 winners shot by shot'}}}),/Studying 8 winners shot by shot/);
 });
 test('picks: each original with why and price; the total follows what is ticked',()=>{
- const html=renderCopyStudio({copy:{runId:'r',picks},unpicked:new Set(['b'])});
+ const html=renderCopyStudio({copy:{runId:'r',picks},unpicked:new Set(['b']),engine:'omni'});
  assert.match(html,/5\.8M plays · 104× their normal/);assert.match(html,/4 of their winners open with the same four words/);assert.match(html,/2 other winners skipped/);
- assert.match(html,/data-act="copy-start" data-usd="4.43" data-ids="a"[^>]*>Copy this one · \$4\.43/);assert.match(html,/src="\/media\/r\/a"/);
+ assert.match(html,/data-act="copy-start" data-usd="4.43" data-engines="omni" data-ids="a"[^>]*>Copy this one · \$4\.43/);
+ // Both models: each winner once with each, priced with each model's own price.
+ const both=renderCopyStudio({copy:{runId:'r',picks:{...picks,picks:picks.picks.map(p=>({...p,veo:{parts:6,usd:4.3}}))}},unpicked:new Set(['b']),engine:'both'});
+ assert.match(both,/data-usd="8.73" data-engines="omni,veo-fast"/);assert.match(both,/with both models · \$8\.73/);assert.match(both,/data-copy-engine="veo-fast" aria-pressed="false">Veo 3\.1 Fast · \$4\.3/);assert.match(html,/src="\/media\/r\/a"/);
 });
 test('making: the profile with a ring per copy at its real percent, one bar with time left; done copies show the reel and how close they are',()=>{
  const copy={batch:{id:'B',usd:8.86,pct:37,left:130,items:[item(),item({postId:'b',state:'done',pct:100,reel:{url:'/channels/r/x/reel.mp4',cover:'/c.jpg'},fidelity:{score:88,faithful:true,shots:85,words:98,length:95,beats:[{from:0,to:3,happens:'pours',match:3,differs:'nothing'}]}})]}};
  const html=renderCopyStudio({copy,kit});
  assert.match(html,/style="--p:42;--i:0"/);assert.match(html,/data-live="pct">42%/);assert.match(html,/1 min 35 s left/);assert.match(html,/37% · about 2 min 10 s left/);
  assert.match(html,/<video src="\/channels\/r\/x\/reel.mp4#t=1" poster="\/c.jpg"/);assert.match(html,/88\/100 match/);assert.doesNotMatch(html,/% same/);assert.match(html,/@food\.fact\.check/);
- const open=renderCopyStudio({copy,kit,compareOpen:true});assert.match(open,/data-orig="b"/);assert.match(open,/Match score 88 of 100/);assert.match(open,/Gemini watched both/);assert.match(open,/data-act="copy-sync" data-post="b"/);assert.match(open,/A faithful copy\./);
- assert.deepEqual(copyLive(copy).items[0],{postId:'a',pct:42,stage:'Filming part 2 of 4',eta:'1 min 35 s left',state:'working'});
+ const open=renderCopyStudio({copy,kit,compareOpen:true});assert.match(open,/data-orig="b"/);assert.match(open,/Gemini Omni · match score 88 of 100/);assert.match(open,/Gemini watched both/);assert.match(open,/data-act="copy-sync" data-post="b"/);assert.match(open,/A faithful copy\./);
+ assert.deepEqual(copyLive(copy).items[0],{key:'a',postId:'a',pct:42,stage:'Filming part 2 of 4',eta:'1 min 35 s left',state:'working'});
 });
 test('the page redraws when the shape changes (a copy finishes), not when only numbers move',()=>{
  const a={batch:{id:'B',items:[item()]}},b={batch:{id:'B',items:[item({pct:80})]}},c={batch:{id:'B',items:[item({state:'done',reel:{url:'/r.mp4'}})]}};
@@ -49,7 +52,7 @@ test('a finished batch leads to Ready to post; not while copies are still being 
 test('a failed comparison says so and offers to compare again, with nothing to film',()=>{
  const copy={batch:batch({items:[item({state:'done',pct:100,reel:{url:'/r.mp4'},fidelity:{error:'Request payload size exceeds the limit'},retryUsd:0})]})};
  const html=renderCopyStudio({copy});assert.match(html,/data-act="copy-retry" data-post="a" data-usd="0">Compare again/);assert.doesNotMatch(html,/undefined/);
- assert.match(renderCopyStudio({copy,compareOpen:true}),/Not compared: Request payload size exceeds the limit/);
+ assert.match(renderCopyStudio({copy,compareOpen:true}),/not compared: Request payload size exceeds the limit/);
 });
 test('a stopped copy points to its Try again button',()=>{
  const html=renderCopyStudio({copy:{batch:batch({items:[item({state:'stopped',error:'The app restarted while this copy was being made. Parts already made are kept: press Try again to pay only for the rest.',retryUsd:1.13})]})}});

@@ -106,7 +106,7 @@ const server=http.createServer(async(req,res)=>{
    if(req.method==='POST'&&copyRoute[2]==='retry'){const data=await body(req);json(res,202,await copies.retry(job,{ids:data.ids,confirmUsd:Number(data.confirmUsd)}));return;}
    // Compare a made copy with its original again (cents), without filming anything (audit, 2026-09-29).
    if(req.method==='POST'&&copyRoute[2]==='compare'){const data=await body(req);if(data.confirm!==true)throw new Error('Confirm first');json(res,202,await copies.compareAgain(job,{postId:String(data.postId||'')}));return;}
-   if(req.method==='POST'&&copyRoute[2]==='start'){const data=await body(req);json(res,202,await copies.start(job,{ids:data.ids,confirmUsd:Number(data.confirmUsd)}));return;}
+   if(req.method==='POST'&&copyRoute[2]==='start'){const data=await body(req);json(res,202,await copies.start(job,{ids:data.ids,confirmUsd:Number(data.confirmUsd),engines:Array.isArray(data.engines)&&data.engines.length?data.engines:['omni']}));return;}
   }
   // Real results: Kaan's handle, then a check scans his account (public, about 3 cents) and matches our reels.
   const resRoute=path.match(/^\/api\/runs\/([\w-]+)\/results(?:\/(handle|check))?$/);
