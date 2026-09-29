@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PART_USD,EXTEND_USD} from '../lib/kit-reel.mjs';
-import {copyMode,visualScript,formatKey,copyCandidates,pickCopies,timedWords,copyScript,wordsKept,copyPrice,stageKey,plannedStages,progressOf,learnStage,fidelityScore,fidelityVerdict,hasTimedWords,COPY_MAX_PARTS} from '../lib/copy.mjs';
+import {copyableRequest,copyMode,visualScript,formatKey,copyCandidates,pickCopies,timedWords,copyScript,wordsKept,copyPrice,stageKey,plannedStages,progressOf,learnStage,fidelityScore,fidelityVerdict,hasTimedWords,COPY_MAX_PARTS} from '../lib/copy.mjs';
 
 const reel=(id,xNormal,seconds,text,timed=true,plays=null,engagement=null)=>({id,xNormal,seconds,text,timed,plays,engagement});
 
@@ -153,4 +153,10 @@ test('visual copy: a winner whose sound is a song (or that has no speech) is cop
 test('candidates: a silent or song-only winner is offered too, most played first',()=>{
  const c=copyCandidates([{id:'song',xNormal:113,seconds:6,text:'',timed:false,silent:true,plays:750412,engagement:57},{id:'talk',xNormal:5,seconds:30,text:'Here is why your bananas go brown so fast and what stops it',timed:true,plays:40000,engagement:20}]);
  assert.deepEqual(c.map(x=>x.id),['song','talk']);
+});
+
+test('a look without hosts offers a faceless person to Jev, so a reel shown from behind can be copied',()=>{
+ const r=copyableRequest({beats:[{shot:'from behind'}],payoff:{},first_second:'x'},{cast:[],place:'a store aisle'});
+ assert.equal(r.state.our_hosts.length,1);assert.match(r.state.our_hosts[0].look,/face is never shown/);assert.match(r.questions.roles_fit.instructions,/only from behind/);
+ assert.equal(copyableRequest({beats:[]},{cast:[{name:'Leo',look:'a man',role:'host'}],place:'p'}).state.our_hosts[0].name,'Leo');
 });
