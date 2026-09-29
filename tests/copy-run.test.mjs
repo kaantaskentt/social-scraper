@@ -237,3 +237,19 @@ test('a winner over a song is made as a visual copy: no spoken words, the printe
   assert.match(plan.sound,/Add a sound on Instagram: the original plays hip-hop singing/);assert.match(plan.picked[0].idea.title,/Copy · DON'T TALK TO ME/);
  }finally{await rm(root,{recursive:true,force:true});}
 });
+// A flaky run of the "making" test (2026-09-29) showed "done" at 90%: the status read the percent before an await and the
+// state after it. The status now reads one snapshot of each copy. This test checks the two agree when a copy finishes
+// around a status read; it could not pin the exact interleaving (the flip lands before the file read), so the full
+// suite's repeated runs are the evidence the flake is gone.
+test('a copy\'s state and percent always agree: "done" is 100%',async()=>{
+ let open;const gate=new Promise(r=>{open=r;});const {root,studio}=await setup({gate});
+ try{
+  await studio.pickStart(job);await until(()=>studio.status(job),s=>s.picking?.state!=='working');await studio.start(job,{ids:['chk'],confirmUsd:3.3});
+  await until(()=>studio.status(job),s=>s.batch.items[0].stage==='Filming part 2 of 3');
+  const item=studio.batches.get(RUN).items[0],dir=join(root,'channels',RUN,'reels',item.reelId);await mkdir(dir,{recursive:true});await writeFile(join(dir,'reel.json'),JSON.stringify({id:item.reelId,url:'/x/reel.mp4',video:join(dir,'reel.mp4'),seconds:24}));
+  const reading=studio.status(job);item.state='done'; // the file read in status() is where the copy used to finish unseen
+  const s=await reading;const it=s.batch.items[0];
+  assert.ok(it.state==='done'?it.pct===100:it.pct<100,`${it.state} at ${it.pct}%`);
+  studio.batches.get(RUN).items[0].state='working';open();await until(()=>studio.status(job),s=>['done','failed'].includes(s.batch.items[0].state));
+ }finally{open();await studio.finished(RUN).catch(()=>{});await rm(root,{recursive:true,force:true});}
+});
