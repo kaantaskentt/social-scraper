@@ -80,13 +80,13 @@ test('#30 a stopped scan can be resumed from the page',async()=>{
 });
 
 
-test('the analysis sheet posts the chosen limit and fresh flag only after confirmation',async()=>{
+// The sheet's Start button shows the whole price and is the confirmation (a second box on top was one click too many).
+test('the analysis sheet posts the chosen limit and fresh flag when Start (with its price) is pressed',async()=>{
  for(const limit of [30,60,100]){
   const jobs={A:job('A','alpha')},base=channel(jobs);
   const page=await boot({routes:(method,path,body)=>{if(path==='/api/runs'&&method==='POST'){jobs.B=job('B',body.creator);return jobs.B;}return base(method,path,body);},stored:{'flow.run':'A'}});
   await page.submit({handle:'https://www.instagram.com/new.account/',limit:String(limit),fresh:limit===30?null:'on'});
-  assert.equal(page.calls.some(c=>c.method==='POST'&&c.path==='/api/runs'),false,'opening the confirmation cannot spend');
-  await page.approve();const request=page.calls.find(c=>c.path==='/api/runs'&&c.method==='POST');assert.ok(request);
+  const request=page.calls.find(c=>c.path==='/api/runs'&&c.method==='POST');assert.ok(request);
   assert.equal(request.body.creator,'new.account');assert.equal(request.body.limit,limit);assert.equal(request.body.fresh,limit!==30);assert.equal(request.headers['X-Lab-Token'],'t');
   assert.equal(page.mem.get('flow.run'),'B');assert.match(page.view(),/new.account is scanned/);
  }

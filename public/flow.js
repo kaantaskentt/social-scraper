@@ -1,5 +1,5 @@
 // Social Scraper, the five-step app: state, data loading and clicks. Rendering lives in flow-views.mjs.
-import {reachable,renderStepper,renderScan,renderWinners,renderSecret,renderKit,renderMake,renderReady,renderConfirmLook,esc,scanState,syncRuns,topWinners,readyReels,morphChildren,syncPlay,copyAnnouncement,dockActions,renderAnalysisSheet,renderAccounts,winnersFinished,reelDownloadBundle} from './flow-views.mjs';
+import {startLabel,reachable,renderStepper,renderScan,renderWinners,renderSecret,renderKit,renderMake,renderReady,renderConfirmLook,esc,scanState,syncRuns,topWinners,readyReels,morphChildren,syncPlay,copyAnnouncement,dockActions,renderAnalysisSheet,renderAccounts,winnersFinished,reelDownloadBundle} from './flow-views.mjs';
 import {parseHandles} from './handles.mjs';
 import {mountScanMap,reach} from './scan-map.mjs';
 import {renderCopyStudio,copyLive,copyShape} from './copy-view.mjs';
@@ -225,7 +225,7 @@ document.addEventListener('submit',e=>{
  if(e.target.dataset.form!=='scan')return;e.preventDefault();
  const form=new FormData(e.target),{handles,error}=parseHandles(form.get('handle')),fresh=form.get('fresh')==='on',limit=Number(form.get('limit'));if(![30,60,100].includes(limit))return;
  if(error||handles.length!==1){$('#analysis-error').textContent=error||'Enter one Instagram account.';return;}
- ask('Start this analysis?',`Collect and listen to ${limit} reels from @${handles[0]} for about $${({30:0.12,60:0.22,100:0.35})[limit]}.`,()=>{act(async()=>{const job=await api('/api/runs',{creator:handles[0],limit,concurrency:4,budget:1,fresh});await api(`/api/runs/${job.id}/run`,{});$('#analysis').close();S.runs=[{id:job.id,creator:job.creator,count:0,status:'running'},...S.runs];S.step='scan';await loadRun(job.id,{keepStep:true});});},{ok:'Start'});
+act(async()=>{const job=await api('/api/runs',{creator:handles[0],limit,concurrency:4,budget:1,fresh});await api(`/api/runs/${job.id}/run`,{});$('#analysis').close();S.runs=[{id:job.id,creator:job.creator,count:0,status:'running'},...S.runs];S.step='scan';await loadRun(job.id,{keepStep:true});});
 });
 // The confirm pop-up: a title, a sentence, and what its button does. `look` is the kit's pictures, when they matter.
 function ask(title,text,ok,{look='',ok:label='Make it'}={}){
@@ -243,3 +243,6 @@ $('#player').addEventListener('close',()=>{const v=$('#player video');v.pause();
   if(first)await loadRun(first.id).catch(()=>{});else render();}
  catch(e){const dock=dockActions(`<header class="step-head"><h1>Could not open your accounts</h1><p>Refresh to reconnect and try again.</p></header><p class="err">${esc(e.message)}</p><button class="btn btn-primary" data-act="reload">Refresh →</button>`,{step:'scan',open:{}});$('#view').innerHTML=dock.html;$('#actions').innerHTML=dock.bar;}
 })();
+
+// The sheet's Start button always shows the price of the chosen reel count (scan plus prep ahead).
+document.addEventListener('change',e=>{if(e.target.matches?.('#analysis input[name=limit]')){const b=$('#analysis [data-start]');if(b)b.textContent=startLabel(Number(e.target.value));}});

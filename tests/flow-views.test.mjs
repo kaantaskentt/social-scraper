@@ -277,7 +277,7 @@ test('new analysis offers the three measured sizes and a fresh start by default'
  const html=renderAnalysisSheet();
  assert.deepEqual(REEL_COUNTS,[{limit:30,time:3,usd:0.12},{limit:60,time:4,usd:0.22},{limit:100,time:6,usd:0.35}]);
  for(const {limit,time,usd} of REEL_COUNTS){assert.match(html,new RegExp(`name="limit" value="${limit}"`));assert.ok(html.includes(`About ${time} min`));assert.ok(html.includes(`About $${usd.toFixed(2)}`));}
- assert.match(html,/name="fresh" checked/);assert.match(html,/type="submit">Start/);assert.match(html,/instagram.com/);
+ assert.match(html,/name="fresh" checked/);assert.match(html,/type="submit" data-start>Start · about \$0\.52</);assert.match(html,/instagram.com/);
  assert.match(renderAccounts([{id:'a',creator:'alpha',count:30}],{id:'a',creator:'alpha'}),/new-analysis[\s\S]*data-run="a"[\s\S]*30 reels/);
 });
 test('scored reels unlock Winners immediately; Secret waits; Look and Copy wait for the top winners',()=>{
