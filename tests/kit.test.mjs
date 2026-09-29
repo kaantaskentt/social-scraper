@@ -205,3 +205,23 @@ test('a picture the image filter refuses is tried once more, then kept as a flag
  assert.equal(f.state,'failed');assert.match(f.error,/HTTP 500/);assert.ok(f.saved);
  await rm(root,{recursive:true});
 });
+// The Look's pictures are drawn up to three at once (one after another, the six options took most of the Look's
+// time, 2026-09-29): a picture waits only for the pictures it builds on, and pictures in flight count against the limit.
+test('pictures draw side by side, each after the ones it builds on, never past the spending limit',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'kit-par-'));
+ try{
+  let now=0,max=0;const log=[];
+  const image=async({prompt})=>{now++;max=Math.max(max,now);log.push(`start ${prompt}`);await new Promise(r=>setTimeout(r,20));log.push(`end ${prompt}`);now--;return {data:Buffer.from(prompt),costUsd:0.04};};
+  const pass={shows:'ok',match:3,text_visible:false,broken:false,people_count:1,same_person:'yes',looks_like_original:'yes'};
+  const kb=new KitBuilder(root,()=>({gemini:'g',jev:'j'}),{image,gemini:async()=>({json:pass,costUsd:0})});await mkdir(kb.dir('r1'),{recursive:true});
+  const items=[{role:'opt0-face0',label:'A',aspect:'9:16',refs:[],prompt:'A'},{role:'opt1-face0',label:'B',aspect:'9:16',refs:[],prompt:'B'},{role:'opt2-place',label:'C',aspect:'9:16',refs:[],prompt:'C'},
+   {role:'body0',label:'D',aspect:'9:16',refs:['opt0-face0'],faceRef:'opt0-face0',prompt:'D'}];
+  const tally={usd:0},paid=async(step,call)=>{const r=await call();tally.usd+=r.costUsd;return r;};
+  const {pictures}=await kb.draw({id:'r1'},items,{keys:{gemini:'g'},live:{progress:{done:0}},paid,guard:need=>{if(tally.usd+need>1)throw new Error('limit');}});
+  assert.equal(max,3);assert.deepEqual(pictures.map(p=>p.role),['opt0-face0','opt1-face0','opt2-place','body0']); // results keep the plan's order
+  assert.ok(log.indexOf('start D')>log.indexOf('end A'),'the body waits for the face it builds on');
+  const tight=new KitBuilder(await mkdtemp(join(tmpdir(),'kit-par-')),()=>({}),{image,gemini:async()=>({json:pass,costUsd:0})});
+  await mkdir(tight.dir('r2'),{recursive:true});  const t2={usd:0};await assert.rejects(tight.draw({id:'r2'},items.slice(0,3),{keys:{gemini:'g'},live:{progress:{done:0}},paid:async(s,c)=>{const r=await c();t2.usd+=r.costUsd;return r;},guard:need=>{if(t2.usd+need>0.1+1e-9)throw new Error('limit');}}),/limit/);
+  assert.ok(t2.usd<=0.1,'two pictures in flight fill the $0.10 limit; the third is never started');
+ }finally{await rm(root,{recursive:true,force:true});}
+});

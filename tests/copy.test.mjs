@@ -167,3 +167,15 @@ test('the comparison of a visual copy ignores the place and the song, and needs 
  assert.match(fidelityPrompt(b,{visual:true}),/music \(added when the reel is posted\)[\s\S]*garbled or different words mean that result is not visible/);
  assert.doesNotMatch(fidelityPrompt(b),/garbled/);
 });
+// Framing by code (2026-09-29): the picture model drew our person at about half the original's size twice, so the first
+// frame is cropped until the person's top has the original's size and place in the frame.
+test('the crop that gives our person the original\'s size and place in the frame',async()=>{
+ const {framingCrop}=await import('../lib/copy.mjs');
+ // boxes are [ymin,xmin,ymax,xmax] out of 1000; the original's top is 1.5x as tall as ours
+ const c=framingCrop({ours:[400,300,700,700],theirs:[250,100,700,900],width:720,height:1280});
+ assert.ok(Math.abs(c.scale-1.5)<1e-9);assert.equal(c.w,480);assert.equal(c.h,853);
+ assert.ok(c.x>=0&&c.y>=0&&c.x+c.w<=720&&c.y+c.h<=1280);
+ const topInCrop=(0.4*1280-c.y)/c.h;assert.ok(Math.abs(topInCrop-0.25)<0.02,`top at ${topInCrop}`); // the top sits where theirs does
+ assert.equal(framingCrop({ours:[250,100,700,900],theirs:[400,300,700,700],width:720,height:1280}),null); // ours is already as large: no crop
+ assert.equal(framingCrop({ours:[400,300,420,700],theirs:[0,0,1000,1000],width:720,height:1280}).scale,2.5); // never zooms past 2.5x
+});
