@@ -74,3 +74,9 @@ test('a spoken promise we cannot keep is caught from what was really said',async
  for(const t of ['My mom left a comment: this is wrong.','This trick will send you straight to sleep.','My full routine takes ten minutes.','Drop a comment if this worked for you.'])assert.equal(spokenPromise(w(t)),null,t);
  for(const t of ['Link in the description for the guide.','Comment EGG to get our full food safety guide','Comment GUIDE','Comment below and I will send it','I will send you the guide tonight','the link below has it'])assert.ok(spokenPromise(w(t)),t);
 });
+
+test('ordinary sentences with the word comment are not promises',async()=>{
+ const {spokenPromise}=await import('../lib/captions.mjs');const w=t=>t.split(' ').map(text=>({text}));
+ for(const t of ['I read every comment for the next video idea.','This comment for a friend made my day.','Leave a comment for my mom, she loves this.'])assert.equal(spokenPromise(w(t)),null,t);
+ assert.match(spokenPromise(w('Try it tonight. Comment below and I will send it.')),/Comment below/);assert.match(spokenPromise(w('Comment for the full guide.')),/Comment for the full guide/);
+});

@@ -8,7 +8,8 @@ import {join} from 'node:path';
 import {parseEnv} from 'node:util';
 import {generate} from '../lib/gemini.mjs';
 import {MODELS,jevAsk} from '../lib/secret-run.mjs';
-import {PART_QA_SCHEMA,partQaPrompt,partVerdict,checkKitScriptRequest} from '../lib/kit-reel.mjs';
+import {checkKitScriptRequest,referencesFor} from '../lib/kit-reel.mjs';
+import {checkPart} from '../lib/reel-make.mjs';
 import {repeats,tally,byGroup,baselines,flips,lastRun,flipLine,freeze} from '../evals/kit.mjs';
 
 const read=p=>readFile(new URL(p,import.meta.url),'utf8').then(parseEnv).catch(()=>({}));
@@ -21,7 +22,7 @@ const LOG=new URL('../data/qa-eval.jsonl',import.meta.url),k=repeats();
 // Part cases: the clip, which part of which script, and whether the part should pass (the maker watches twice).
 // set 'in-rule': the lip rule (talking:false skips lips) was written for this very clip, so it cannot fail on lips.
 const PARTS=[
- {name:'silver: the spoon stays black (result missing)',set:'parts',script:'silver',ch:'cd88abf1-e0ac-4497-bc38-d32756318418',clip:'reels/1-tarnished-silver-polish-5bcebe/part-2-a2-new.mp4',part:1,talking:false,pass:false},
+ {name:'silver: the spoon stays black (result missing)',set:'in-rule',script:'silver',ch:'cd88abf1-e0ac-4497-bc38-d32756318418',clip:'reels/1-tarnished-silver-polish-5bcebe/part-2-a2-new.mp4',part:1,talking:false,pass:false},
  {name:'fizz 99%: good voice-over part (no lips to judge)',set:'in-rule',script:'fizz-final',ch:'lab-fizzfinal',clip:'reels/0-baking-powder-fizz-test-3472d4/part-2-a1-new.mp4',part:1,talking:false,pass:true},
  {name:'baking soda talking: good part 1',set:'parts',script:'ken-baking-soda',ch:'a444f915-b549-4b73-bbde-664c3aea9216',clip:'reels/0-testing-baking-soda-activity-419945/part-1-a1.mp4',part:0,talking:true,pass:true},
 ];
@@ -47,11 +48,14 @@ const SCRIPTS=[
  {name:'push-up: straight line, elbows about 45 degrees',set:'hold-out',script:await hold('pushup-form'),ok:true,confirmed:false},
 ];
 const rows=[];let usd=0;
+// The channel's host pictures, as the maker sends them (its face references).
+const facesOf=async ch=>{const kit=JSON.parse(await readFile(join(CH,ch,'kit','kit.json'),'utf8').catch(()=>'null'));return kit?Promise.all(referencesFor(kit).filter(r=>r.role.startsWith('face')).map(r=>readFile(join(CH,ch,'kit',r.file)))):[];};
 for(const c of PARTS){
- const script=await frozen(c.script),{file,sha256}=await freeze(join(CH,c.ch,c.clip),join(FROZEN,c.ch,c.clip)),bytes=await readFile(file);
- const watch=async()=>{const r=await generate({key:env.GEMINI_API_KEY,model:MODELS.watch,parts:[{video:bytes},{text:partQaPrompt(script,c.part,false)}],schema:PART_QA_SCHEMA});usd+=r.costUsd||0;return r.json;};
- // One run = the maker's two watches, exactly as in production.
- const run=async()=>{const [a,b]=await Promise.all([watch(),watch()]);if(b.result_as_written==='no')a.result_as_written='no';return partVerdict(a,{talking:c.talking});};
+ const script=await frozen(c.script),{file,sha256}=await freeze(join(CH,c.ch,c.clip),join(FROZEN,c.ch,c.clip)),bytes=await readFile(file),faces=await facesOf(c.ch);
+ // One run = the maker's own part check (lib/reel-make.mjs checkPart): both watches, the host pictures, Jev's "does it
+ // matter" step. The exam used to run its own copy without faces or Jev (audit, 2026-09-29).
+ const gemini=async a=>{const r=await generate(a);usd+=r.costUsd||0;return r;};
+ const run=()=>checkPart({bytes,faces,script,index:c.part,talking:c.talking,gemini,jev:jevAsk,keys:{gemini:env.GEMINI_API_KEY,jev:env.TYPESAFE_API_KEY}});
  const runs=await Promise.all(Array.from({length:k},run)),t=tally(runs.map(v=>v.pass),c.pass);
  rows.push({name:c.name,set:c.set,want:c.pass,...t,sha256,got:runs.map(v=>v.pass?'pass':`fail: ${v.problems.join(', ')}`)});
 }

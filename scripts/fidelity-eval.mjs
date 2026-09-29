@@ -47,7 +47,7 @@ for(const c of CASES){
  const copyText=c.copyId?texts[c.copyId]:null,measures={words_kept:copyText&&texts[c.orig]?wordsKept(texts[c.orig],copyText):null,length_ratio:Math.round(lb/la*100)/100};
  const watch=async()=>{
   const g=await generate({key:keys.gemini,model:MODELS.watch,parts:[{text:'Reel A (the original):'},{video:bytesA},{text:'Reel B (our copy):'},{video:bytesB},{text:fidelityPrompt(beats)}],schema:FIDELITY_SCHEMA});usd+=g.costUsd||0;
-  const f=fidelityScore({wordsKept:measures.words_kept??undefined,lengthRatio:measures.length_ratio,beats:g.json.beats}),v=fidelityVerdict(f.score,g.json,beats);
+  const f=fidelityScore({wordsKept:measures.words_kept??undefined,lengthRatio:measures.length_ratio,beats:g.json.beats,count:beats.length}),v=fidelityVerdict(f.score,g.json,beats);
   return {faithful:v.faithful,redo:v.redo,score:f.score,shots:f.shots,feel:g.json.same_feel,gap:g.json.biggest_gap};
  };
  const runs=await Promise.all(Array.from({length:k},watch)),t=tally(runs.map(r=>r.faithful),c.want);

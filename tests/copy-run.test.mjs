@@ -183,3 +183,13 @@ test('learned stage times: copies at once keep every sample, and one change is l
   const learned=JSON.parse(await readFile(join(root,'experiments','stage-times.json'),'utf8'));assert.equal(learned.samples.study.length,6);
  }finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('a copy that was only being compared when the app stopped stays done, not "stopped"',async()=>{
+ const {root,studio}=await setup();
+ try{const dir=join(root,'channels',RUN,'reels','copy-z');await mkdir(dir,{recursive:true});await writeFile(join(dir,'reel.json'),JSON.stringify({video:join(dir,'reel.mp4')}));
+  await mkdir(join(root,'channels',RUN,'copies'),{recursive:true});
+  await writeFile(join(root,'channels',RUN,'copies','batch.json'),JSON.stringify({id:'B',usd:3.3,items:[{postId:'chk',reelId:'copy-z',parts:3,usd:3.3,state:'working',stage:'Comparing with the original',planned:[{key:'compare',seconds:30}],pointer:0},{postId:'x',reelId:'copy-none',parts:3,usd:3.3,state:'working',planned:[{key:'film_first',seconds:45}],pointer:0}]}));
+  const fresh=new CopyStudio(root,()=>({}),{planner:{},maker:{dir:r=>join(root,'channels',r)}}),s=await fresh.status(job);
+  assert.equal(s.batch.items[0].state,'done');assert.equal(s.batch.items[1].state,'stopped');
+ }finally{await rm(root,{recursive:true,force:true});}
+});
