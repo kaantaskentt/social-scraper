@@ -8,7 +8,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {parseEnv,promisify} from 'node:util';
 import {execFile} from 'node:child_process';
-import {frames,claudeCheck,checkVerdict,confirmClaims,CLAUDE_MODEL} from '../lib/claude-check.mjs';
+import {frames,claudeCheck,checkVerdict,CLAUDE_MODEL} from '../lib/claude-check.mjs';
 import {jevAsk} from '../lib/secret-run.mjs';
 import {transcribeWords,linesHeard,alignScript} from '../lib/captions.mjs';
 import {mediaSeconds} from '../lib/render-reel.mjs';
@@ -53,7 +53,7 @@ await Promise.all(CASES.map(async c=>{
  const runs=await Promise.all(Array.from({length:k},async()=>{
   const {report,usage:u}=await claudeCheck({key:env.ANTHROPIC_API_KEY,images,script:s,transcript,measures,model});
   usage.input+=u.input_tokens||0;usage.output+=u.output_tokens||0;
-  return {v:checkVerdict(await confirmClaims(report,{jev:jevAsk,key:env.TYPESAFE_API_KEY})),swipe:report.swipe_second};
+  return {v:checkVerdict(report),swipe:report.swipe_second};
  }));
  // Right = the same post/no-post call by majority; exact = the same level by majority too.
  const post=tally(runs.map(r=>r.v.pass),c.level!=='broken'),level=tally(runs.map(r=>r.v.level),c.level);

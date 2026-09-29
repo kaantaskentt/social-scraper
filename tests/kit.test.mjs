@@ -50,8 +50,8 @@ test('a kit that does not fit its format is caught',()=>{
  assert.match(checkKit(kit(),'animated',1).join(),/art style/);
  assert.match(checkKit(kit({cast:[{...host,look:'AI host: man, 30s'}]}),'ai_host',1).join(),/must look real/);
  assert.match(checkKit(kit({place:'a virtual hangout room'}),'ai_host',1).join(),/must look real/);
- assert.match(checkKit(kit({promise:'Easy tricks and simple health drinks.'}),'ai_host',1).join(),/non-medical/);
- assert.match(kitPrompt({account:'x',format:'ai_host',cast:1,expert:false,study:[],saved}),/stays non-medical/);
+ assert.doesNotMatch(checkKit(kit({promise:'Easy tricks and simple health drinks.'}),'ai_host',1).join(),/non-medical/); // claims stay in (Kaan, 2026-09-29)
+ assert.doesNotMatch(kitPrompt({account:'x',format:'ai_host',cast:1,expert:false,study:[],saved}),/stays non-medical/);
  assert.deepEqual(checkKit(kit({art_style:'flat cartoon',name:'Digital Doodles'}),'animated',1),[]);
  assert.match(checkKit(kit({cast:[{...host,outfit:'a vintage graphic tee, olive cargo pants'}]}),'ai_host',1).join(),/every piece/);
  assert.deepEqual(checkKit(kit({cast:[{...host,outfit:'a black ribbed tank top, olive cargo pants and white sneakers'}]}),'ai_host',1),[]);

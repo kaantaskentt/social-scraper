@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {HEALTH_Q,PART_USD,PARTS,MAX_WORDS,kitBrief,kitIdeaPrompt,judgeKitIdeaRequest,kitScriptPrompt,remakePrompt,scriptProblems,checkKitScriptRequest,readKitScriptCheck,kitPrice,referencesFor,partPrompt,spokenText,discloseCaption,partVerdict} from '../lib/kit-reel.mjs';
+import {PART_USD,PARTS,MAX_WORDS,kitBrief,kitIdeaPrompt,judgeKitIdeaRequest,kitScriptPrompt,remakePrompt,scriptProblems,checkKitScriptRequest,readKitScriptCheck,kitPrice,referencesFor,partPrompt,spokenText,discloseCaption,partVerdict} from '../lib/kit-reel.mjs';
 const craft={rules:[{kind:'hook',rule:'Open on a pour',how:'extreme close-up of pouring',reels:['a','b']}],voice_direction:'brisk and confident, close to the mic',shot_style:'close-ups, cut every 2 s',sound_style:'loud fizz at the reveal',ending_style:'end on the result'};
 import {ReelPlanner} from '../lib/reel-plan-run.mjs';
 import {ReelMaker,checkPart} from '../lib/reel-make.mjs';
@@ -22,10 +22,11 @@ test('price: two 10-second parts at the Omni price, the limit allows one retry e
 });
 
 test('ideas and judging use the kit: hosts, place, signature things, AI-video safety',()=>{
- const p=kitIdeaPrompt(kit,'ai_host',{headline:'h'});assert.match(p,/Leo and Mia\) are on camera/);assert.match(p,/"place":"A bright white kitchen"/);assert.match(p,/no brand names/);assert.match(p,/20 to 30 seconds/);assert.match(p,/payoff every 6 to 9 seconds/);assert.match(p,/pattern_used/);assert.match(p,/why_true/);assert.match(p,/honey in water/);assert.match(p,/Write 12 different/);
+ const p=kitIdeaPrompt(kit,'ai_host',{headline:'h'});assert.match(p,/Leo and Mia\) are on camera/);assert.match(p,/"place":"A bright white kitchen"/);assert.match(p,/no brand names/);assert.match(p,/20 to 30 seconds/);assert.match(p,/payoff every 6 to 9 seconds/);assert.match(p,/pattern_used/);assert.doesNotMatch(p,/honey in water|non-medical|TRUE and really happens|no health claims/i); // claims stay in, also from old looks (Kaan, 2026-09-29)
+assert.match(p,/Write 12 different/);
  assert.match(kitIdeaPrompt(kit,'ai_host',{},craft),/craft of the winners: .*Open on a pour/);
  assert.match(kitIdeaPrompt({...kit,cast:[]},'hands_pov',{}),/Only hands are on camera/);
- const req=judgeKitIdeaRequest({title:'t'},{},kit,'ai_host');assert.deepEqual(Object.keys(req.questions),['fit','ai_ready','hook','payoff','novel','pain_point','health_claim','true_demo']);assert.match(kitIdeaPrompt(kit,'ai_host',{}),/do NOT already know/);assert.match(kitIdeaPrompt(kit,'ai_host',{}),/DRAMATIC to see and hear/);assert.equal(req.state.channel.hosts[0].name,'Leo');
+ const req=judgeKitIdeaRequest({title:'t'},{},kit,'ai_host');assert.deepEqual(Object.keys(req.questions),['fit','ai_ready','hook','payoff','novel','pain_point']);assert.match(kitIdeaPrompt(kit,'ai_host',{}),/do NOT already know/);assert.match(kitIdeaPrompt(kit,'ai_host',{}),/DRAMATIC to see and hear/);assert.equal(req.state.channel.hosts[0].name,'Leo');
  assert.equal(kitBrief(kit,'ai_host').hands,undefined);
 });
 
@@ -41,12 +42,13 @@ test('code checks the script: 2 or 3 parts, timing, speakers, word counts, no co
  const hands=script();for(const p of hands.parts)for(const b of p.beats)b.who='hands';assert.deepEqual(scriptProblems(hands,{...kit,cast:[]},'hands_pov'),[]);
 });
 
-test('Jev checks truth, health, feeling and risk per part; code turns answers into problems',()=>{
- const req=checkKitScriptRequest(script(),craft);assert.ok(req.questions.true_claim&&req.questions.gripping&&req.questions.part_1_risky&&req.questions.part_2_risky);assert.equal(req.state.craft.voice,'brisk and confident, close to the mic');
+test('Jev checks feeling and risk per part, never whether a claim is true; code turns answers into problems',()=>{
+ const req=checkKitScriptRequest(script(),craft);assert.equal(req.questions.true_claim??req.questions.health_fact??req.questions.method_correct??req.questions.line_1_1_true,undefined);assert.ok(req.questions.gripping&&req.questions.part_1_risky&&req.questions.part_2_risky);assert.equal(req.state.craft.voice,'brisk and confident, close to the mic');
  const good={answers:{starts_mid_action:{noul:0.9},clear_action:{noul:0.8},health_fact:{noul:0.1},true_claim:{noul:0.9},emotion:{choice:'satisfaction'},gripping:{score:2.4},part_1_risky:{noul:0.1},part_2_risky:{noul:0.2}}};
  assert.equal(readKitScriptCheck(good,script(),kit,'ai_host').pass,true);
  const bad=readKitScriptCheck({answers:{...good.answers,true_claim:{noul:0.2},part_2_risky:{noul:0.8}}},script(),kit,'ai_host');
- assert.deepEqual(bad.problems,['Something the reel shows or implies may not be true: check what each shot shows (for example which muscle works or what the result proves)','Part 2 is risky for AI video']);assert.deepEqual(bad.riskyParts,[2]);
+ assert.deepEqual(bad.problems,['Part 2 is risky for AI video']); // a "not true" answer from an old check blocks nothing
+assert.deepEqual(bad.riskyParts,[2]);
  assert.deepEqual(readKitScriptCheck({answers:{...good.answers,first_second:{score:1.1}}},script(),kit,'ai_host').problems,['The first second is not striking enough (1.1 of 3)']);assert.ok(req.questions.first_second);
  const dull=readKitScriptCheck({answers:{...good.answers,gripping:{score:1.2}}},script(),kit,'ai_host');assert.deepEqual(dull.problems,['Not gripping enough (1.2 of 3)']);assert.equal(dull.gripping,1.2);
 });
@@ -68,7 +70,7 @@ test('part prompts: references named in order, beats timed, sounds from the kit,
 test('spoken text for captions, AI disclosure in the caption, part verdicts',()=>{
  assert.equal(spokenText(script()),'Floppy celery? Wait. Ice water, fifteen minutes. Crunchy again. Follow for the next test.');
  assert.match(kitScriptPrompt({title:'t'},kit,'ai_host',{},craft),/Never ask viewers to comment a keyword.*The winners' craft, follow it/s);
- const rp=remakePrompt({first_second:'pour'},kit,'ai_host',craft);assert.match(rp,/Remake this proven reel/);assert.match(rp,/never copy sentences/);assert.match(rp,/myth.*replace it with a TRUE test/);
+ const rp=remakePrompt({first_second:'pour'},kit,'ai_host',craft);assert.match(rp,/Remake this proven reel/);assert.match(rp,/never copy sentences/);assert.doesNotMatch(rp,/myth|TRUE test/);
  assert.equal(discloseCaption('Save it. #x','ai_host'),'Save it. #x\n\nOur hosts are AI.');assert.equal(discloseCaption('Our AI hosts. #x','ai_host'),'Our AI hosts. #x');assert.equal(discloseCaption('Hands. #x','hands_pov'),'Hands. #x\n\nMade with AI.');assert.equal(discloseCaption('Old reel. #x',undefined),'Old reel. #x\n\nMade with AI.');
  const ok={match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false};
  assert.deepEqual(partVerdict(ok),{pass:true,problems:[]});
@@ -174,11 +176,11 @@ test('remake: studies the winner shot by shot, learns the craft once (cached), w
  await rm(root,{recursive:true});
 });
 
-test('hands never talk, objects are named, and health framing never reaches the video prompt',()=>{
+test('hands never talk, objects are named, and the channel\'s own framing reaches the video prompt as it is',()=>{
  const hk={...kitSaved,format:'hands_pov',kit:{...kit,cast:[]},pictures:[{role:'hands',file:'h.jpg'},{role:'place',file:'p.jpg'}]};
  const s=script();for(const p of s.parts)for(const b of p.beats)b.who='hands';
  const p=partPrompt(s,0,hk,{...craft,voice_direction:'Speak fast, as if you are revealing a forbidden health secret they must know.'});
- assert.doesNotMatch(p,/hands says/);assert.match(p,/A voice says: "Floppy celery\? Wait\."/);assert.doesNotMatch(p,/health|forbidden|secret/i);assert.match(p,/voice direction: Speak fast/);
+ assert.doesNotMatch(p,/hands says/);assert.match(p,/A voice says: "Floppy celery\? Wait\."/);assert.match(p,/voice direction: Speak fast, as if you are revealing a forbidden health secret/);
  assert.match(kitScriptPrompt({title:'t'},kit,'ai_host',{}),/never "white powder"/);
 });
 
@@ -202,22 +204,13 @@ test('designed voices: nobody speaks on camera; each host gets one voice (made o
  await rm(root,{recursive:true});
 });
 
-test('health claims: remedies and cures are out, exercise form and muscles are fitness instruction, not medicine',()=>{
- const q=HEALTH_Q('idea');assert.match(q,/curing, treating or preventing an illness, pain/);assert.match(q,/detox/);assert.match(q,/weight-loss/);assert.match(q,/good form, and which muscles it works is NOT a health claim/);
- assert.equal(judgeKitIdeaRequest({},{},kit,'ai_host').questions.health_claim.instructions,q);assert.equal(checkKitScriptRequest(script()).questions.health_fact.instructions,HEALTH_Q('script'));
-});
 
 test('medical-looking props from the look never reach the writers',()=>{
  const k={...kit,assets:[{what:'A transparent plastic model',kind:'object',how:'shows build-up'},{what:'glass mugs',kind:'object',how:'every test'}]};
  assert.deepEqual(kitBrief(k,'ai_host').signature,['glass mugs (object): every test']);
 });
 
-test('Jev checks every spoken line, so a rewrite knows which sentence is doubtful',()=>{
- const req=checkKitScriptRequest(script());assert.ok(req.questions.line_1_1_true);assert.match(req.questions.line_1_1_true.instructions,/"Floppy celery\? Wait\."/);
- const good={answers:{starts_mid_action:{noul:0.9},clear_action:{noul:0.8},health_fact:{noul:0.1},true_claim:{noul:0.3},emotion:{choice:'satisfaction'},gripping:{score:2.4},part_1_risky:{noul:0.1},part_2_risky:{noul:0.1},line_1_2_true:{noul:0.2}}};
- assert.deepEqual(readKitScriptCheck(good,script(),kit,'ai_host').problems,['Not sure this is true: "Ice water, fifteen minutes."']);
- assert.match(readKitScriptCheck({answers:{...good.answers,line_1_2_true:{noul:0.9}}},script(),kit,'ai_host').problems.join(),/shows or implies may not be true: check what each shot shows/);
- assert.deepEqual(readKitScriptCheck({answers:{...good.answers,true_claim:{noul:0.9},line_1_2_true:{noul:0.9},emotion:{choice:'aspiration'}}},script(),kit,'ai_host').problems,[]);
+test('a line that points to a link, bio, DM or freebie we do not have is still a problem',()=>{
  const link=script();link.parts[1].beats[1].says='Check the link for more recipes.';assert.match(scriptProblems(link,kit,'ai_host').join(),/link, bio, DM or freebie/);
 });
 
@@ -276,11 +269,6 @@ test('talking hosts: the script rule, a lower close-up bar, a lip-sync check, an
  await rm(root,{recursive:true});
 });
 
-test('Jev checks the method, not only each line: a wrong ingredient blocks the script',()=>{
- const req=checkKitScriptRequest(script());assert.match(req.questions.method_correct.instructions,/baking soda needs an acid/);
- const a={starts_mid_action:{noul:0.9},clear_action:{noul:0.8},health_fact:{noul:0.1},true_claim:{noul:0.9},emotion:{choice:'satisfaction'},gripping:{score:2.4},part_1_risky:{noul:0.1},part_2_risky:{noul:0.1},method_correct:{noul:0.2}};
- assert.deepEqual(readKitScriptCheck({answers:a},script(),kit,'ai_host').problems,['The method or an ingredient is wrong: the result shown would not really happen']);
-});
 
 test('a clip whose result differs from the script always fails, whatever else is fine',()=>{
  const ok={shows:'x',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing',lips_match:'yes'};

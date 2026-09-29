@@ -9,31 +9,30 @@ test('the pattern handed to Jev and the writer is plain words from the Secret: d
  const p=patternFrom(secret);assert.match(p.do_more.join(' '),/Step by step \(12 of 15 best, 5 of 15 weakest\)/);assert.match(p.do_less.join(' '),/Problem, then fix/);assert.match(p.keep.join(' '),/Demonstration/);
 });
 
-test('Jev judges each idea: fit to the pattern, how AI-ready it is, the hook, a health claim, and whether the demo is true',()=>{
+test('Jev judges each idea: fit to the pattern, how AI-ready it is and the hook; never whether a claim is true',()=>{
  const req=judgeIdeaRequest({title:'Egg float test',hook_line:'Drop an egg in water',demo:'An egg sinks or floats',steps:['Fill a glass','Drop the egg']},patternFrom(secret));
- assert.deepEqual(Object.keys(req.questions).sort(),['ai_ready','fit','health_claim','hook','true_demo']);
- assert.equal(req.questions.health_claim.type,'noul');assert.equal(req.questions.fit.type,'score');assert.match(JSON.stringify(req.state),/Egg float test/);
+ assert.deepEqual(Object.keys(req.questions).sort(),['ai_ready','fit','hook']);
+assert.equal(req.questions.fit.type,'score');assert.match(JSON.stringify(req.state),/Egg float test/);
 });
 
-test('ranking: health claims and false demos are out; the rest are ordered by fit, AI-readiness and hook, with the reasons kept',()=>{
+test('ranking: every idea is ordered by fit, AI-readiness and hook; claims are never a reason to drop one',()=>{
  const ideas=[{title:'A'},{title:'B'},{title:'C'},{title:'D'}];
- const j=(fit,ai,hook,health,truth)=>({answers:{fit:{score:fit},ai_ready:{score:ai},hook:{score:hook},health_claim:{noul:health},true_demo:{noul:truth}}});
- const ranked=rankIdeas(ideas,[j(3,3,3,0.9,0.9),j(2,2,2,0.1,0.8),j(3,3,2,0.1,0.9),j(3,3,3,0.1,0.2)]);
- assert.deepEqual(ranked.picked.map(r=>r.idea.title),['C','B']);
- assert.deepEqual(ranked.rejected.map(r=>[r.idea.title,r.reason]),[['A','health or medical claim'],['D','the demo may not be true']]);
- assert.ok(ranked.picked[0].scores.fit===3&&ranked.picked[0].total>ranked.picked[1].total);
+ const j=(fit,ai,hook)=>({answers:{fit:{score:fit},ai_ready:{score:ai},hook:{score:hook},health_claim:{noul:0.9},true_demo:{noul:0.1}}}); // old answers are ignored
+ const ranked=rankIdeas(ideas,[j(3,3,3),j(2,2,2),j(3,3,2),j(3,3,3)]);
+ assert.deepEqual(ranked.picked.map(r=>r.idea.title),['A','D','C','B']);assert.deepEqual(ranked.rejected,[]);
+ assert.ok(ranked.picked[0].scores.fit===3&&ranked.picked[0].total>ranked.picked[3].total);
 });
 
-test('Jev checks the script: starts mid-action, one clear action, no health claim as fact, and each shot is safe for AI video',()=>{
+test('Jev checks the script: starts mid-action, one clear action, and each shot is safe for AI video; never a claim',()=>{
  const script={hook_title:'Is your egg fresh?',voiceover:[{line:'Drop an egg into water.',shot:'s1'}],shots:[{id:'s1',seconds:5,visual:'Hands drop an egg into a glass of water',camera:'close-up'},{id:'s2',seconds:4,visual:'A woman smiles at the camera and reads the label',camera:'medium'}]};
- const req=checkScriptRequest(script);assert.ok(req.questions.starts_mid_action&&req.questions.clear_action&&req.questions.health_fact&&req.questions.shot_s1_risky&&req.questions.shot_s2_risky);
+ const req=checkScriptRequest(script);assert.ok(req.questions.starts_mid_action&&req.questions.clear_action&&req.questions.shot_s1_risky&&req.questions.shot_s2_risky);assert.equal(req.questions.health_fact,undefined);
  const raw={answers:{starts_mid_action:{noul:0.9},clear_action:{noul:0.8},health_fact:{noul:0.1},emotion:{choice:'curiosity'},shot_s1_risky:{noul:0.1},shot_s2_risky:{noul:0.9}}};
  const c=readScriptCheck(raw,script);assert.equal(c.pass,false);assert.deepEqual(c.riskyShots,['s2']);assert.deepEqual(c.problems,['Shot s2 is risky for AI video']);
- assert.equal(readScriptCheck({answers:{...raw.answers,shot_s2_risky:{noul:0.2},health_fact:{noul:0.7}}},script).problems[0],'States a health claim as fact');
+ assert.deepEqual(readScriptCheck({answers:{...raw.answers,shot_s2_risky:{noul:0.2},health_fact:{noul:0.7}}},script).problems,[]);
 });
 
-test('prompts and schemas: faceless hands and voice, true and non-medical, 4 to 8 second shots (Seedance 2.0 minimum is 4)',()=>{
- assert.match(ideaPrompt(patternFrom(secret),secret),/hands/i);assert.match(ideaPrompt(patternFrom(secret),secret),/non-medical|no health/i);
+test('prompts and schemas: faceless hands and voice, no truth or health rules, 4 to 8 second shots (Seedance 2.0 minimum is 4)',()=>{
+ assert.match(ideaPrompt(patternFrom(secret),secret),/hands/i);assert.doesNotMatch(ideaPrompt(patternFrom(secret),secret),/non-medical|no health|TRUE/);assert.doesNotMatch(scriptPrompt({title:'Egg'},patternFrom(secret)),/health|really happen/i);
  assert.match(scriptPrompt({title:'Egg'},patternFrom(secret)),/4 to 8 seconds/);
  assert.ok(IDEA_SCHEMA.properties.ideas&&SCRIPT_SCHEMA.properties.shots);
 });

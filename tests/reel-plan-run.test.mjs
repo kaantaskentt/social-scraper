@@ -23,11 +23,11 @@ async function setup(){
 const settle=async(p,id)=>{for(let i=0;i<400&&p.state.get(id)?.state==='working';i++)await new Promise(r=>setTimeout(r,5));return p.state.get(id);};
 const job={id:'run1',creator:'ken.remedie',posts:[]};
 
-test('ideas: Gemini writes them, Jev judges each, health claims are removed, the best fit comes first',async()=>{
+test('ideas: Gemini writes them, Jev judges each, claims are not filtered, the best fit comes first',async()=>{
  const {root,calls,p}=await setup();
  try{await p.startIdeas(job);assert.equal((await settle(p,'run1')).state,'ready',p.state.get('run1')?.error);
   const plan=JSON.parse(await readFile(join(root,'channels','run1','plan.json'),'utf8'));
-  assert.deepEqual(plan.picked.map(x=>x.idea.title),['Egg float','Ice cubes']);assert.deepEqual(plan.rejected.map(x=>[x.idea.title,x.reason]),[['Detox water','health or medical claim']]);
+  assert.deepEqual(plan.picked.map(x=>x.idea.title),['Egg float','Detox water','Ice cubes']);assert.deepEqual(plan.rejected,[]); // Kaan, 2026-09-29: claims stay in
   assert.equal(calls.jev,3);assert.match(calls.gemini[0],/hands/i);
   const ledger=JSON.parse(await readFile(join(root,'channels','run1','spend.json'),'utf8'));assert.equal(ledger.length,4);assert.ok(ledger.some(x=>x.step==='judge idea'&&x.usd>0));
  }finally{await rm(root,{recursive:true,force:true});}
