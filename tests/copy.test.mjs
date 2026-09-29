@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PART_USD,EXTEND_USD} from '../lib/kit-reel.mjs';
-import {copyableRequest,copyMode,visualScript,formatKey,copyCandidates,pickCopies,timedWords,copyScript,wordsKept,copyPrice,stageKey,plannedStages,progressOf,learnStage,fidelityScore,fidelityVerdict,hasTimedWords,COPY_MAX_PARTS} from '../lib/copy.mjs';
+import {fidelityPrompt,copyableRequest,copyMode,visualScript,formatKey,copyCandidates,pickCopies,timedWords,copyScript,wordsKept,copyPrice,stageKey,plannedStages,progressOf,learnStage,fidelityScore,fidelityVerdict,hasTimedWords,COPY_MAX_PARTS} from '../lib/copy.mjs';
 
 const reel=(id,xNormal,seconds,text,timed=true,plays=null,engagement=null)=>({id,xNormal,seconds,text,timed,plays,engagement});
 
@@ -159,4 +159,10 @@ test('a look without hosts offers a faceless person to Jev, so a reel shown from
  const r=copyableRequest({beats:[{shot:'from behind'}],payoff:{},first_second:'x'},{cast:[],place:'a store aisle'});
  assert.equal(r.state.our_hosts.length,1);assert.match(r.state.our_hosts[0].look,/face is never shown/);assert.match(r.questions.roles_fit.instructions,/only from behind/);
  assert.equal(copyableRequest({beats:[]},{cast:[{name:'Leo',look:'a man',role:'host'}],place:'p'}).state.our_hosts[0].name,'Leo');
+});
+
+test('the comparison of a visual copy ignores the place and the song, and needs the printed words exact',()=>{
+ const b=[{from:0,to:5,shot:'from behind',happens:'hoodie print',says:'',sound:'beat'}];
+ assert.match(fidelityPrompt(b,{visual:true}),/music \(added when the reel is posted\)[\s\S]*garbled or different words mean that result is not visible/);
+ assert.doesNotMatch(fidelityPrompt(b),/garbled/);
 });

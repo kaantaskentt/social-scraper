@@ -470,3 +470,27 @@ test('visual copy prompt: only the garment\'s printed line may show, no speech, 
  const seen={match:3,same_people:'yes',text_or_logos:true,gear_visible:false,broken:false,lips_match:'no_speech_on_camera',result_as_written:'yes'};
  assert.equal(partVerdict(seen,{talking:false,allowText:true}).pass,true);assert.equal(partVerdict(seen,{talking:false}).pass,false);
 });
+
+test('a visual copy fails its check when the printed line is wrong or unreadable',async()=>{
+ const {partVerdict,printMatch}=await import('../lib/kit-reel.mjs');
+ const seen=t=>({match:3,same_people:'no_people',text_or_logos:true,gear_visible:false,broken:false,lips_match:'no_speech_on_camera',result_as_written:'yes',printed_text:t});
+ const print="DON'T TALK TO ME I HAVE A CRAZY GIRLFRIEND";
+ assert.equal(printMatch(print,'Dont talk to me, I have a crazy girlfriend'),1);assert.ok(printMatch(print,'LASTIA IULRD WEGS')<0.2);
+ assert.equal(partVerdict(seen("DON'T TALK TO ME I HAVE A CRAZY GIRLFRIEND"),{talking:false,allowText:true,print}).pass,true);
+ assert.deepEqual(partVerdict(seen('LASTIA IULRD WEGS'),{talking:false,allowText:true,print}).problems,['the printed line reads "LASTIA IULRD WEGS", not the line we asked for']);
+});
+test('Veo visual copy: the first frame is drawn with the exact line, read back, redrawn once if wrong, then animated',async()=>{
+ const {root,job,ch}=await setup();const keys=()=>({gemini:'g',jev:'j',groq:'q'});
+ const kitNoHost={...kitSaved,format:'visuals',kit:{...kitSaved.kit,cast:[]},pictures:[{role:'place',file:'place-a.jpg'},{role:'scene',file:'scene-a.jpg'}]};
+ await writeFile(join(ch,'kit','kit.json'),JSON.stringify(kitNoHost));
+ const vs={visual:true,print:"DON'T TALK TO ME",hook_title:'',caption:'c',parts:[{seconds:8,beats:[{from:0,to:8,shot:'Medium shot from behind, slow push-in',who:'voice',does:'A young man stands in a store aisle, back to the camera',says:'',sound:''}]}]};
+ await writeFile(join(ch,'plan.json'),JSON.stringify({mode:'kit',source:'copy',engine:'veo-fast',copyOf:'o1',kitAt:kitNoHost.createdAt,createdAt:'2026-09-29T02:00:00Z',chosen:0,picked:[{idea:{title:'Copy'}}],script:vs,check:{pass:true},price:{usd:0.8}}));
+ const posts=[];const veoFetch=async(url,o={})=>{if(o.method==='POST'){posts.push(JSON.parse(o.body));return Response.json({name:'models/x/operations/op1'});}
+  if(url.includes(':download'))return new Response('VEO');return Response.json({done:true,response:{generateVideoResponse:{generatedSamples:[{video:{uri:'https://generativelanguage.googleapis.com/v1beta/files/v:download?alt=media'}}]}}});};
+ let drawn=0;const image=async({prompt,refs})=>{drawn++;assert.match(prompt,/"DON'T TALK TO ME"/);assert.equal(String(refs[0].data),'JPG place');return {data:Buffer.from(`FRAME${drawn}`),mime:'image/jpeg',costUsd:0.04};};
+ const gemini=async({schema,parts})=>{if(schema.required?.includes('printed_text')&&!schema.required.includes('match'))return {json:{printed_text:drawn===1?'DONT TALK T0 NE':"DON'T TALK TO ME"},costUsd:0.001};
+  return {json:{shows:'x',match:3,same_people:'no_people',text_or_logos:true,gear_visible:false,broken:false,missing:'nothing',printed_text:"DON'T TALK TO ME"},costUsd:0};};
+ const maker=new ReelMaker(root,keys,{cover:fakeCover,gemini,image,jev:async()=>good,veoFetch,pollMs:0,seconds:async()=>8,cut:async(i,o)=>o,render:async a=>{await writeFile(a.out,'R');return {seconds:10.5,spoken:[]};}});
+ await maker.start(job,{confirmCredits:0.8});const m=await until(()=>maker.status(job));assert.equal(m.state,'done',m.error);
+ assert.equal(drawn,2);assert.equal(Buffer.from(posts[0].instances[0].image.bytesBase64Encoded,'base64').toString(),'FRAME2');assert.equal(posts[0].instances[0].referenceImages,undefined);
+});

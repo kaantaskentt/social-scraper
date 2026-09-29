@@ -55,3 +55,11 @@ test('a refused prompt or a filtered video fails with the reason and costs nothi
   await assert.rejects(new VeoJobs(dir,lost).run('part-4',{prompt:'p',seconds:7}),/may already be paid/);assert.equal(g.calls.post.length,0);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+// A visual copy's printed line: Veo garbled "DON'T TALK TO ME..." into "LASTIA IULRD WEGS" when asked to write it
+// (2026-09-29), so the first frame is drawn with the exact line and Veo animates from it.
+test('a first frame is sent as the starting image, without reference pictures',()=>{
+ const r=veoRequest({prompt:'p',image:Buffer.from('frame'),refs:[Buffer.from('a')]});
+ assert.equal(Buffer.from(r.instances[0].image.bytesBase64Encoded,'base64').toString(),'frame');assert.equal(r.instances[0].image.mimeType,'image/jpeg');
+ assert.equal(r.instances[0].referenceImages,undefined);assert.equal(r.parameters.durationSeconds,8);assert.equal(r.parameters.personGeneration,'allow_adult');
+});
