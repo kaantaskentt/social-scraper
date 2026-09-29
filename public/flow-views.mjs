@@ -1,4 +1,4 @@
-// The six-step app: Scan → Winners → Secret → Kit → Make → Ready to post. Pure render functions (data in, HTML out) so
+// The five-step app: Scan → Winners → Look → Copy → Ready to post (the Secret is built inside Look; 2026-09-29). Pure render functions (data in, HTML out) so
 // Node tests can check them. Short words, visuals first; the long research views live at /lab.
 import {SHORT,LABELS,PLAIN} from './secret-labels.mjs';
 import {MECHANISMS} from './secret-mechanisms.mjs';
@@ -8,12 +8,15 @@ const compact=n=>Number.isFinite(n)?new Intl.NumberFormat('en',{notation:'compac
 const name=(q,v)=>SHORT[q]?.[v]||LABELS[q]?.[1]?.[v]||v;
 const plain=(q,v)=>PLAIN[q]?.[v]||'';
 
-export const STEPS=[['scan','Scan'],['winners','Winners'],['secret','Secret'],['kit','Kit'],['make','Make'],['ready','Ready to post']];
+// Kaan, 2026-09-29: continue from the winners with the copy path. The Secret page stays reachable from Winners
+// ("Why do these win?") but is no longer a step: Look builds it when it is missing.
+export const STEPS=[['scan','Scan'],['winners','Winners'],['kit','Look'],['make','Copy'],['ready','Ready to post']];
 // Which steps can be opened: each needs the one before it to be done.
-export function reachable({scanned=false,scored=false,secret=false,reels=0}){
- return {scan:true,winners:scanned&&scored,secret:scanned&&scored,kit:secret,make:secret,ready:reels>0};
+export function reachable({scanned=false,scored=false,kit=false,reels=0}){
+ return {scan:true,winners:scanned&&scored,secret:scanned&&scored,kit:scanned&&scored,make:kit,ready:reels>0};
 }
 export function renderStepper(current,open,done){
+ if(current==='secret')current='winners'; // "Why do these win?" belongs to Winners now
  return `<nav class="steps" aria-label="Steps">${STEPS.map(([id,label],i)=>`<button type="button" class="step${id===current?' is-current':''}${done[id]?' is-done':''}" data-step="${id}"${open[id]?'':' disabled'} aria-current="${id===current?'step':'false'}"><span class="step-dot">${done[id]&&id!==current?'✓':i+1}</span><span class="step-label">${label}</span></button>`).join('<span class="step-line" aria-hidden="true"></span>')}</nav>`;
 }
 const next=(to,label)=>`<div class="next-row"><button type="button" class="btn btn-primary" data-step="${to}">${esc(label)} →</button></div>`;
@@ -60,7 +63,7 @@ export function renderWinners({account,winners=[],weakest=[]}){
  return `${head(`@${account}'s winners`,'These reels got at least 2× the views this account normally gets.')}
 <div class="reel-grid">${winners.map(w=>reelTile(w,{badge:`${w.xNormal.toFixed(1)}× normal`,sub:`${compact(w.reach)} views`})).join('')}</div>
 ${weakest.length?`<h2 class="sub-title">Their weakest, for contrast</h2><div class="reel-grid is-small">${weakest.map(w=>reelTile(w,{badge:`${w.xNormal.toFixed(1)}×`,sub:`${compact(w.reach)} views`})).join('')}</div>`:''}
-${next('secret','Why do these win?')}`;
+<div class="next-row"><button type="button" class="btn btn-ghost" data-step="secret">Why do these win?</button><button type="button" class="btn btn-primary" data-step="kit">Make your look →</button></div>`;
 }
 
 // 3 · Secret, readable by a 10-year-old: 3 things to do, 1 to avoid, what every reel has, why it works, a check.
@@ -126,7 +129,7 @@ ${renderDna(dna,{imageFor})}
 ${why?`<section class="block"><h2 class="sub-title">Why it works on people</h2><ul class="why-list card">${why}</ul></section>`:''}
 ${risk?`<div class="card risk"><b>Before you copy</b><p>${esc(risk.point)}</p></div>`:''}
 <section class="block"><h2 class="sub-title">Did we understand it right?</h2><div class="card"><div class="seen-grid">${formula}</div>${check}</div></section>
-${next('kit','Build the look')}`;
+${next('kit','Make your look')}`;
 }
 
 // 4 · Kit: the brand memory. The host, the place and the sound every reel shares, drawn and checked.

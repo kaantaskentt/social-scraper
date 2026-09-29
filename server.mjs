@@ -42,7 +42,10 @@ const replicator=await new Replicator(pipeline.root).init();
 const secrets=new SecretBuilder(pipeline.root,keys);
 const planner=new ReelPlanner(pipeline.root,keys);
 const maker=new ReelMaker(pipeline.root,keys);
-const kits=new KitBuilder(pipeline.root,keys);
+// Look builds the Secret itself when it is missing (the page goes Winners → Look): start it, wait, hand it over.
+const ensureSecret=async job=>{const {results}=score(job,LATEST);await secrets.start(job,results);
+ for(;;){const st=await secrets.status(job,results);if(st.state==='done')return st.saved;if(st.state!=='building')throw new Error(st.error||'Studying their winners stopped');await new Promise(r=>setTimeout(r,2000));}};
+const kits=new KitBuilder(pipeline.root,keys,{ensureSecret});
 const dnas=new DnaBuilder(pipeline.root,keys);
 const results=new ResultsTracker(pipeline.root,keys);
 const copies=new CopyStudio(pipeline.root,keys,{planner,maker});

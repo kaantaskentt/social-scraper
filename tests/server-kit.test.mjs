@@ -16,7 +16,8 @@ test('server: the kit needs a confirm and a Secret, serves only kit pictures, an
   const {token}=await (await fetch(`${base}/api/bootstrap`)).json();
   const post=(p,b)=>fetch(`${base}/api/runs/run1/kit${p}`,{method:'POST',headers:{'X-Lab-Token':token,'Content-Type':'application/json'},body:JSON.stringify(b)});
   assert.match((await (await post('',{})).json()).error,/Confirm/);
-  assert.match((await (await post('',{confirm:true})).json()).error,/Secret first/);
+  // Without a Secret, Look studies the winners first instead of refusing (the page goes Winners → Look, 2026-09-29).
+  const started=await (await post('',{confirm:true})).json();assert.ok(!started.error,started.error);assert.equal(started.stage,'Studying their winners');
   assert.match((await (await post('/approve',{confirm:true})).json()).error,/Build the kit first/);
   assert.match((await (await post('/voices',{confirm:true})).json()).error,/Draw your look first/);
   assert.match((await (await post('/choose',{confirm:true})).json()).error,/no options to choose from/);

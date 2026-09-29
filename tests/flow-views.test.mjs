@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import {reachable,renderStepper,renderScan,renderWinners,renderSecret,renderKit,renderMake,renderReady,renderPrice,renderIdeas} from '../public/flow-views.mjs';
 const img=id=>`/media/r/${id}`;
 
-test('steps open in order: winners and secret need a scored scan, make needs the secret, ready needs a reel',()=>{
+test('steps open in order: winners and look need a scored scan, copy needs a finished look, ready needs a reel',()=>{
  assert.deepEqual(reachable({}),{scan:true,winners:false,secret:false,kit:false,make:false,ready:false});
- assert.deepEqual(reachable({scanned:true,scored:true,secret:true,reels:1}),{scan:true,winners:true,secret:true,kit:true,make:true,ready:true});
+ assert.deepEqual(reachable({scanned:true,scored:true,kit:true,reels:1}),{scan:true,winners:true,secret:true,kit:true,make:true,ready:true});
+ // Look opens right after Winners (it builds the Secret itself); Copy needs a finished look (2026-09-29).
+ assert.deepEqual(reachable({scanned:true,scored:true}),{scan:true,winners:true,secret:true,kit:true,make:false,ready:false});
  const html=renderStepper('secret',reachable({scanned:true,scored:true}),{scan:true,winners:true});
- assert.match(html,/data-step="secret"[^>]*aria-current="step"/);assert.match(html,/data-step="make"[^>]*disabled/);assert.match(html,/✓/);
+ assert.match(html,/data-step="winners"[^>]*aria-current="step"/);assert.doesNotMatch(html,/data-step="secret"/);assert.match(html,/data-step="make"[^>]*disabled/);assert.match(html,/✓/);
 });
 
 test('scan: one input, the price on the button, earlier accounts to reopen, and a next step once scanned',()=>{
@@ -30,7 +32,7 @@ test('secret: 3 things to do with dots and proof, 1 to avoid, what every reel ha
  assert.equal((html.match(/class="on"/g)||[]).length>=12+5,true,'dots are drawn');
  assert.match(html,/Their weakest reels do this more[\s\S]*Problem, then fix/);assert.match(html,/Every reel has[\s\S]*Kitchen/);
  assert.match(html,/When you want to know the answer, you keep watching\.[\s\S]*Backed by research/);assert.match(html,/Before you copy[\s\S]*Check health claims/);
- assert.match(html,/data-feedback="yes"/);assert.match(html,/data-step="kit"[^>]*>Build the look/);assert.doesNotMatch(html,/\d+\.\d+ s/,'no numbers soup');
+ assert.match(html,/data-feedback="yes"/);assert.match(html,/data-step="kit"[^>]*>Make your look/);assert.doesNotMatch(html,/\d+\.\d+ s/,'no numbers soup');
  assert.match(renderSecret({account:'ken',status:{state:'none',plan:{usd:0.336,reels:30}},imageFor:img}),/Find the secret · about \$0\.34/);
 });
 

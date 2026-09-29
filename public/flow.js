@@ -21,7 +21,7 @@ function toast(text){const t=$('#toast');t.textContent=text;t.hidden=false;clear
 const scanned=()=>['complete','partial'].includes(S.job?.status);
 const scanning=()=>['running','scraping'].includes(S.job?.status);
 const scored=()=>Object.values(S.results||{}).some(r=>r.quadrant&&r.quadrant!=='insufficient');
-const flags=()=>({scanned:scanned(),scored:scored(),secret:S.secret?.state==='done',reels:readyReels(S.make?.reels).length});
+const flags=()=>({scanned:scanned(),scored:scored(),secret:S.secret?.state==='done',kit:Boolean(S.kit?.saved?.approved),reels:readyReels(S.make?.reels).length});
 const doneSteps=()=>{const f=flags();return {scan:f.scanned,winners:f.scanned&&f.scored,secret:f.secret,kit:Boolean(S.kit?.saved?.approved),make:f.reels>0,ready:false};};
 const post=id=>S.job?.posts.find(p=>p.id===id);
 const imageFor=id=>`/media/${encodeURIComponent(S.runId)}/${encodeURIComponent(id)}`;
@@ -92,7 +92,7 @@ async function loadRun(id,{keepStep=false}={}){
 
  if(S.runId!==id)return;
  Object.assign(S,{job,dna,results2,copy,copyUnpicked:new Set(),saved:new Set(videos.saved||[]),secret,kit,plan,make,results:money.results||{},moneyError:money.error||'',feedback:secret?.saved?.feedback||null,runs:syncRuns(S.runs,job)});
- if(!keepStep){const d=doneSteps(),remembered=store.get(`flow.step.${id}`);S.step=remembered&&reachable(flags())[remembered]?remembered:d.kit?'make':d.secret?'kit':d.winners?'winners':'scan';}
+ if(!keepStep){const d=doneSteps(),remembered=store.get(`flow.step.${id}`);S.step=remembered&&reachable(flags())[remembered]?remembered:d.kit?'make':(S.kit?.saved||S.kit?.state==='working'||d.secret)&&d.winners?'kit':d.winners?'winners':'scan';}
  render();poll();if(S.step==='make')prepareMake();
 }
 function poll(){
