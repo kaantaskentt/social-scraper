@@ -32,12 +32,14 @@ const sessionKeys={};const verified={};
 const keys=()=>({fireworks:sessionKeys.fireworks||localEnv.FIREWORKS_API_KEY||process.env.FIREWORKS_API_KEY,apify:sessionKeys.apify||localEnv.APIFY_TOKEN||process.env.APIFY_TOKEN||process.env.APIFY_API_TOKEN,groq:sessionKeys.groq||localEnv.GROQ_API_KEY||process.env.GROQ_API_KEY,jev:sessionKeys.jev||localEnv.TYPESAFE_API_KEY||process.env.TYPESAFE_API_KEY||process.env.JEV_API_KEY,gemini:sessionKeys.gemini||localEnv.GEMINI_API_KEY||process.env.GEMINI_API_KEY,anthropic:localEnv.ANTHROPIC_API_KEY||process.env.ANTHROPIC_API_KEY});
 const pipeline=await new Pipeline(process.env.LAB_DATA_DIR||join(ROOT,'data'),keys,{transcriptionProvider,fireworksRpm:Number(localEnv.FIREWORKS_REQUESTS_PER_MINUTE||process.env.FIREWORKS_REQUESTS_PER_MINUTE||60),groqRpm:Number(localEnv.GROQ_REQUESTS_PER_MINUTE||process.env.GROQ_REQUESTS_PER_MINUTE||20)}).init();
 let mediaActive=0;const mediaWaiters=[],mediaPending=new Map();async function mediaTask(fn){if(mediaActive>=8)await new Promise(resolve=>mediaWaiters.push(resolve));else mediaActive++;try{return await fn();}finally{if(mediaWaiters.length)mediaWaiters.shift()();else mediaActive--;}}
-// Videos are saved locally when a run finishes (and at startup for finished runs), before Instagram links expire.
+// Videos are saved as soon as a run's reels are collected, winners first (not after the whole scan: 2026-09-29), and at
+// startup for every collected run, before Instagram links expire.
 const videoJobs=new Map();
 function startVideoSave(job){const existing=videoJobs.get(job.id);if(existing?.running)return existing;const state={running:true,progress:null,result:null,error:null};state.done=saveVideos(pipeline.root,job,{onProgress:p=>{state.progress=p;}}).then(r=>{state.result=r;}).catch(e=>{state.error=e.message;console.error(`Social Scraper: saving videos for ${job.id} failed: ${e.message}`);}).finally(()=>{state.running=false;});videoJobs.set(job.id,state);return state;}
-const finished=j=>['complete','partial'].includes(j.status);
-for(const j of pipeline.jobs.values())if(finished(j))startVideoSave(j);
-pipeline.listeners.add(id=>{const j=pipeline.jobs.get(id);if(j&&finished(j)&&!videoJobs.get(id)?.running&&!videoJobs.get(id)?.result)startVideoSave(j);});
+const collected=j=>j.posts?.length>0;
+for(const j of pipeline.jobs.values())if(collected(j))startVideoSave(j);
+pipeline.listeners.add(id=>{const j=pipeline.jobs.get(id);if(j&&collected(j)&&!videoJobs.get(id)?.running&&!videoJobs.get(id)?.result)startVideoSave(j);});
+pipeline.resumeInterrupted();
 const replicator=await new Replicator(pipeline.root).init();
 const secrets=new SecretBuilder(pipeline.root,keys);
 const planner=new ReelPlanner(pipeline.root,keys);

@@ -4,6 +4,7 @@ import {mkdtemp,rm,readFile,writeFile,mkdir,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {saveVideos,deleteVideos,videoInfo,videoPath,parseRange,linkExpired} from '../lib/videos.mjs';
+import {byPriority} from '../lib/data.mjs';
 
 const job=(id,ids)=>({id,posts:ids.map(p=>({id:p,videoUrl:`https://scontent.cdninstagram.com/${p}.mp4?oe=FFFFFFFF`}))});
 const fake=calls=>async url=>{calls.push(url);if(url.includes('bad'))throw new Error('Media download failed (403)');if(url.includes('html'))return {bytes:Buffer.from('<html>'),type:'text/html'};return {bytes:Buffer.from('video:'+url),type:'video/mp4'};};
@@ -50,4 +51,15 @@ test('range header parsing for video seeking',()=>{
  assert.deepEqual(parseRange('bytes=-100',1000),{start:900,end:999});
  assert.deepEqual(parseRange('bytes=0-5000',1000),{start:0,end:999});
  for(const bad of ['bytes=1000-','bytes=5-2','items=0-1','bytes=0-1,5-6','bytes=-0'])assert.equal(parseRange(bad,1000),null,bad);
+});
+
+// Winners (and the weakest, for contrast) are what the next steps look at first, so they are fetched first
+// (2026-09-29: videos used to download only after the whole scan finished).
+test('the reels furthest from the account\'s usual plays come first: the winners, then the weakest',async()=>{
+ const posts=[{id:'mid',plays:10000},{id:'huge',plays:5000000},{id:'none'},{id:'tiny',plays:600},{id:'big',plays:300000},{id:'m2',plays:12000}];
+ assert.deepEqual(byPriority(posts).map(p=>p.id),['huge','big','tiny','mid','m2','none']);
+ const root=await mkdtemp(join(tmpdir(),'cl-v-'));
+ try{const calls=[];const j={id:'run2',posts:posts.filter(p=>p.plays).map(p=>({...p,videoUrl:`https://scontent.cdninstagram.com/${p.id}.mp4?oe=FFFFFFFF`}))};
+  await saveVideos(root,j,{downloader:fake(calls),concurrency:1});assert.deepEqual(calls.map(u=>u.split('/').pop().split('.')[0]),['huge','big','tiny','mid','m2']);
+ }finally{await rm(root,{recursive:true,force:true});}
 });

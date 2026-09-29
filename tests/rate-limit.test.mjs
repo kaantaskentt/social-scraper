@@ -22,3 +22,12 @@ test('long quota resets still pause rather than retrying indefinitely',async()=>
  const original=global.fetch;let calls=0;global.fetch=async()=>{calls++;return Response.json({error:{message:'Audio seconds per hour exceeded'}},{status:429,headers:{'retry-after':'1800'}});};
  try{await assert.rejects(request('https://api.groq.com/test',{}, {service:'Groq',rateRetries:10,sleep:async()=>assert.fail('Must not wait for a long quota reset')}),/Audio seconds per hour/);assert.equal(calls,1);}finally{global.fetch=original;}
 });
+// Groq's free plan allows 20 transcriptions a minute; a paid plan allows far more. The pace starts at the free rate,
+// speeds up by a quarter after every 10 clean requests and falls back by 30% on a rate limit (2026-09-29).
+test('an adaptive pace speeds up after clean requests and backs off on a rate limit',async()=>{
+ let clock=0;const starts=[];const pacer=createRequestPacer(20,{adaptive:{max:400},now:()=>clock,sleep:async ms=>{clock+=ms;}});
+ for(let i=0;i<31;i++){await pacer.wait();starts.push(clock);}
+ const gap=i=>starts[i]-starts[i-1];assert.ok(gap(5)>=3000);assert.ok(gap(30)<gap(5)*0.7,`${gap(30)} vs ${gap(5)}`);
+ const fast=pacer.rpm();pacer.cooldown(1000);assert.ok(pacer.rpm()<=fast*0.7+1e-9);assert.ok(pacer.rpm()>=20*0.5);
+ const fixed=createRequestPacer(20,{now:()=>clock,sleep:async ms=>{clock+=ms;}});for(let i=0;i<25;i++)await fixed.wait();assert.equal(fixed.rpm(),20);
+});

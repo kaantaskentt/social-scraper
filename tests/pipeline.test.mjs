@@ -32,3 +32,17 @@ test('invalid keys pause with recoverable failure',async()=>{const root=await mk
 test('untimed imported segments do not become false zero-second timestamps',()=>{const req=buildRequest({text:'A useful sentence with enough words.',segments:[{start:null,end:null,text:'A useful sentence with enough words.'}]});assert.equal(req.state.segments[0].start,null);assert.equal(req.state.segments[0].end,null);});
 
 test('rate-limit diagnostics survive reading the error response body',async()=>{const old=global.fetch;global.fetch=async()=>Response.json({error:{message:'Audio limit reached; retry later'}},{status:429});try{await assert.rejects(request('https://api.groq.com/test',{}, {service:'Groq',retries:0}),/Audio limit reached/);}finally{global.fetch=old;}});
+// 2026-09-29: a restart cut Kaan's scan off at 47 of 100 and it sat for 9 minutes. The winners (and the weakest) are
+// transcribed first, and a scan that was running when the app stopped resumes on its own.
+test('winners are transcribed first, and a scan cut off by a restart resumes by itself',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'creator-lab-test-'));const realFetch=global.fetch;const order=[];
+ global.fetch=async(url,opts)=>{if(String(url).includes('groq.com')){order.push(opts.body.get('url'));return Response.json({...transcript,duration:8});}if(String(url).includes('typesafe.ai'))return Response.json(response(JSON.parse(opts.body)));throw new Error('Unexpected request');};
+ try{
+  const rows=[['mid',10000],['viral',4000000],['flop',500],['mid2',12000],['big',300000]].map(([id,v])=>({id,ownerUsername:'tester',videoViewCount:v,likesCount:10,videoUrl:`https://scontent.cdninstagram.com/${id}.mp4`,videoDuration:8}));
+  const p=await new Pipeline(root,()=>({groq:'test',jev:'test'})).init();const run=await p.create({creator:'tester',limit:5,concurrency:1},rows);
+  run.status='running';await p.persist(run);
+  const again=await new Pipeline(root,()=>({groq:'test',jev:'test'})).init();assert.equal(again.jobs.get(run.id).status,'interrupted');
+  again.resumeInterrupted();while(!again.active.size&&again.jobs.get(run.id).status==='interrupted')await new Promise(r=>setTimeout(r,5));while(again.active.size)await new Promise(r=>setTimeout(r,5));
+  assert.equal(again.jobs.get(run.id).status,'complete');assert.deepEqual(order.map(u=>u.split('/').pop().split('.')[0]),['viral','big','flop','mid','mid2']);
+ }finally{global.fetch=realFetch;await rm(root,{recursive:true,force:true});}
+});
