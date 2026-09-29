@@ -197,9 +197,9 @@ document.addEventListener('click',async e=>{
 document.addEventListener('submit',e=>{
  if(e.target.dataset.form==='track'){e.preventDefault();const handle=new FormData(e.target).get('handle');act(async()=>{S.results2=await api(`/api/runs/${encodeURIComponent(S.runId)}/results/handle`,{handle});toast(`Tracking @${S.results2.handle}`);});return;}
  if(e.target.dataset.form!=='scan')return;e.preventDefault();
- const {handles,error}=parseHandles(new FormData(e.target).get('handle'));
+ const form=new FormData(e.target),{handles,error}=parseHandles(form.get('handle')),fresh=form.get('fresh')==='on';
  if(error||handles.length!==1){S.error=error||'Enter one account';render();return;}
- act(async()=>{const job=await api('/api/runs',{creator:handles[0],limit:100,concurrency:4,budget:1});await api(`/api/runs/${job.id}/run`,{});S.runs=[{id:job.id,creator:job.creator,count:0,status:'running'},...S.runs];await loadRun(job.id);});
+ act(async()=>{const job=await api('/api/runs',{creator:handles[0],limit:100,concurrency:4,budget:1,fresh});await api(`/api/runs/${job.id}/run`,{});S.runs=[{id:job.id,creator:job.creator,count:0,status:'running'},...S.runs];await loadRun(job.id);});
 });
 // The confirm pop-up: a title, a sentence, and what its button does. `look` is the kit's pictures, when they matter.
 function ask(title,text,ok,{look='',ok:label='Make it'}={}){
