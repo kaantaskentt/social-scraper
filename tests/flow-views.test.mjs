@@ -296,7 +296,7 @@ test('scan summary: reels, winners (at least 2x their usual), best reel and the 
 });
 test('winner metrics put plays before relative reach and engagement, with inline muted preview',()=>{
  const html=renderWinners({account:'a',winners:[{id:'w',image:'/w.jpg',video:'/w.mp4',reach:14.3e6,xNormal:397,engagement:22}],secretOpen:false,lookOpen:false});
- assert.match(html,/14.3M <span>plays[\s\S]*397× their usual[\s\S]*Engagement 22 per 1K plays/);
+ assert.match(html,/reel-badge is-top">397× their usual<\/span>[\s\S]*14.3M <span>plays[\s\S]*Engagement 22 per 1K plays/); // the badge sits on the picture
  assert.match(html,/data-src="\/w.mp4" muted playsinline loop/);assert.match(html,/data-step="secret" disabled/);assert.match(html,/data-step="kit" disabled/);
 });
 test('one primary action is docked with its hooks, cost, disabled state and optional secondary',()=>{
