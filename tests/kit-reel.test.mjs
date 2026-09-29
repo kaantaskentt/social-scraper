@@ -410,3 +410,54 @@ test('Veo copy: the 8 s clip carries our pictures, the 7 s extension carries the
  const reel=m.reels[0];assert.equal(reel.engine,'veo-fast');assert.deepEqual(Object.keys(reel.paid),['part-1#1','part-2#1','part-2#2']);assert.equal(reel.spentUsd,0.8+0.7+0.7);
  assert.equal(reel.parts[1].attempt,2);assert.equal(reel.copyOf,'o1');
 });
+
+// Kaan, 2026-09-29: no length caps, and a refusal must not break a copy. Veo extends one video up to 148 s (a small
+// limit here), so a longer copy starts a fresh clip with the pictures (a new chain) and the chains are joined. Veo
+// refused our host's photo as "a real person" once on natural.solutions (the same photo passed in another copy): a
+// refusal is free, so the maker tries the host's other pictures before giving up.
+test('Veo copy: a long reel is filmed as joined chains, and a "real person" refusal retries with another host picture',async()=>{
+ const {root,job,ch}=await setup();const keys=()=>({gemini:'g',jev:'j',groq:'q'});
+ const beat=(who,says)=>({from:0,to:7,shot:'close',who,does:`${who} talks`,says,sound:''});
+ const vs={hook_title:'H',caption:'c',parts:[{seconds:8,beats:[{...beat('Leo','One.'),to:8}]},{seconds:7,beats:[beat('Mia','Two.')]},{seconds:8,beats:[{...beat('Leo','Three.'),to:8}]}]};
+ await writeFile(join(ch,'plan.json'),JSON.stringify({mode:'kit',source:'copy',engine:'veo-fast',copyOf:'o1',kitAt:kitSaved.createdAt,createdAt:'2026-09-29T02:00:00Z',chosen:0,picked:[{idea:{title:'Copy'}}],script:vs,check:{pass:true},price:{usd:2.3}}));
+ const posts=[];const veoFetch=async(url,o={})=>{
+  if(o.method==='POST'){posts.push({url,body:JSON.parse(o.body)});return Response.json({name:`models/x/operations/op${posts.length}`});}
+  if(url.includes(':download'))return new Response('VEO'+posts.length);
+  if(url.endsWith('/op1'))return Response.json({done:true,error:{code:400,message:"Sorry, we can't create videos with real people's names or likenesses. Please remove the celebrity reference and try again."}});
+  return Response.json({done:true,response:{generateVideoResponse:{generatedSamples:[{video:{uri:'https://generativelanguage.googleapis.com/v1beta/files/v:download?alt=media'}}]}}});};
+ const fine={shows:'x',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'};
+ let joined=null;const secs=f=>/part-2/.test(f)?15:/part-[13]/.test(f)?8:23;
+ const maker=new ReelMaker(root,keys,{cover:fakeCover,gemini:async()=>({json:fine,costUsd:0}),jev:async()=>good,veoFetch,pollMs:0,veoChainSeconds:15,seconds:async f=>secs(f),
+  join:async(files,out)=>{joined=files;await writeFile(out,'JOINED');return out;},cut:async(i,o)=>{await writeFile(o,'c');return o;},render:async a=>{await writeFile(a.out,'R');return {seconds:23,spoken:[]};}});
+ await maker.start(job,{confirmCredits:2.3});const m=await until(()=>maker.status(job));assert.equal(m.state,'done',m.error);
+ assert.equal(posts.length,4);
+ const img=b=>Buffer.from(b.instances[0].referenceImages[0].image.bytesBase64Encoded,'base64').toString();
+ assert.equal(img(posts[0].body),'JPG face0');assert.equal(img(posts[1].body),'JPG turn0'); // the refused face is swapped for another picture of the same host
+ assert.ok(posts[2].body.instances[0].video);assert.equal(posts[2].body.instances[0].referenceImages,undefined); // part 2 extends chain 1
+ assert.equal(posts[3].body.instances[0].video,undefined);assert.equal(img(posts[3].body),'JPG turn0');assert.match(posts[3].body.instances[0].prompt,/^Vertical phone video/); // part 3 starts chain 2 fresh, with the picture that worked
+ const reel=m.reels[0];assert.equal(reel.refVariant,1);assert.equal(reel.spentUsd,0.8+0.7+0.8);assert.deepEqual(joined.map(f=>f.split('/').pop()),['part-2-a1.mp4','part-3-a1.mp4']);
+});
+test('Veo copy: when Google refuses every picture of the host, it stops with a clear next step and costs nothing',async()=>{
+ const {root,job,ch}=await setup();const keys=()=>({gemini:'g',jev:'j',groq:'q'});
+ const vs={hook_title:'H',caption:'c',parts:[{seconds:8,beats:[{from:0,to:8,shot:'close',who:'Leo',does:'Leo talks',says:'One.',sound:''}]}]};
+ await writeFile(join(ch,'plan.json'),JSON.stringify({mode:'kit',source:'copy',engine:'veo-fast',copyOf:'o1',kitAt:kitSaved.createdAt,createdAt:'2026-09-29T02:00:00Z',chosen:0,picked:[{idea:{title:'Copy'}}],script:vs,check:{pass:true},price:{usd:0.8}}));
+ let posts=0;const veoFetch=async(url,o={})=>{if(o.method==='POST'){posts++;return Response.json({name:`models/x/operations/op${posts}`});}
+  return Response.json({done:true,error:{code:400,message:'Sorry, we can\'t create videos with real people\'s names or likenesses.'}});};
+ const maker=new ReelMaker(root,keys,{cover:fakeCover,gemini:async()=>({json:{},costUsd:0}),jev:async()=>good,veoFetch,pollMs:0,seconds:async()=>8,cut:async(i,o)=>o,render:async()=>({})});
+ await maker.start(job,{confirmCredits:0.8});const m=await until(()=>maker.status(job));
+ assert.equal(m.state,'failed');assert.match(m.error,/looks like a real person.*Gemini Omni.*new host/);assert.equal(posts,2); // face0, then turn0 (face1 has no other picture)
+});
+test('Omni copy: every 4 parts a fresh chain starts with the pictures (Google extends only up to 30 s), and chains are joined',async()=>{
+ const {root,job,ch}=await setup();const keys=()=>({gemini:'g',jev:'j',groq:'q'});
+ const part=n=>({seconds:10,beats:[{from:0,to:10,shot:'close',who:'Leo',does:'Leo talks',says:`Line ${n}.`,sound:''}]});
+ const sc={hook_title:'H',caption:'c',parts:[1,2,3,4,5].map(part)};
+ await writeFile(join(ch,'plan.json'),JSON.stringify({mode:'kit',source:'copy',engine:'omni',copyOf:'o1',voiceMode:'native',kitAt:kitSaved.createdAt,createdAt:'2026-09-29T02:00:00Z',chosen:0,picked:[{idea:{title:'Copy'}}],script:sc,check:{pass:true},price:{usd:0}}));
+ const g=fakeGoogle();let joined=null;const fine={shows:'x',match:3,same_people:'yes',text_or_logos:false,gear_visible:false,broken:false,missing:'nothing'};
+ const {kitPrice}=await import('../lib/kit-reel.mjs');const usd=kitPrice(5).usd;
+ const maker=new ReelMaker(root,keys,{cover:fakeCover,gemini:async()=>({json:fine,costUsd:0}),jev:async()=>good,videoFetch:g.fetchImpl,pollMs:0,seconds:async f=>/chains-joined/.test(f)?50:10,
+  join:async(files,out)=>{joined=files;await writeFile(out,'JOINED');return out;},cut:async(i,o)=>{await writeFile(o,'c');return o;},render:async a=>{await writeFile(a.out,'R');return {seconds:50,spoken:[]};}});
+ await maker.start(job,{confirmCredits:usd});const m=await until(()=>maker.status(job));assert.equal(m.state,'done',m.error);
+ const hasImages=b=>b.input.some(x=>x.type==='image');
+ assert.deepEqual(g.calls.post.map(hasImages),[true,false,false,false,true]);assert.deepEqual(g.calls.post.map(b=>Boolean(b.previous_interaction_id)),[false,true,true,true,false]);
+ assert.deepEqual(joined.map(f=>f.split('/').pop()),['part-4-a1.mp4','part-5-a1.mp4']);assert.equal(usd,Math.round((2*PART_USD+3*1.13)*100)/100);
+});

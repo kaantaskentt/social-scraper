@@ -1,22 +1,44 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {PART_USD,EXTEND_USD} from '../lib/kit-reel.mjs';
 import {formatKey,copyCandidates,pickCopies,timedWords,copyScript,wordsKept,copyPrice,stageKey,plannedStages,progressOf,learnStage,fidelityScore,fidelityVerdict,hasTimedWords,COPY_MAX_PARTS} from '../lib/copy.mjs';
 
-const reel=(id,xNormal,seconds,text,timed=true)=>({id,xNormal,seconds,text,timed});
+const reel=(id,xNormal,seconds,text,timed=true,plays=null,engagement=null)=>({id,xNormal,seconds,text,timed,plays,engagement});
 
-test('candidates: winners short enough to film, strongest first, a format that won more than once is counted',()=>{
- const c=copyCandidates([reel('chicken',104,37,'Pour boiling water over raw chicken. If thick white clumps come out'),reel('salmon',72,39,'Pour boiling water over raw salmon. If thick white clumps come out'),
-  reel('long',52,138,'Did you know that this simple drink has been used for years by many'),reel('lime',43,43,'Put lime on blueberries and watch what happens. Pharmacies do not like this'),reel('weak',1.2,30,'Something that did about their normal number of views today')]);
- assert.deepEqual(c.map(x=>x.id),['chicken','salmon']);assert.equal(c[0].repeats,2); // lime is 43 s: longer than the 41 s a 40-second copy can hold
+// Kaan, 2026-09-29: "suggest their best high engagement viral videos, don't suggest bad ones". On natural.solutions the
+// old picker offered two 60K-play reels (one an ad for their book) and skipped the 14.3M, 5.4M and 2.0M ones, because
+// it only took reels up to 41 s (Gemini Omni's limit); Veo 3.1 extends up to 148 s.
+test('candidates: the most-played winners first, any length (Kaan: no caps on seconds), with speech and word times',()=>{
+ const c=copyCandidates([reel('mid',3.8,38,'Did you know that if you add peanut butter to chickpeas and mix',true,64787,20),reel('viral',425,68,'You cannot eat apples spinach chicken yogurt and it will not clear',true,14256715,14),
+  reel('toes',46,54,'Stand on your toes twenty times after dinner tonight and watch your blood sugar',true,1556012,49),reel('toolong',60,160,'A very long talk about many different things for a long time here',true,900000,20),
+  reel('weak',1.2,30,'Something that did about their normal number of views today on this',true,20000,18)]);
+ assert.deepEqual(c.map(x=>x.id),['viral','toes','toolong','mid']); // 160 s is filmed as two joined videos
+ assert.equal(copyCandidates([reel('a',9,30,'one two three four five six seven eight nine',false,50000,20)]).length,0); // no word times: cannot be copied word for word
+ assert.equal(copyCandidates([reel('a',9,300,'one two three four five six seven eight nine',true,50000,20)]).length,1);
  assert.equal(formatKey('Pour boiling water, over raw chicken'),'pour boiling water over');
- assert.equal(copyCandidates([reel('a',9,COPY_MAX_PARTS*10+2,'one two three four five six seven eight nine')]).length,0);
- // A transcript without word times cannot be copied word for word: it is not offered (audit, 2026-09-29).
- assert.equal(copyCandidates([reel('a',9,30,'one two three four five six seven eight nine',false)]).length,0);assert.equal(copyCandidates([reel('a',9,COPY_MAX_PARTS*10+1,'one two three four five six seven eight nine')]).length,1);
+});
+test('candidates: an ad for their own product and a low-engagement reel are never suggested',()=>{
+ const c=copyCandidates([reel('book',3.7,40,'For everyone asking about the book, I have been researching natural remedies for over forty years',true,61069,5.5),
+  reel('bio',5,30,'Grab the full recipe with the link in my bio right now before it goes',true,90000,20),
+  reel('boosted',8,30,'Here is a quick tip that everyone should know about keeping bananas fresh',true,300000,4),
+  reel('good',6,30,'Here is why your bananas go brown so fast and the one thing that stops it',true,200000,19),
+  reel('ok',4,30,'Put a spoon of honey in warm water and watch what happens to it next',true,150000,17)]);
+ assert.deepEqual(c.map(x=>x.id),['good','ok']); // 4 per 1,000 is under half the channel's usual (17 to 19)
+});
+test('candidates: near-identical scripts count once (the most-played), and how often they won is kept',()=>{
+ const c=copyCandidates([reel('b',60,59,'You can eat apples chicken spinach yogurt and it will not clear what has been sitting in your gut',true,5389958,21),
+  reel('a',425,68,'You cannot eat apples spinach chicken yogurt and it will not clear what has been sitting in your gut',true,14256715,14),
+  reel('c',20,72,'You can eat fruit meat vegetables milk anything you want and it still will not clear out your gut',true,2023884,17),
+  reel('d',9,55,'Stand on your toes twenty times after dinner tonight and watch your blood sugar spikes vanish',true,1556012,49)]);
+ assert.deepEqual(c.map(x=>x.id),['a','c','d']);assert.equal(c[0].repeats,2);
 });
 test('the five: Jev drops reels that will not copy or need people we do not have, and each says why',()=>{
  const cands=[{id:'a',xNormal:104,repeats:4},{id:'b',xNormal:72,repeats:1},{id:'c',xNormal:43,repeats:1}];
  const j=(s,r)=>({answers:{copyable:{score:s},roles_fit:{noul:r}}});
- const p=pickCopies(cands,[j(2.6,0.9),j(1.2,0.9),j(2.2,0.2)]);assert.deepEqual(p.map(x=>x.id),['a']);assert.equal(p[0].why,'4 of their winners open with the same four words. Jev rates it 2.6 of 3 for copying.'); // the card shows the x-normal already
+ const p=pickCopies(cands,[j(2.6,0.9),j(1.2,0.9),j(2.2,0.2)]);assert.deepEqual(p.map(x=>x.id),['a']);assert.equal(p[0].why,'4 of their winners use this script. Jev rates it 2.6 of 3 for copying.'); // the card shows plays and x-normal already
+});
+test('an Omni copy has no length cap: every 4 parts a fresh chain starts, priced like a first part',()=>{
+ assert.equal(copyPrice(8),Math.round((2*PART_USD+6*EXTEND_USD)*100)/100);assert.equal(copyPrice(4),Math.round((PART_USD+3*EXTEND_USD)*100)/100);
 });
 test('timed words share a segment\'s time by word length, in order, inside the segment',()=>{
  const w=timedWords([{start:0,end:2.68,text:' Pour boiling water over raw chicken.'}]);

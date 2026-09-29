@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {VeoJobs,veoSegments,veoPrice,veoRequest,VEO} from '../lib/veo.mjs';
+import {VeoJobs,veoSegments,veoPrice,veoRequest,VEO,chainStarts,VEO_MAX} from '../lib/veo.mjs';
 
 // A fake Google: POST starts an operation, GET says not done once, then done with a download link.
 function google({refuse=false,filtered=false}={}){
@@ -20,6 +20,14 @@ const opts=g=>({key:'k',fetchImpl:g.fetchImpl,sleep:async()=>{},pollMs:0});
 test('segments: 8 s, then 7 s at a time until the original is covered; price per second of the tier',()=>{
  assert.deepEqual(veoSegments(8),[8]);assert.deepEqual(veoSegments(36),[8,7,7,7,7]);assert.deepEqual(veoSegments(37.4),[8,7,7,7,7,7]); // 36 s would cut the last 1.4 s of a 37.4 s originalassert.deepEqual(veoSegments(43),[8,7,7,7,7,7]);
  assert.equal(veoPrice([8,7,7,7,7]),3.6);assert.equal(veoPrice([8,7,7,7,7],'standard'),14.4);assert.equal(VEO.fast.usdPerSecond,0.10);
+});
+// Kaan, 2026-09-29: "ignore the caps for seconds". Veo extends one video up to 148 s; a longer reel starts a fresh 8 s
+// clip (a new chain, with the hosts' pictures again) and the chains are joined.
+test('no length cap: past 148 s a new chain starts with a fresh 8 s clip, and the chains cover the whole reel',()=>{
+ const s=veoSegments(160);assert.equal(s.reduce((a,b)=>a+b,0)>=159.5,true);assert.equal(s[21],8);assert.equal(s.slice(0,21).reduce((a,b)=>a+b,0),VEO_MAX);
+ const c=chainStarts(s,VEO_MAX);assert.deepEqual(c.map((f,i)=>f?i:-1).filter(i=>i>=0),[0,21]);
+ assert.deepEqual(chainStarts([10,10,10,10,10,10,10,10,10],40).map((f,i)=>f?i:-1).filter(i=>i>=0),[0,4,8]); // Omni: 4 parts of 10 s per chain
+ assert.deepEqual(veoSegments(36),[8,7,7,7,7]);
 });
 test('the first clip carries up to 3 reference pictures (allow_adult, 8 s); an extension carries the previous video',()=>{
  const first=veoRequest({prompt:'p',refs:[Buffer.from('a'),Buffer.from('b'),Buffer.from('c'),Buffer.from('d')]});

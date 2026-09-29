@@ -33,7 +33,7 @@ async function setup({makeKit,gate}={}){
 }
 const until=async(get,ok)=>{const end=Date.now()+10000;for(;;){const s=await get();if(ok(s)||Date.now()>end)return s;await new Promise(r=>setTimeout(r,10));}};
 
-test('parts: 10-second parts, at most 4 (Google extends a video only up to 30 s)',()=>{assert.equal(partsFor(22),3);assert.equal(partsFor(37.4),4);assert.equal(partsFor(30.2),3);assert.equal(partsFor(41),4);assert.equal(partsFor(120),4);});
+test('parts: 10-second parts covering the whole reel, no cap (every 4 parts a fresh Omni chain starts)',()=>{assert.equal(partsFor(22),3);assert.equal(partsFor(37.4),4);assert.equal(partsFor(30.2),3);assert.equal(partsFor(41),4);assert.equal(partsFor(120),12);});
 
 test('picking: winners with speech, their breakdowns and Jev\'s "can we copy it", saved with the reason and the price',async()=>{
  const {root,studio,calls}=await setup();
