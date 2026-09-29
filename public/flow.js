@@ -73,7 +73,8 @@ function render(){
  if(S.step==='scan'&&S.job){if(!S.scanSel)S.scanSel=[...S.job.posts].filter(p=>reach(p)).sort((a,b)=>reach(b)-reach(a))[0]?.id||null;
   mountScanMap($('#view'),{posts:S.job.posts,imageFor,videoFor,selected:S.scanSel,onSelect:id=>{S.scanSel=id;render();}});}
 }
-addEventListener('resize',()=>{if(S.step==='scan')render();});
+// One redraw after the window stops changing size (it redrew the whole map on every step of a drag).
+let resizeTimer=null;addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(S.step==='scan')render();},150);});
 // The live numbers of the copy studio, written into the page in place.
 function patchCopy(live){
  if(!live)return;const set=(el,v)=>{if(el&&el.textContent!==v)el.textContent=v;};
