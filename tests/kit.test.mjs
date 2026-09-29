@@ -53,9 +53,13 @@ test('a kit that does not fit its format is caught',()=>{
  assert.doesNotMatch(checkKit(kit({promise:'Easy tricks and simple health drinks.'}),'ai_host',1).join(),/non-medical/); // claims stay in (Kaan, 2026-09-29)
  assert.doesNotMatch(kitPrompt({account:'x',format:'ai_host',cast:1,expert:false,study:[],saved}),/stays non-medical/);
  assert.deepEqual(checkKit(kit({art_style:'flat cartoon',name:'Digital Doodles'}),'animated',1),[]);
- assert.match(checkKit(kit({cast:[{...host,outfit:'a vintage graphic tee, olive cargo pants'}]}),'ai_host',1).join(),/every piece/);
+ assert.match(checkKit(kit({cast:[{...host,outfit:'a vintage graphic tee, olive cargo pants'}]}),'ai_host',1).join(),/has no colour/);
  assert.deepEqual(checkKit(kit({cast:[{...host,outfit:'a black ribbed tank top, olive cargo pants and white sneakers'}]}),'ai_host',1),[]);
- assert.match(checkKit(kit({cast:[{...host,outfit:'a trendy crop top'}]}),'ai_host',1).join(),/Mira's outfit needs the exact colour of every piece/);
+ assert.match(checkKit(kit({cast:[{...host,outfit:'a trendy crop top'}]}),'ai_host',1).join(),/Mira's outfit: "a trendy crop top" has no colour/);
+ // Only garments need a colour; denim washes count; the missing piece is named (@liangsvitality failed twice on vague rules, 2026-09-29).
+ assert.deepEqual(checkKit(kit({cast:[{...host,outfit:'a heather grey tank top with rolled-up sleeves and light-wash jeans'}]}),'ai_host',1),[]);
+ assert.deepEqual(checkKit(kit({cast:[{...host,outfit:'an emerald wrap dress and white sneakers'}]}),'ai_host',1),[]);
+ assert.match(checkKit(kit({cast:[{...host,outfit:'a sage linen shirt and relaxed chinos'}]}),'ai_host',1).join(),/"relaxed chinos" has no colour|names no clothes/);
 });
 
 test('picture plan: face first, later pictures reference it, the scene uses face and place',()=>{
@@ -224,4 +228,14 @@ test('pictures draw side by side, each after the ones it builds on, never past t
   await mkdir(tight.dir('r2'),{recursive:true});  const t2={usd:0};await assert.rejects(tight.draw({id:'r2'},items.slice(0,3),{keys:{gemini:'g'},live:{progress:{done:0}},paid:async(s,c)=>{const r=await c();t2.usd+=r.costUsd;return r;},guard:need=>{if(t2.usd+need>0.1+1e-9)throw new Error('limit');}}),/limit/);
   assert.ok(t2.usd<=0.1,'two pictures in flight fill the $0.10 limit; the third is never started');
  }finally{await rm(root,{recursive:true,force:true});}
+});
+// @liangsvitality (2026-09-29): with 3 host options of 2 hosts each, one vague outfit among six failed the whole look
+// twice. An alternative option that does not pass is set aside; only the main hosts must pass.
+test('build: an alternative host option with a vague outfit is set aside, the look is still written once',async()=>{
+ const {root,job}=await setup();
+ const vague=optKit({alt_casts:[[{...host,name:'Ada',look:'woman in her twenties, tall, long black curly hair'}],[{...host,name:'Bo',look:'man in his fifties, stocky, grey buzz cut',outfit:'a relaxed shirt and comfy trousers'}]]});
+ const {calls,opts}=fakes({kits:[vague]});const b=new KitBuilder(root,keys,opts);
+ await b.start(job);const s=await until(b,job);assert.equal(s.state,'done',s.error);
+ assert.equal(calls.write,1);assert.deepEqual(s.saved.options.casts.map(c=>c.hosts[0].name),['Mira','Ada']);
+ await rm(root,{recursive:true});
 });
