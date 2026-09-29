@@ -10,7 +10,7 @@ import {metrics,slimPost} from './lib/data.mjs';
 import {checkProvider,download} from './lib/providers.mjs';
 import {demo,artwork} from './lib/demo.mjs';
 import {moneyReport} from './lib/money-report.mjs';
-import {saveVideos,deleteVideos,videoInfo,videoPath,parseRange,streamFile} from './lib/videos.mjs';
+import {saveVideos,deleteVideos,videoInfo,videoPath,parseRange,streamFile,sendFile} from './lib/videos.mjs';
 import {Replicator} from './lib/replicate.mjs';
 import {handleReplicate} from './lib/replicate-http.mjs';
 import {handleShotlist} from './lib/shotlist.mjs';
@@ -138,7 +138,7 @@ const server=http.createServer(async(req,res)=>{
    const data=await body(req);json(res,200,await maker.feedback(job,String(data.reelId||''),{verdict:data.verdict,reasons:Array.isArray(data.reasons)?data.reasons.map(String):[]}));return;}
   const made=path.match(/^\/channels\/([\w-]+)\/([\w-]+)\/(reel\.mp4|cover\.jpg|kit\.png|shot-[\w-]+\.mp4|part-\d+-a\d+(?:-full)?\.mp4)$/);
   if(made){const file=join(pipeline.root,'channels',made[1],'reels',made[2],made[3]);let info;try{info=await stat(file);}catch{res.writeHead(404);res.end();return;}
-   res.writeHead(200,{'Content-Type':made[3].endsWith('.png')?'image/png':made[3].endsWith('.jpg')?'image/jpeg':'video/mp4','Content-Length':info.size,'Accept-Ranges':'bytes','Cache-Control':'no-cache'});streamFile(res,file);return;}
+   sendFile(req,res,file,{size:info.size,type:made[3].endsWith('.png')?'image/png':made[3].endsWith('.jpg')?'image/jpeg':'video/mp4'});return;}
   const vids=path.match(/^\/api\/runs\/([\w-]+)\/videos(?:\/(save|delete))?$/);
   if(vids){const job=pipeline.jobs.get(vids[1]);if(!job){json(res,404,{error:'Run not found'});return;}const state=videoJobs.get(job.id);
    if(vids[2]==='save'&&req.method==='POST')startVideoSave(job);
@@ -164,8 +164,7 @@ const server=http.createServer(async(req,res)=>{
   }
   const video=path.match(/^\/videos\/([\w-]+)\/([\w-]+)$/);
   if(video){let file,info;try{file=videoPath(pipeline.root,video[1],video[2]);info=await stat(file);}catch{res.writeHead(404);res.end();return;}
-   const range=req.headers.range;if(range){const r=parseRange(range,info.size);if(!r){res.writeHead(416,{'Content-Range':`bytes */${info.size}`});res.end();return;}res.writeHead(206,{'Content-Type':'video/mp4','Accept-Ranges':'bytes','Content-Range':`bytes ${r.start}-${r.end}/${info.size}`,'Content-Length':r.end-r.start+1,'Cache-Control':'no-cache'});streamFile(res,file,{start:r.start,end:r.end});return;}
-   res.writeHead(200,{'Content-Type':'video/mp4','Accept-Ranges':'bytes','Content-Length':info.size,'Cache-Control':'no-cache'});streamFile(res,file);return;}
+   sendFile(req,res,file,{size:info.size,type:'video/mp4'});return;}
   const art=path.match(/^\/demo-art\/(\d+)\.svg$/);if(art){res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'});res.end(artwork(Number(art[1])));return;}
   const thumb=path.match(/^\/media\/([\w-]+)\/([\w-]+)$/);if(thumb){const job=pipeline.jobs.get(thumb[1]),post=job?.posts.find(p=>p.id===thumb[2]);if(!post?.thumbnailUrl){res.writeHead(404);res.end();return;}const file=join(pipeline.root,'media',post.id+'.img');let bytes;try{bytes=await readFile(file);}catch{if(!mediaPending.has(file))mediaPending.set(file,mediaTask(async()=>{const result=await download(post.thumbnailUrl,8*1024*1024);if(!/^image\/(jpeg|png|webp)/.test(result.type))throw new Error('Unsupported thumbnail format');await writeFile(file,result.bytes);return result.bytes;}).finally(()=>mediaPending.delete(file)));bytes=await mediaPending.get(file);}const type=bytes[0]===0x89?'image/png':bytes.toString('ascii',8,12)==='WEBP'?'image/webp':'image/jpeg';res.writeHead(200,{'Content-Type':type,'Cache-Control':'public, max-age=86400'});res.end(bytes);return;}
   const files={'/record':'record.html','/record.js':'record.js','/record.css':'record.css','/':'flow.html','/lab':'index.html','/flow.js':'flow.js','/flow.css':'flow.css','/flow-views.mjs':'flow-views.mjs','/scan-map.mjs':'scan-map.mjs','/copy-view.mjs':'copy-view.mjs','/app.js':'app.js','/research.mjs':'research.mjs','/money-view.mjs':'money-view.mjs','/anatomy-view.mjs':'anatomy-view.mjs','/replicate-view.mjs':'replicate-view.mjs','/studio-view.mjs':'studio-view.mjs','/reel-plan-view.mjs':'reel-plan-view.mjs','/shotlist-text.mjs':'shotlist-text.mjs','/shot-lines.mjs':'shot-lines.mjs','/secret-view.mjs':'secret-view.mjs','/secret-labels.mjs':'secret-labels.mjs','/secret-mechanisms.mjs':'secret-mechanisms.mjs','/handles.mjs':'handles.mjs','/styles.css':'styles.css','/theme.css':'theme.css','/money/index.mjs':'money/index.mjs','/money/1.0.mjs':'money/1.0.mjs'};

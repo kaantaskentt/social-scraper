@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,rm,readFile,writeFile,mkdir,readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {saveVideos,deleteVideos,videoInfo,videoPath,parseRange,linkExpired} from '../lib/videos.mjs';
+import {saveVideos,deleteVideos,videoInfo,videoPath,parseRange,linkExpired,sendFile} from '../lib/videos.mjs';
 import {byPriority} from '../lib/data.mjs';
 
 const job=(id,ids)=>({id,posts:ids.map(p=>({id:p,videoUrl:`https://scontent.cdninstagram.com/${p}.mp4?oe=FFFFFFFF`}))});
@@ -61,5 +61,15 @@ test('the reels furthest from the account\'s usual plays come first: the winners
  const root=await mkdtemp(join(tmpdir(),'cl-v-'));
  try{const calls=[];const j={id:'run2',posts:posts.filter(p=>p.plays).map(p=>({...p,videoUrl:`https://scontent.cdninstagram.com/${p.id}.mp4?oe=FFFFFFFF`}))};
   await saveVideos(root,j,{downloader:fake(calls),concurrency:1});assert.deepEqual(calls.map(u=>u.split('/').pop().split('.')[0]),['huge','big','tiny','mid','m2']);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('files are sent by byte range when the player asks, else whole',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'cl-v-'));const {Writable}=await import('node:stream');const {writeFile}=await import('node:fs/promises');
+ const file=join(root,'r.mp4');await writeFile(file,'0123456789');
+ const send=headers=>new Promise(done=>{const out=[];const res=new Writable({write(c,e,cb){out.push(c);cb();}});res.writeHead=(status,h)=>{res.status=status;res.headers=h;};res.on('finish',()=>done({status:res.status,headers:res.headers,body:Buffer.concat(out).toString()}));res.end=((end)=>(...a)=>end.apply(res,a))(res.end);sendFile({headers},res,file,{size:10,type:'video/mp4'});});
+ try{const part=await send({range:'bytes=2-5'});assert.equal(part.status,206);assert.equal(part.body,'2345');assert.equal(part.headers['Content-Range'],'bytes 2-5/10');
+  const whole=await send({});assert.equal(whole.status,200);assert.equal(whole.body,'0123456789');
+  const bad=await send({range:'bytes=20-30'});assert.equal(bad.status,416);
  }finally{await rm(root,{recursive:true,force:true});}
 });
