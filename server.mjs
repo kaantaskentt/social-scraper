@@ -38,7 +38,9 @@ const videoJobs=new Map();
 function startVideoSave(job){const existing=videoJobs.get(job.id);if(existing?.running)return existing;const state={running:true,progress:null,result:null,error:null};state.done=saveVideos(pipeline.root,job,{onProgress:p=>{state.progress=p;}}).then(r=>{state.result=r;}).catch(e=>{state.error=e.message;console.error(`Social Scraper: saving videos for ${job.id} failed: ${e.message}`);}).finally(()=>{state.running=false;});videoJobs.set(job.id,state);return state;}
 const collected=j=>j.posts?.length>0;
 for(const j of pipeline.jobs.values())if(collected(j))startVideoSave(j);
-pipeline.listeners.add(id=>{const j=pipeline.jobs.get(id);if(j&&collected(j)&&!videoJobs.get(id)?.running&&!videoJobs.get(id)?.result)startVideoSave(j);});
+// A save that failed (a folder error) is not restarted on every scan update (it would loop, audit 2026-09-29); the
+// page's save action retries it.
+pipeline.listeners.add(id=>{const j=pipeline.jobs.get(id),v=videoJobs.get(id);if(j&&collected(j)&&!v?.running&&!v?.result&&!v?.error)startVideoSave(j);});
 pipeline.resumeInterrupted();
 const replicator=await new Replicator(pipeline.root).init();
 const secrets=new SecretBuilder(pipeline.root,keys);
