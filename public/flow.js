@@ -1,5 +1,5 @@
 // Social Scraper, the five-step app: state, data loading and clicks. Rendering lives in flow-views.mjs.
-import {reachable,renderStepper,renderScan,renderWinners,renderSecret,renderKit,renderMake,renderReady,renderConfirmLook,esc,scanState,syncRuns,topWinners,readyReels,morphChildren,syncPlay,copyAnnouncement} from './flow-views.mjs';
+import {reachable,renderStepper,renderScan,renderWinners,renderSecret,renderKit,renderMake,renderReady,renderConfirmLook,esc,scanState,syncRuns,topWinners,readyReels,morphChildren,syncPlay,copyAnnouncement,dockActions,renderAnalysisSheet,renderAccounts,winnersFinished,reelDownloadBundle} from './flow-views.mjs';
 import {parseHandles} from './handles.mjs';
 import {mountScanMap,reach} from './scan-map.mjs';
 import {renderCopyStudio,copyLive,copyShape} from './copy-view.mjs';
@@ -21,7 +21,7 @@ function toast(text){const t=$('#toast');t.textContent=text;t.hidden=false;clear
 const scanned=()=>['complete','partial'].includes(S.job?.status);
 const scanning=()=>['running','scraping'].includes(S.job?.status);
 const scored=()=>Object.values(S.results||{}).some(r=>r.quadrant&&r.quadrant!=='insufficient');
-const flags=()=>({scanned:scanned(),scored:scored(),secret:S.secret?.state==='done',kit:Boolean(S.kit?.saved?.approved),reels:readyReels(S.make?.reels).length});
+const flags=()=>({scanned:scanned(),scored:scored(),secret:S.secret?.state==='done',kit:Boolean(S.kit?.saved?.approved),winnersReady:winnersFinished(S.job?.posts||[],S.results),reels:readyReels(S.make?.reels).length});
 const doneSteps=()=>{const f=flags();return {scan:f.scanned,winners:f.scanned&&f.scored,secret:f.secret,kit:Boolean(S.kit?.saved?.approved),make:f.reels>0,ready:false};};
 const post=id=>S.job?.posts.find(p=>p.id===id);
 const imageFor=id=>`/media/${encodeURIComponent(S.runId)}/${encodeURIComponent(id)}`;
@@ -29,33 +29,35 @@ const videoFor=id=>S.saved.has(id)?`/videos/${encodeURIComponent(S.runId)}/${enc
 const hasVideo=p=>S.saved.has(p.id)||Boolean(p.videoUrl);
 
 const scanProgress=()=>scanState(S.job);
+const engagement=p=>{const plays=p?.plays||p?.views;return plays>0&&Number.isFinite(p.likes)&&Number.isFinite(p.comments)?(p.likes+p.comments)/plays*1000:null;};
 function winners(){
  if(!S.job||!S.results)return {winners:[],weakest:[]};
- const w=topWinners(S.job.posts,S.results,{hasVideo,limit:6}).map(x=>({...x,image:imageFor(x.id)}));
- const weak=S.job.posts.map(p=>({p,r:S.results[p.id]})).filter(({p,r})=>r&&r.quadrant!=='insufficient'&&Number.isFinite(r.xNormal)&&hasVideo(p)).sort((a,b)=>a.r.xNormal-b.r.xNormal).slice(0,4).map(({p,r})=>({id:p.id,xNormal:r.xNormal,reach:r.reach,image:imageFor(p.id)}));
+ const w=topWinners(S.job.posts,S.results,{hasVideo,limit:6}).map(x=>({...x,image:imageFor(x.id),video:videoFor(x.id),engagement:engagement(post(x.id))}));
+ const weak=S.job.posts.map(p=>({p,r:S.results[p.id]})).filter(({p,r})=>r&&r.quadrant!=='insufficient'&&Number.isFinite(r.xNormal)&&hasVideo(p)).sort((a,b)=>a.r.xNormal-b.r.xNormal).slice(0,4).map(({p,r})=>({id:p.id,xNormal:r.xNormal,reach:r.reach,image:imageFor(p.id),video:videoFor(p.id)}));
  return {winners:w,weakest:weak};
 }
 
 function render(){
  // A channel still loading shows a quiet placeholder, never the empty "Pick an account" page for a moment.
- if(S.runId&&!S.job){$('#view').innerHTML='<div class="card writing rise"><span class="cmp-label">Opening your channel</span><div class="shimmer" aria-hidden="true"></div></div>';S.lastHtml=null;return;}
+ if(S.runId&&!S.job){$('#actions').innerHTML='';$('#view').innerHTML='<div class="card writing rise"><span class="cmp-label">Opening your channel</span><div class="shimmer" aria-hidden="true"></div></div>';S.lastHtml=null;return;}
  const open=reachable(flags());if(!open[S.step])S.step='scan';
  $('#stepper').innerHTML=renderStepper(S.step,open,doneSteps());
- $('#acct-now').textContent=S.job?`@${S.job.creator}`:'';
+ const accounts=renderAccounts(S.runs,S.job);if(S.accountsHtml!==accounts){$('#acct-now').innerHTML=accounts;S.accountsHtml=accounts;}
  const account=S.job?.creator||'';let html='';
- if(S.step==='scan')html=renderScan({runs:S.runs,run:S.job?{id:S.runId,creator:S.job.creator,count:S.job.posts.length}:null,progress:scanProgress(),error:S.error,scored:scored(),scoreError:S.moneyError});
- if(S.step==='winners')html=renderWinners({account,...winners()});
+ if(S.step==='scan')html=renderScan({runs:S.runs,run:S.job?{id:S.runId,creator:S.job.creator,count:S.job.posts.length}:null,posts:S.job?.posts,results:S.results,progress:scanProgress(),error:S.error,scored:scored(),scoreError:S.moneyError});
+ if(S.step==='winners')html=renderWinners({account,...winners(),secretOpen:open.secret,lookOpen:open.kit});
  if(S.step==='secret')html=renderSecret({account,status:S.secret,imageFor,feedback:S.feedback,dna:S.dna});
  if(S.step==='kit')html=renderKit({account,status:S.kit,busy:S.busy,error:S.error,pick:S.kitPick,reels:(S.make?.reels||[]).filter(r=>r.mode==='kit'&&r.kitAt===S.kit?.saved?.createdAt)});
  // Make: the copy studio first (copy their proven winners, Kaan 2026-09-29); new ideas one tap away.
  if(S.step==='make'&&S.makeView!=='ideas'&&S.kit?.saved?.approved){
-  const shape=`copy:${S.runId}:${copyShape(S.copy)}:${S.copyCompare}:${S.copyEngine||'both'}:${[...(S.copyUnpicked||[])].join()}:${S.busy}:${S.error}`;
+  const shape=`copy:${S.runId}:${copyShape(S.copy)}:${S.copyCompare}:${S.copyEngine||'veo-fast'}:${[...(S.copyUnpicked||[])].join()}:${S.busy}:${S.error}`;
   announce(copyAnnouncement(S.copy));
   // Only the numbers move while copies are made, so a playing video is never reset by the once-a-second refresh.
   if(shape===S.viewKey&&$('#view .copy-grid')){patchCopy(copyLive(S.copy));return;}
   // The intro card already says what copying is, so the header says it only once the intro is gone (audit 2026-09-29).
   const intro=!S.copy?.batch&&(!S.copy?.picks||S.copy?.picking?.state==='working');
-  const page=`<header class="step-head"><h1>Copy @${esc(account)}'s winners</h1><p>${intro?'':'Same shots, words and sounds as their proven reels, with your hosts. '}<button type="button" class="link-btn" data-act="make-ideas">Or make a new idea instead</button></p></header><p class="err"${S.error?'':' hidden'}>${esc(S.error)}</p>${renderCopyStudio({copy:S.copy,kit:S.kit?.saved,busy:S.busy,unpicked:S.copyUnpicked||new Set(),compareOpen:S.copyCompare,engine:S.copyEngine||'both'})}`;
+  let page=`<header class="step-head"><h1>Copy @${esc(account)}'s winners</h1><p>${intro?'':'Same shots, words and sounds as their proven reels, with your hosts. '}<button type="button" class="link-btn" data-act="make-ideas">Or make a new idea instead</button></p></header><p class="err"${S.error?'':' hidden'}>${esc(S.error)}</p>${renderCopyStudio({copy:S.copy,kit:S.kit?.saved,busy:S.busy,unpicked:S.copyUnpicked||new Set(),compareOpen:S.copyCompare,engine:S.copyEngine||'veo-fast'})}`;
+  const dock=dockActions(page,{step:S.step,open,busy:S.busy});page=dock.html;$('#actions').innerHTML=dock.bar;
   // A new shape on the same page (a tile done, a pick ticked, picking moving on) swaps only the parts that changed, so a
   // playing video is not reset and nothing re-animates (audit 2026-09-29); a page from another step is replaced.
   if(S.viewKey?.startsWith(`copy:${S.runId}:`)){const t=document.createElement('template');t.innerHTML=page;morphChildren($('#view'),t.content);}else $('#view').innerHTML=page;
@@ -63,10 +65,11 @@ function render(){
  }
  if(S.step==='make')html=`${S.kit?.saved?.approved?'<p class="hint back-row"><button type="button" class="link-btn" data-act="make-copy">← Back to copying their winners</button></p>':''}${renderMake({account,plan:S.plan,make:S.make,balance:S.balance,mode:S.mode,busy:S.busy,error:S.error,pricing:S.pricing,kit:S.kit?.saved,fbOpen:S.fbOpen,showAll:S.showAllIdeas})}`;
  if(S.step==='ready')html=renderReady({reels:readyReels(S.make?.reels),fbOpen:S.fbOpen,judge:S.make?.judge,results:S.results2,busy:S.busy});
+ const dock=dockActions(html,{step:S.step,open,busy:S.busy});html=dock.html;$('#actions').innerHTML=dock.bar;
  // The scan map keeps its tiles between refreshes (so they fly from the wall to the map); the rest redraws.
- const key=S.step==='scan'?`scan:${S.runId}:${scanProgress()?.state}:${S.error}:${S.runs.map(r=>`${r.id}.${r.count}.${r.status}`).join()}`:null;
+ const key=S.step==='scan'?`scan:${S.runId}:${scanProgress()?.state}:${scanProgress()?.done}:${scored()}:${S.error}:${S.runs.map(r=>`${r.id}.${r.count}.${r.status}`).join()}`:null;
  // Other steps redraw only when the page really changed: open "Why" panels stay open and nothing re-animates.
- if(!(key&&key===S.viewKey&&$('#view .scan-stage'))&&(key||html!==S.lastHtml))$('#view').innerHTML=html;S.viewKey=key;S.lastHtml=key?null:html;
+ if(!(key&&key===S.viewKey&&$('#view .scan-stage'))&&(key||html!==S.lastHtml)){const kept=S.viewKey?.startsWith(`scan:${S.runId}:`)&&S.step==='scan'?$('#view .scan-live'):null;$('#view').innerHTML=html;if(kept)$('#view .scan-live')?.replaceWith(kept);}S.viewKey=key;S.lastHtml=key?null:html;
  if(S.step==='scan'&&S.job){if(!S.scanSel)S.scanSel=[...S.job.posts].filter(p=>reach(p)).sort((a,b)=>reach(b)-reach(a))[0]?.id||null;
   mountScanMap($('#view'),{posts:S.job.posts,imageFor,videoFor,selected:S.scanSel,onSelect:id=>{S.scanSel=id;render();}});}
 }
@@ -82,7 +85,7 @@ function patchCopy(live){
 async function loadRun(id,{keepStep=false}={}){
  // Choices made on one account never carry over to another (a host picked on A was drawn for B, audit 2026-09-29).
  const switching=S.runId!==id;S.runId=id;store.set('flow.run',id);S.error='';S.scanSel=null;
- if(switching){S.job=null;S.sync?.unlink();Object.assign(S,{kitPick:null,makeView:null,copyCompare:false,showAllIdeas:false,fbOpen:null,sync:null});render();}
+ if(switching){clearTimeout(S.timer);S.job=null;S.sync?.unlink();Object.assign(S,{kitPick:null,makeView:null,copyCompare:false,copyEngine:'veo-fast',showAllIdeas:false,fbOpen:null,sync:null});render();}
  const base=`/api/runs/${encodeURIComponent(id)}`;
  let loaded;try{loaded=await Promise.all([api(base),api(`${base}/videos`).catch(()=>({saved:[]})),api(`${base}/secret`).catch(e=>({state:'none',error:e.message})),api(`${base}/kit`).catch(e=>({state:'none',error:e.message})),api(`${base}/reel-plan`).catch(()=>({state:'none'})),api(`${base}/reel-make`).catch(()=>({state:'none',reels:[]})),api(`${base}/money`).catch(e=>({results:{},error:e.message})),api(`${base}/dna`).catch(e=>({state:'none',error:e.message})),api(`${base}/results`).catch(()=>null),api(`${base}/copy`).catch(()=>null)]);}
  // A channel that cannot load goes back to the account list with the reason, never a spinner forever.
@@ -104,19 +107,20 @@ function poll(){
 }
 async function refresh(){
  const id=S.runId,base=`/api/runs/${encodeURIComponent(id)}`;
+ const currentApi=async(...args)=>{const value=await api(...args);if(S.runId!==id)throw new Error('Account changed');return value;};
  try{
-  if(scanning()){S.job=await api(base);S.runs=syncRuns(S.runs,S.job);if(scanned()){await loadRun(id,{keepStep:true});return;}}
-  if(S.secret?.state==='building')S.secret=await api(`${base}/secret`);
-  if(S.kit?.state==='working')S.kit=await api(`${base}/kit`);
-  if(S.dna?.state==='working')S.dna=await api(`${base}/dna`);
+  if(scanning()){const count=S.job.posts.length,job=await currentApi(base);if(S.runId!==id)return;S.job=job;S.runs=syncRuns(S.runs,S.job);if(count!==job.posts.length||S.moneyError){const money=await currentApi(`${base}/money`).catch(e=>({results:S.results,error:e.message}));if(S.runId!==id)return;S.results=money.results||{};S.moneyError=money.error||'';}if(scanned()){await loadRun(id,{keepStep:true});return;}}
+  if(S.secret?.state==='building')S.secret=await currentApi(`${base}/secret`);
+  if(S.kit?.state==='working')S.kit=await currentApi(`${base}/kit`);
+  if(S.dna?.state==='working')S.dna=await currentApi(`${base}/dna`);
   // When the script is ready the answer is at the top of the page: bring it into view.
-  if(S.plan?.state==='working'){S.plan=await api(`${base}/reel-plan`);if(S.plan.state!=='working')scrollTo({top:0,behavior:'smooth'});}
-  if(S.make?.state==='working'){S.make=await api(`${base}/reel-make`);if(S.make.state!=='working')S.balance=null;}
-  if(S.copy?.picking?.state==='working'||S.copy?.batch?.items.some(i=>['working','waiting'].includes(i.state))){const was=S.copy;S.copy=await api(`${base}/copy`);if(was?.picking?.state==='working'&&S.copy.picking?.state==='done')S.copyUnpicked=new Set();if(S.copy.batch&&!S.copy.batch.items.some(i=>['working','waiting'].includes(i.state)))S.make=await api(`${base}/reel-make`);}
- }catch(e){S.error=e.message;}
+  if(S.plan?.state==='working'){S.plan=await currentApi(`${base}/reel-plan`);if(S.plan.state!=='working')scrollTo({top:0,behavior:'smooth'});}
+  if(S.make?.state==='working'){S.make=await currentApi(`${base}/reel-make`);if(S.make.state!=='working')S.balance=null;}
+  if(S.copy?.picking?.state==='working'||S.copy?.batch?.items.some(i=>['working','waiting'].includes(i.state))){const was=S.copy;S.copy=await currentApi(`${base}/copy`);if(was?.picking?.state==='working'&&S.copy.picking?.state==='done')S.copyUnpicked=new Set();if(S.copy.batch&&!S.copy.batch.items.some(i=>['working','waiting'].includes(i.state)))S.make=await currentApi(`${base}/reel-make`);}
+ }catch(e){if(S.runId!==id)return;S.error=e.message;}
  if(S.runId===id){render();poll();}
 }
-async function act(fn){if(S.busy)return;S.busy=true;S.error='';render();try{await fn();}catch(e){S.error=e.message;toast(e.message);}finally{S.busy=false;render();poll();}}
+async function act(fn){if(S.busy)return;S.busy=true;S.error='';render();try{await fn();}catch(e){S.error=e.message;if($('#analysis').open&&$('#analysis-error'))$('#analysis-error').textContent=e.message+' Try again.';toast(e.message);}finally{S.busy=false;render();poll();}}
 // The Make step needs a current price and the balance; both are free to check.
 async function prepareMake(){
  // With a look in use, reels are made on the Gemini key: no Higgsfield balance, and an old hands-only plan is not re-priced.
@@ -129,12 +133,30 @@ async function reprice(){
 }
 async function loadBalance(){try{S.balance=(await api('/api/higgsfield/balance')).credits;}catch(e){S.balance=null;S.error=e.message;}render();}
 
-document.addEventListener('click',async e=>{
- const t=e.target.closest('[data-copy-engine],[data-copy-pick],[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close],[data-kit-format],[data-kit-cast],[data-kit-place],[data-voice],[data-fb],[data-fb-reason],[data-voice-mode]');if(!t||t.disabled)return;
+async function handleClick(e,confirmed=false){
+ const t=e.target.closest('[data-caption],[data-download],[data-preview],[data-copy-engine],[data-copy-pick],[data-step],[data-run],[data-play],[data-act],[data-idea],[data-mode],[data-feedback],[data-copy],[data-close],[data-kit-format],[data-kit-cast],[data-kit-place],[data-voice],[data-fb],[data-fb-reason],[data-voice-mode]');if(!t||t.disabled)return;
+ if(t.dataset.act==='reload'){location.reload();return;}
+ if(t.dataset.act==='new-analysis'){$('#analysis').innerHTML=renderAnalysisSheet();$('#analysis').showModal();return;}
+ if(t.dataset.caption){const expanded=t.getAttribute('aria-expanded')==='true';t.setAttribute('aria-expanded',String(!expanded));return;}
+ if(t.dataset.preview){const v=t.querySelector('video');if(v){if(!v.src)v.src=v.dataset.src;v.paused?v.play().catch(()=>{}):v.pause();t.classList.toggle('is-playing',!v.paused);}return;}
+ if(t.dataset.download){
+  let r=S.make?.reels?.find(r=>r.id===t.dataset.download);if(!r)return;const runId=S.runId;t.disabled=true;
+  try{
+   if(!r.cover){r=await api(`/api/runs/${encodeURIComponent(runId)}/reel-cover`,{reelId:r.id});if(S.runId!==runId)return;S.make.reels=S.make.reels.map(x=>x.id===r.id?r:x);}
+   if(!r.url||!r.cover)throw new Error('The cover is not available yet. Open Details and try making it again.');
+   const files=await Promise.all([[r.url,'reel.mp4'],[r.cover,'cover.jpg']].map(async([url,name])=>{const response=await fetch(url);if(!response.ok)throw new Error(`Could not download ${name}. Try again.`);return {name,bytes:new Uint8Array(await response.arrayBuffer())};}));
+   const url=URL.createObjectURL(reelDownloadBundle(files)),a=document.createElement('a');a.href=url;a.download=`${r.id}.zip`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);toast('Reel and cover downloaded');
+  }catch(error){toast(error.message);}finally{t.disabled=false;}
+  return;
+ }
+
  const base=`/api/runs/${encodeURIComponent(S.runId)}`;
+ // Every new paid request gets a finite confirmation. Existing copy/video confirmations stay below.
+ const paid=['kit-build','kit-choose','kit-pictures','kit-voices','dna-build','results-check','copy-pick','copy-new','secret-build','ideas','scan-resume'].includes(t.dataset.act)||t.dataset.idea!==undefined||t.dataset.voiceMode||(!S.kit?.saved?.approved&&(t.dataset.kitFormat||t.dataset.act==='kit-character'));
+ if(paid&&!confirmed){const runId=S.runId,label=t.textContent?.trim()||'Continue';ask('Continue with this step?',`${label}. This uses your connected account and may cost money.`,()=>{if(S.runId===runId)handleClick({target:t},true);},{ok:'Continue'});return;}
  // An error belongs to the step it happened on (audit 2026-09-29).
- if(t.dataset.step){S.error='';S.step=t.dataset.step;store.set(`flow.step.${S.runId}`,S.step);render();scrollTo({top:0,behavior:'smooth'});if(S.step==='make')prepareMake();return;}
- if(t.dataset.run){loadRun(t.dataset.run).catch(err=>toast(err.message));return;}
+ if(t.dataset.step){if(!reachable(flags())[t.dataset.step])return;S.error='';S.step=t.dataset.step;store.set(`flow.step.${S.runId}`,S.step);render();scrollTo({top:0,behavior:'smooth'});if(S.step==='make')prepareMake();return;}
+ if(t.dataset.run){$('.account-menu')?.removeAttribute('open');loadRun(t.dataset.run).catch(err=>toast(err.message));return;}
  if(t.dataset.close!==undefined){t.closest('dialog').close();return;}
  if(t.dataset.play){const src=videoFor(t.dataset.play);if(!src){toast('No video saved for this reel.');return;}const v=$('#player video');v.src=src;$('#player').showModal();v.play().catch(()=>{});return;}
  if(t.dataset.copy){const text=document.getElementById(t.dataset.copy)?.textContent||'';try{await navigator.clipboard.writeText(text);toast('Caption copied');}catch{toast('Could not copy. Select the caption and copy it.');}return;}
@@ -193,19 +215,22 @@ document.addEventListener('click',async e=>{
   ask('Make this reel?',usd?`The video costs about $${credits.toFixed(2)} on your Gemini key (up to $${max.toFixed(2)} if a part needs its one retry), plus a little for the checks and voices. Each part is checked before the next one is paid for.`:`This spends ${credits} Higgsfield credits (up to ${max} if shots need their one retry). You have ${S.balance??'?'} credits. Each shot is checked before the next one is paid for.`,
    ()=>act(async()=>{S.make={...(await api(`${base}/reel-make`,{confirm:true,mode:S.mode,confirmCredits:credits})),reels:S.make?.reels||[]};}),{look:usd?renderConfirmLook(S.kit?.saved):''});
  }
-});
+}
+document.addEventListener('click',handleClick);
 document.addEventListener('submit',e=>{
  if(e.target.dataset.form==='track'){e.preventDefault();const handle=new FormData(e.target).get('handle');act(async()=>{S.results2=await api(`/api/runs/${encodeURIComponent(S.runId)}/results/handle`,{handle});toast(`Tracking @${S.results2.handle}`);});return;}
  if(e.target.dataset.form!=='scan')return;e.preventDefault();
- const form=new FormData(e.target),{handles,error}=parseHandles(form.get('handle')),fresh=form.get('fresh')==='on';
- if(error||handles.length!==1){S.error=error||'Enter one account';render();return;}
- act(async()=>{const job=await api('/api/runs',{creator:handles[0],limit:100,concurrency:4,budget:1,fresh});await api(`/api/runs/${job.id}/run`,{});S.runs=[{id:job.id,creator:job.creator,count:0,status:'running'},...S.runs];await loadRun(job.id);});
+ const form=new FormData(e.target),{handles,error}=parseHandles(form.get('handle')),fresh=form.get('fresh')==='on',limit=Number(form.get('limit'));if(![30,60,100].includes(limit))return;
+ if(error||handles.length!==1){$('#analysis-error').textContent=error||'Enter one Instagram account.';return;}
+ ask('Start this analysis?',`Collect and listen to ${limit} reels from @${handles[0]} for about $${({30:0.12,60:0.22,100:0.35})[limit]}.`,()=>{act(async()=>{const job=await api('/api/runs',{creator:handles[0],limit,concurrency:4,budget:1,fresh});await api(`/api/runs/${job.id}/run`,{});$('#analysis').close();S.runs=[{id:job.id,creator:job.creator,count:0,status:'running'},...S.runs];S.step='scan';await loadRun(job.id,{keepStep:true});});},{ok:'Start'});
 });
 // The confirm pop-up: a title, a sentence, and what its button does. `look` is the kit's pictures, when they matter.
 function ask(title,text,ok,{look='',ok:label='Make it'}={}){
- $('#confirm-title').textContent=title;$('#confirm-look').innerHTML=look;$('#confirm-text').textContent=text;$('#confirm-ok').textContent=label;$('#confirm').returnValue='';$('#confirm').showModal();
- $('#confirm').addEventListener('close',()=>{if($('#confirm').returnValue==='ok')ok();},{once:true});
+ const runId=S.runId;$('#confirm-title').textContent=title;$('#confirm-look').innerHTML=look;$('#confirm-text').textContent=text;$('#confirm-ok').textContent=label;$('#confirm').returnValue='';$('#confirm').showModal();
+ $('#confirm').addEventListener('close',()=>{if($('#confirm').returnValue==='ok'&&S.runId===runId)ok();},{once:true});
 }
+document.addEventListener('pointerover',e=>{if(e.pointerType==='touch')return;const t=e.target.closest('[data-preview]'),v=t?.querySelector('video');if(v){if(!v.src)v.src=v.dataset.src;v.play().then(()=>t.classList.add('is-playing')).catch(()=>{});}});
+document.addEventListener('pointerout',e=>{const t=e.target.closest('[data-preview]');if(t&&!t.contains(e.relatedTarget)){t.querySelector('video')?.pause();t.classList.remove('is-playing');}});
 $('#player').addEventListener('close',()=>{const v=$('#player video');v.pause();v.removeAttribute('src');v.load();});
 
 (async()=>{
@@ -213,5 +238,5 @@ $('#player').addEventListener('close',()=>{const v=$('#player video');v.pause();
   const remembered=store.get('flow.run'),first=S.runs.find(r=>r.id===remembered)||S.runs.find(r=>['complete','partial'].includes(r.status));
   // A remembered channel that fails to load leaves the account list and its reason on screen (audit 2026-09-29).
   if(first)await loadRun(first.id).catch(()=>{});else render();}
- catch(e){$('#view').innerHTML=`<p class="err">Could not load the app: ${esc(e.message)}</p>`;}
+ catch(e){const dock=dockActions(`<header class="step-head"><h1>Could not open your accounts</h1><p>Refresh to reconnect and try again.</p></header><p class="err">${esc(e.message)}</p><button class="btn btn-primary" data-act="reload">Refresh →</button>`,{step:'scan',open:{}});$('#view').innerHTML=dock.html;$('#actions').innerHTML=dock.bar;}
 })();

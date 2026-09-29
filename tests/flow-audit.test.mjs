@@ -34,8 +34,8 @@ test('#18 winners are reels labelled winner (at least 2x), not every reel above 
  const results={a:{quadrant:'star',xNormal:1.1,label:'normal',reach:10},b:{quadrant:'billboard',xNormal:2.4,label:'winner',reach:20},c:{quadrant:'insufficient',xNormal:6,label:'big_winner',reach:30},d:{quadrant:'star',xNormal:3,label:'normal',reach:5}};
  assert.deepEqual(topWinners(posts,results,{hasVideo:()=>true}).map(w=>w.id),['c','b']);
  assert.deepEqual(topWinners(posts,results,{hasVideo:p=>p.id!=='c'}).map(w=>w.id),['b']);
- const html=renderWinners({account:'ken',winners:[{id:'b',image:'/i',xNormal:2.4,reach:20}]});assert.match(html,/at least 2× the views/);assert.doesNotMatch(html,/many more views/);
- assert.match(renderWinners({account:'ken',winners:[]}),/No reel with a saved video got at least 2×/);
+ const html=renderWinners({account:'ken',winners:[{id:'b',image:'/i',xNormal:2.4,reach:20}]});assert.match(html,/Proven ideas/);assert.doesNotMatch(html,/many more views/);
+ assert.match(renderWinners({account:'ken',winners:[]}),/No saved reel got at least twice/);
 });
 
 test('#20 an Instagram statement is tagged "Instagram says", never "Proven by research", and says only what the source says',()=>{
@@ -130,7 +130,7 @@ test('#54 a finished scan with nothing scored says why instead of a "See the win
  const run={id:'a',creator:'x',count:100};
  assert.match(renderScan({run,progress:{state:'done'},scored:true}),/data-step="winners"/);
  const none=renderScan({run,progress:{state:'done'},scored:false});assert.doesNotMatch(none,/data-step="winners"/);assert.match(none,/Not enough reels with view and comment counts to find winners/);
- assert.match(renderScan({run,progress:{state:'done'},scored:false,scoreError:'Server busy'}),/Could not score the reels: Server busy/);
+ assert.match(renderScan({run,progress:{state:'done'},scored:false,scoreError:'Server busy'}),/Could not find the winners: Server busy/);
 });
 
 test('#55 the account list follows the loaded run',()=>{

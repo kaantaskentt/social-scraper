@@ -12,8 +12,8 @@ const plain=(q,v)=>PLAIN[q]?.[v]||'';
 // ("Why do these win?") but is no longer a step: Look builds it when it is missing.
 export const STEPS=[['scan','Scan'],['winners','Winners'],['kit','Look'],['make','Copy'],['ready','Ready to post']];
 // Which steps can be opened: each needs the one before it to be done.
-export function reachable({scanned=false,scored=false,kit=false,reels=0}){
- return {scan:true,winners:scanned&&scored,secret:scanned&&scored,kit:scanned&&scored,make:kit,ready:reels>0};
+export function reachable({scanned=false,scored=false,kit=false,reels=0,winnersReady=false}){
+ return {scan:true,winners:scored,secret:scanned&&scored,kit:scored&&(scanned||winnersReady),make:kit&&(scanned||winnersReady),ready:reels>0};
 }
 export function renderStepper(current,open,done){
  if(current==='secret')current='winners'; // "Why do these win?" belongs to Winners now
@@ -28,26 +28,25 @@ const head=(title,sub)=>`<header class="step-head"><h1>${esc(title)}</h1>${sub?`
 const STOPPED={failed:'The scan stopped',paused:'The scan is paused',interrupted:'The scan was cut off when the app restarted',ready:'The scan has not started'};
 export function scanState(job){
  if(!job)return null;if(['complete','partial'].includes(job.status))return {state:'done'};
- const total=job.posts.length||job.limit||100,done=job.posts.filter(p=>p.analysis||p.excludedReason).length;
+ const total=job.posts.length||job.limit||100,done=job.posts.filter(p=>finishedPost(p)||p.analysis||p.excludedReason).length;
  if(!['running','scraping'].includes(job.status))return {state:'stopped',done,total,label:STOPPED[job.status]||`The scan is ${job.status}`,error:job.error||''};
- return {state:'running',done,total,label:job.posts.length?`Listening to and labelling reel ${done} of ${total}`:'Collecting the reels from Instagram'};
+ return {state:'running',done,total,label:job.posts.length?`Listening to reel ${done} of ${total}`:'Collecting reels'};
 }
 // The account list follows the loaded run: it said "0 reels · running" next to "@x is scanned" (audit 2026-09-29).
 export const syncRuns=(runs,job)=>job?runs.map(r=>r.id===job.id?{...r,count:job.posts.length,status:job.status}:r):runs;
 // One card per account: the fullest scan (most reels, then newest) stands for it.
 export function latestRuns(runs){const by=new Map();for(const r of runs){const k=r.creator,have=by.get(k);if(!have||r.count>have.count||(r.count===have.count&&String(r.createdAt)>String(have.createdAt)))by.set(k,r);}return [...by.values()];}
-export function renderScan({runs=[],run=null,progress=null,error='',scored=true,scoreError=''}){
- runs=latestRuns(runs);
- const list=runs.length?`<div class="acct-list">${runs.map(r=>`<button type="button" class="acct${run?.id===r.id?' is-on':''}" data-run="${esc(r.id)}"><b>@${esc(r.creator)}</b><span>${esc(r.count)} reels · ${esc(r.status)}</span></button>`).join('')}</div>`:'';
- const form=`<form class="card scan-form" data-form="scan"><label for="scan-handle">Instagram account</label><div class="scan-row"><span class="at">@</span><input id="scan-handle" name="handle" autocomplete="off" placeholder="ken.remedie" required><button class="btn btn-primary" type="submit">Scan 100 reels · about $0.35</button></div><p class="hint">Collects the reels, listens to them and labels what is said. Takes about 10 minutes.</p><label class="fresh"><input type="checkbox" name="fresh" checked> Fresh start: listen and label every reel again, reusing nothing from earlier scans</label>${error?`<p class="err">${esc(error)}</p>`:''}</form>`;
- const status=run?(progress?.state==='stopped'?`<div class="card scan-status is-stopped"><b>${esc(progress.label)}: @${esc(run.creator)}</b><progress value="${progress.done}" max="${progress.total}"></progress><span class="hint">${esc(progress.done)} of ${esc(progress.total)} reels done.</span>${progress.error?`<p class="err">${esc(progress.error)}</p>`:''}<div class="next-row left"><button type="button" class="btn btn-primary" data-act="scan-resume">Resume the scan</button></div><span class="hint">It picks up where it stopped: only the reels still to do are paid for.</span></div>`
-  :progress&&progress.state!=='done'?`<div class="card scan-status"><b>Scanning @${esc(run.creator)}</b><progress value="${progress.done}" max="${progress.total}"></progress><span class="hint">${esc(progress.label)}</span></div>`:`<div class="card scan-status is-done"><b>@${esc(run.creator)} is scanned</b><span class="hint">${esc(run.count)} reels</span></div>`):'';
- // The live wall and map (drawn by scan-map.mjs into this frame, kept between refreshes so tiles can fly).
- const live=run?`<section class="card scan-live"><div class="scan-top"><b>@${esc(run.creator)}</b><span class="scan-count hint"></span></div><div class="scan-grid"><div class="scan-stage" data-run="${esc(run.id)}"><svg aria-hidden="true"></svg><span class="scan-lab">Thumbnail wall</span><span class="scan-lab right">Performance map</span></div><aside class="scan-player"><p class="hint">Click any reel to play it here.</p></aside></div></section>`:'';
- // A scan with nothing scored says why instead of a "See the winners" button that did nothing (audit 2026-09-29).
- const done=run&&(!progress||progress.state==='done');
- const onward=!done?'':scored?next('winners','See the winners'):`<p class="hint">${scoreError?`Could not score the reels: ${esc(scoreError)}`:'Not enough reels with view and comment counts to find winners.'}</p>`;
- return `${head('Pick an account','Scan any public Instagram account, or open one you scanned before.')}${form}${list}${status}${live}${onward}`;
+export const REEL_COUNTS=[{limit:30,time:3,usd:0.12},{limit:60,time:4,usd:0.22},{limit:100,time:6,usd:0.35}];
+export function renderAnalysisSheet(){return `<button type="button" class="x" data-close aria-label="Close new analysis">×</button><form data-form="scan" class="scan-form"><h2 id="analysis-title">New analysis</h2><p class="hint">Find the reels worth making your own.</p><label for="scan-handle">Instagram account</label><input id="scan-handle" name="handle" autocomplete="off" placeholder="@name or instagram.com/name" required><fieldset class="count-choice"><legend>How many reels?</legend>${REEL_COUNTS.map(c=>`<label><input type="radio" name="limit" value="${c.limit}"${c.limit===60?' checked':''}><span><b>${c.limit} reels</b><small>About ${c.time} min</small><small>About $${c.usd.toFixed(2)}</small></span></label>`).join('')}</fieldset><label class="fresh"><input type="checkbox" name="fresh" checked><span>Fresh start <small>Reuse nothing from earlier scans</small></span></label><p class="err" id="analysis-error" role="alert"></p><button class="btn btn-primary" type="submit">Start →</button></form>`;}
+export function renderAccounts(runs,run){return `<details class="account-menu"><summary aria-label="Switch account">${run?`@${esc(run.creator)}`:'Choose an account'} <span aria-hidden="true">⌄</span></summary><div class="account-options"><button class="btn" data-act="new-analysis">＋ New analysis</button>${latestRuns(runs).map(r=>`<button class="acct${run?.id===r.id?' is-on':''}" data-run="${esc(r.id)}"><b>@${esc(r.creator)}</b><span>${esc(r.count)} reels</span></button>`).join('')}</div></details>`;}
+export const finishedPost=p=>['complete','no_speech','music','no_audio','failed'].includes(p.status);
+export function winnersFinished(posts,results){const top=posts.filter(p=>['winner','big_winner'].includes(results?.[p.id]?.label)).sort((a,b)=>results[b.id].xNormal-results[a.id].xNormal).slice(0,6);return top.length>0&&top.every(finishedPost);}
+export function scanSummary(posts=[],results={}){const counts=posts.map(p=>p.plays||p.views).filter(n=>Number.isFinite(n)&&n>0).sort((a,b)=>a-b),n=counts.length;const median=n?(counts[(n-1)>>1]+counts[n>>1])/2:null;const normals=Object.values(results).filter(r=>r.xNormal>0&&r.reach>0).map(r=>r.reach/r.xNormal).sort((a,b)=>a-b);return [['Reels',posts.length],['Median plays',median],['Best reel',n?counts[n-1]:null],['Usual plays',normals.length?normals[normals.length>>1]:null]];}
+export function renderScan({runs=[],run=null,posts=[],results={},progress=null,error='',scored=false,scoreError=''}){
+ if(!run)return `${head('Find your next great reel','Start with an account you love. See what wins, then make it yours.')}<div class="card empty-state"><span class="empty-mark" aria-hidden="true">↗</span><h2>Every great reel starts somewhere.</h2><p>Choose an Instagram account to explore its best ideas.</p><button class="btn btn-primary" data-act="new-analysis">New analysis →</button>${error?`<p class="err">${esc(error)}. Choose an account to try again.</p>`:''}</div>${runs.length?`<div class="acct-list">${latestRuns(runs).map(r=>`<button class="acct" data-run="${esc(r.id)}"><b>@${esc(r.creator)}</b><span>${r.count} reels</span></button>`).join('')}</div>`:''}`;
+ const running=progress?.state==='running',stopped=progress?.state==='stopped';
+ const status=running||stopped?`<section class="scan-status card${stopped?' is-stopped':''}"><span class="hint">${stopped?'Needs your attention':'Live scan'}</span><h2>${esc(progress.label)}${stopped?`: @${esc(run.creator)}`:''}</h2><progress value="${progress.done}" max="${progress.total}"></progress><p class="hint">${scored&&running?`Still listening: ${progress.done} of ${progress.total}. Your winners are ready to explore.`:`${progress.done} of ${progress.total} reels finished.`}</p>${stopped?`<p class="err">${esc(progress.error)} Resume to finish the remaining reels.</p><button class="btn" data-act="scan-resume">Resume the scan</button>`:''}</section>`:`<div class="summary-strip">${scanSummary(posts,results).map(([label,value])=>`<div><span>${label}</span><strong>${compact(value)}</strong></div>`).join('')}</div>`;
+ return `${head(running?`Finding @${run.creator}’s best ideas`:stopped?`Finish scanning @${run.creator}`:`@${run.creator} is scanned`,running?'Winners appear as soon as the reels are collected.':'The whole account, with the standouts in plain sight.')}${status}${error?`<p class="err">${esc(error)}. Try refreshing this account.</p>`:''}<section class="card scan-live"><div class="scan-top"><h2>The reels, at a glance</h2><span class="scan-count hint"></span></div><div class="scan-grid"><div class="scan-stage" data-run="${esc(run.id)}"><svg aria-hidden="true"></svg><span class="scan-lab">Thumbnail wall</span><span class="scan-lab right">Performance map</span></div><aside class="scan-player"><p class="hint">Choose a reel to play it here.</p></aside></div></section>${scored?next('winners','See the winners'):scoreError?`<p class="err">Could not find the winners: ${esc(scoreError)}. Refresh to try again.</p>`:!running?'<p class="hint">Not enough reels with view and comment counts to find winners.</p>':''}`;
 }
 
 // 2 · Winners
@@ -57,13 +56,10 @@ export function topWinners(posts,results,{hasVideo,limit=6}){
  return posts.map(p=>({p,r:results?.[p.id]})).filter(({p,r})=>r&&['winner','big_winner'].includes(r.label)&&Number.isFinite(r.xNormal)&&hasVideo(p))
   .sort((a,b)=>b.r.xNormal-a.r.xNormal).slice(0,limit).map(({p,r})=>({id:p.id,xNormal:r.xNormal,reach:r.reach}));
 }
-function reelTile(p,{badge,sub}){return `<button type="button" class="reel" data-play="${esc(p.id)}"><img src="${esc(p.image)}" alt="" loading="lazy" onerror="this.hidden=true"><span class="reel-badge">${esc(badge)}</span><span class="reel-sub">${esc(sub)}</span></button>`;}
-export function renderWinners({account,winners=[],weakest=[]}){
- if(!winners.length)return `${head('No clear winners yet','No reel with a saved video got at least 2× the views this account normally gets.')}`;
- return `${head(`@${account}'s winners`,'These reels got at least 2× the views this account normally gets.')}
-<div class="reel-grid">${winners.map(w=>reelTile(w,{badge:`${w.xNormal.toFixed(1)}× normal`,sub:`${compact(w.reach)} views`})).join('')}</div>
-${weakest.length?`<h2 class="sub-title">Their weakest, for contrast</h2><div class="reel-grid is-small">${weakest.map(w=>reelTile(w,{badge:`${w.xNormal.toFixed(1)}×`,sub:`${compact(w.reach)} views`})).join('')}</div>`:''}
-<div class="next-row"><button type="button" class="btn btn-ghost" data-step="secret">Why do these win?</button><button type="button" class="btn btn-primary" data-step="kit">Make your look →</button></div>`;
+function reelTile(p,{small=false,index=0}={}){return `<article class="winner-card rise" style="--i:${index}"><button type="button" class="reel" data-preview="${esc(p.id)}" aria-label="Play reel with ${compact(p.reach)} plays"><img src="${esc(p.image)}" alt="" loading="lazy" onerror="this.hidden=true">${p.video?`<video data-src="${esc(p.video)}" muted playsinline loop preload="none"></video>`:''}<span class="reel-play" aria-hidden="true">↗</span></button><div class="winner-copy"><h2>${compact(p.reach)} <span>plays</span></h2><p>${Number(p.xNormal).toFixed(1).replace(/\.0$/,'')}× their usual</p>${small?'':`<span class="hint">${Number.isFinite(p.engagement)?`${Math.round(p.engagement)} likes and comments per 1,000 plays`:'Engagement unavailable'}</span>`}</div></article>`;}
+export function renderWinners({account,winners=[],weakest=[],secretOpen=true,lookOpen=true}){
+ if(!winners.length)return `${head('No clear winners yet','No saved reel got at least twice this account’s usual plays. Try a larger scan.')}<button class="btn btn-primary" data-act="new-analysis">New analysis →</button>`;
+ return `${head(`@${account}’s winners`,'Proven ideas. Now imagine them with your hosts.')}<div class="reel-grid">${winners.map((w,index)=>reelTile(w,{index})).join('')}</div>${weakest.length?`<section class="weak-section"><h2 class="sub-title">Their weakest, for perspective</h2><div class="reel-grid is-small">${weakest.map(w=>reelTile(w,{small:true})).join('')}</div></section>`:''}<div class="next-row"><button type="button" class="btn btn-ghost" data-step="secret"${secretOpen?'':' disabled'}>Why do these win?${secretOpen?'':' · listening'}</button><button type="button" class="btn btn-primary" data-step="kit"${lookOpen?'':' disabled'}>${lookOpen?'Make your look →':'Listening to the winners…'}</button></div>`;
 }
 
 // 3 · Secret, readable by a 10-year-old: 3 things to do, 1 to avoid, what every reel has, why it works, a check.
@@ -357,12 +353,8 @@ export function renderReelResult(t){
 export const readyReels=reels=>(reels||[]).filter(r=>r.url);
 export function renderReady({reels=[],fbOpen=null,judge=null,results=null,busy=false}){
  reels=readyReels(reels);
- if(!reels.length)return `${head('Nothing ready yet','Make a reel first.')}`;
- return `${head('Ready to post','For each reel: download the video and the cover, copy the caption, post it on Instagram.')}<p class="ready-tip">When you post: pick the cover, then Advanced settings, turn on <b>Label as made with AI</b>. Meta asks for it on realistic AI video.</p>${''}${renderResultsCard(results,{busy})}<div class="ready-grid">${reels.map(r=>`<article class="card ready">
-<div class="ready-media"><video src="${esc(r.url)}#t=0.5" controls playsinline preload="metadata"></video>${r.cover?`<img class="ready-cover" src="${esc(r.cover)}" alt="Cover">`:`<button type="button" class="ready-cover is-empty" data-act="make-cover" data-reel="${esc(r.id)}">Make the cover · free</button>`}</div>
-<div class="ready-body"><h3>${esc(r.title||'Reel')}</h3>${renderReelResult(results?.reels?.[r.id])}${r.check&&r.check.level!=='good'&&(r.check.problems?.[0]||r.check.weaknesses?.[0])?`<p class="hint">Second opinion: ${esc(r.check.problems?.[0]||r.check.weaknesses[0])}</p>`:''}${r.rank?.sentence?`<p class="hint rank-line">${esc(r.rank.sentence)}</p>`:''}${r.review?.postable===false?`<p class="ready-warn">Not ready: ${esc(r.review.why)}</p>`:r.heard&&!r.heard.all?`<p class="ready-warn">Not ready: this line is cut off or never heard: “${esc(r.heard.missing[0])}”${r.heard.missing.length>1?` and ${r.heard.missing.length-1} more`:''}</p>`:''}<p class="caption" id="cap-${esc(r.id)}">${esc(r.caption||'')}</p>
-<div class="ready-actions"><a class="btn btn-primary" href="${esc(r.url)}" download>1 · Download the reel</a>${r.cover?`<a class="btn" href="${esc(r.cover)}" download>2 · Download the cover</a>`:''}<button type="button" class="btn" data-copy="cap-${esc(r.id)}">${r.cover?'3':'2'} · Copy the caption</button></div>
-<span class="hint">${esc(Math.round(r.seconds||0))} s · ${Number.isFinite(r.spentUsd)?`video $${esc(r.spentUsd.toFixed(2))}, checks extra`:`${esc(r.spent??'')} credits`}</span>${renderReelScore(r,{open:fbOpen===r.id,judge})}</div></article>`).join('')}</div>${next('make','Make another reel')}`;
+ if(!reels.length)return `${head('Nothing ready yet','Your finished reels will live here, ready for their first audience.')}${next('make','Make a reel')}`;
+ return `${head('Ready for your audience','Your reels, covers and captions. All in one place.')}<div class="ready-grid">${reels.map(r=>`<article class="card ready"><div class="ready-media"><video src="${esc(r.url)}#t=0.5"${r.cover?` poster="${esc(r.cover)}"`:''} controls playsinline preload="metadata"></video></div><div class="ready-body"><h3>${esc(r.title||'Your reel')}</h3>${r.review?.postable===false||r.heard&&!r.heard.all?'<p class="ready-warn">Not ready: review the issues in Details.</p>':''}<button type="button" class="caption-toggle" data-caption="cap-${esc(r.id)}" aria-expanded="false" aria-label="Expand caption"><span class="caption" id="cap-${esc(r.id)}">${esc(r.caption||'No caption yet.')}</span><span class="caption-more">Read caption</span></button><div class="ready-actions"><button type="button" class="btn" data-download="${esc(r.id)}">Download reel and cover</button><button type="button" class="btn" data-copy="cap-${esc(r.id)}">Copy caption</button></div><details class="ready-details"><summary>Details</summary><a class="btn" href="${esc(r.url)}" download>Download video only</a>${r.cover?`<a class="cover-link" href="${esc(r.cover)}" download><img src="${esc(r.cover)}" alt="Download cover"></a>`:`<button class="btn" data-act="make-cover" data-reel="${esc(r.id)}">Make the cover · free</button>`}${renderReelResult(results?.reels?.[r.id])}${r.check&&r.check.level!=='good'?`<p class="hint">Second opinion: ${esc(r.check.problems?.[0]||r.check.weaknesses?.[0]||'Review before posting.')}</p>`:''}${r.rank?.sentence?`<p class="hint">${esc(r.rank.sentence)}</p>`:''}${r.review?.postable===false?`<p class="err">${esc(r.review.why)}</p>`:''}${r.heard&&!r.heard.all?`<p class="err">Missing speech: ${esc((r.heard.missing||[]).join('; '))}</p>`:''}<p class="hint">${Math.round(r.seconds||0)} s · ${Number.isFinite(r.spentUsd)?`video $${r.spentUsd.toFixed(2)}, checks extra`:`${esc(r.spent??'–')} credits`}</p>${renderReelScore(r,{open:fbOpen===r.id,judge})}</details></div></article>`).join('')}</div><details class="ready-details"><summary>Posting tips and real results</summary><p class="hint">On Instagram, choose the cover and turn on “Label as made with AI” for realistic AI video.</p>${renderResultsCard(results,{busy})}</details>${next('make','Make another reel')}`;
 }
 
 // Page helpers (they take DOM nodes or media elements, so tests can hand them stand-ins).
@@ -401,4 +393,48 @@ export function copyAnnouncement(copy){
  const n=b.items.length,done=b.items.filter(i=>i.state==='done').length,failed=b.items.filter(i=>['failed','stopped'].includes(i.state)).length;
  if(b.items.some(i=>['working','waiting'].includes(i.state)))return `Making ${n} copies: ${done} made, about ${Math.floor((b.pct||0)/25)*25}% done.`;
  return `${done} of ${n} copies made.${failed?` ${failed} stopped.`:''}`;
+}
+
+// The renderers emit button markup with escaped text (no nested buttons). Move the chosen
+// button unchanged, including all data hooks, into the shared bar before keyed DOM morphing.
+const selectors={
+ scan:[['step','winners'],['act','scan-resume'],['act','reload'],['act','new-analysis']],
+ winners:[['step','kit']],
+ secret:[['step','kit'],['act','secret-build']],
+ kit:[['step','make'],['act','kit-approve'],['act','kit-choose'],['act','kit-build']],
+ make:[['act','copy-start'],['step','ready'],['act','copy-pick'],['act','make'],['act','ideas'],['act','copy-new']],
+ ready:[['step','make']],
+};
+const labels={scan:'01 · Scan',winners:'02 · Winners',secret:'02 · Why they win',kit:'03 · Your look',make:'04 · Copy',ready:'05 · Ready to post'};
+const waiting={scan:'Collecting reels…',winners:'Listening to the winners…',kit:'Building your look…',make:'Making your copies…',ready:'Make a reel',secret:'Finding the pattern…'};
+const disable=button=>/^<button[^>]*\sdisabled(?:\s|>)/.test(button)?button:button.replace('<button','<button disabled');
+export function dockActions(html,{step,open,busy=false}){
+ const buttons=[...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(m=>m[0]);
+ let primary;for(const [kind,value] of selectors[step]){primary=buttons.find(b=>b.includes(`data-${kind}="${value}"`));if(primary)break;}
+ if(primary){html=html.replace(primary,'');if(!/class="[^"]*btn-primary/.test(primary))primary=primary.replace(/class="/, 'class="btn-primary ');}
+ else primary=`<button type="button" class="btn btn-primary" disabled>${step==='scan'&&html.includes('Not enough reels')?'No winners yet':waiting[step]}</button>`;
+ const target=primary.match(/data-step="([^"]+)"/)?.[1];
+ if(busy||target&&open[target]===false)primary=disable(primary);
+ if(step==='kit'&&target==='make')primary=primary.replace(/>[^<]*<\/button>$/, '>Copy these →</button>');
+ if(target==='ready')primary=primary.replace(/>[^<]*<\/button>$/, '>Ready to post →</button>');
+ const secondary=step==='winners'?buttons.find(b=>b.includes('data-step="secret"'))||'':'';
+ if(secondary)html=html.replace(secondary,'');
+ html=html.replace(/class="([^"]*)"/g,(_,classes)=>`class="${classes.split(/\s+/).filter(c=>c!=='btn-primary').join(' ')}"`);
+ return {html,bar:`<div class="action-inner"><span class="action-label">${labels[step]}</span><div class="action-buttons">${secondary}${primary}</div></div>`};
+}
+
+// One local ZIP avoids the browser dropping the second of two automatic downloads.
+// Stored entries need no compression dependency; media is already compressed.
+export function reelDownloadBundle(files){
+ const encoder=new TextEncoder(),table=Array.from({length:256},(_,n)=>{for(let i=0;i<8;i++)n=n&1?0xedb88320^(n>>>1):n>>>1;return n>>>0;});
+ const local=[],central=[];let offset=0;
+ const header=(length,signature)=>{const bytes=new Uint8Array(length),view=new DataView(bytes.buffer);view.setUint32(0,signature,true);return {bytes,view};};
+ for(const file of files){
+  const name=encoder.encode(file.name),data=file.bytes;let crc=0xffffffff;for(const byte of data)crc=(crc>>>8)^table[(crc^byte)&255];crc=(crc^0xffffffff)>>>0;
+  if(data.length>0xffffffff||offset+30+name.length+data.length>0xffffffff)throw new Error('This reel is too large to bundle. Download it from Details.');
+  const l=header(30,0x04034b50);l.view.setUint16(4,20,true);l.view.setUint16(6,0x800,true);l.view.setUint32(14,crc,true);l.view.setUint32(18,data.length,true);l.view.setUint32(22,data.length,true);l.view.setUint16(26,name.length,true);local.push(l.bytes,name,data);
+  const c=header(46,0x02014b50);c.view.setUint16(4,20,true);c.view.setUint16(6,20,true);c.view.setUint16(8,0x800,true);c.view.setUint32(16,crc,true);c.view.setUint32(20,data.length,true);c.view.setUint32(24,data.length,true);c.view.setUint16(28,name.length,true);c.view.setUint32(42,offset,true);central.push(c.bytes,name);offset+=30+name.length+data.length;
+ }
+ const end=header(22,0x06054b50);end.view.setUint16(8,files.length,true);end.view.setUint16(10,files.length,true);end.view.setUint32(12,central.reduce((n,b)=>n+b.length,0),true);end.view.setUint32(16,offset,true);
+ return new Blob([...local,...central,end.bytes],{type:'application/zip'});
 }

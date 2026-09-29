@@ -6,7 +6,8 @@ import {esc} from './flow-views.mjs';
 export const ENGINE_LABEL={omni:'Gemini Omni','veo-fast':'Veo 3.1 Fast'};
 const ENGINE_CHOICES=[['veo-fast','Veo 3.1 Fast'],['omni','Gemini Omni'],['both','Both, side by side']];
 export const enginesOf=choice=>choice==='both'?['omni','veo-fast']:[choice];
-const priceOf=(p,e)=>e==='omni'?p.usd:(p.veo?.usd??p.usd);
+export const priceOf=(p,e)=>e==='omni'?(p.seconds>40?null:Number.isFinite(p.usd)?p.usd:null):(Number.isFinite(p.veo?.usd)?p.veo.usd:null);
+const priceText=(p,e)=>Number.isFinite(priceOf(p,e))?`$${priceOf(p,e).toFixed(2)}`:e==='omni'&&p.seconds>40?'unavailable · longer than 40 s':'price unavailable';
 const n0=v=>Number.isFinite(v)?v>=1e6?`${(v/1e6).toFixed(1)}M`:v>=1e3?`${Math.round(v/1e3)}k`:String(v):'?';
 const clock=s=>!Number.isFinite(s)?'':s<60?`${Math.max(1,Math.round(s))} s`:`${Math.floor(s/60)} min ${String(Math.round(s%60)).padStart(2,'0')} s`;
 const handleOf=name=>String(name||'our.channel').toLowerCase().replace(/[^a-z0-9]+/g,'.').replace(/^\.+|\.+$/g,'');
@@ -25,13 +26,13 @@ ${copy?.picking?.state==='failed'?`<p class="err">${esc(copy.picking.error)}</p>
 <div class="hero-cta"><button type="button" class="btn btn-primary btn-big" data-act="copy-pick"${busy?' disabled':''}>Find the 5 to copy · a few cents</button></div></div>`;
 }
 // Step 2: the picks, each with its original, why it was picked and its price; one button for all.
-function picks(copy,{busy,unpicked,engine='both'}){
- const list=copy.picks.picks,chosen=list.filter(p=>!unpicked.has(p.id)),eng=enginesOf(engine),usd=Math.round(chosen.reduce((a,p)=>a+eng.reduce((x,e)=>x+priceOf(p,e),0),0)*100)/100;
- const choose=`<div class="engine-row"><span class="label">Video model</span><div class="seg" role="group" aria-label="Video model">${ENGINE_CHOICES.map(([id,label])=>`<button type="button" data-copy-engine="${id}" aria-pressed="${engine===id}">${label} · $${Math.round(chosen.reduce((a,p)=>a+enginesOf(id).reduce((x,e)=>x+priceOf(p,e),0),0)*100)/100}</button>`).join('')}</div><span class="hint">Veo 3.1 Fast and Gemini Omni cost about the same per second; Veo can run past 40 seconds.</span></div>`;
- const cards=list.map((p,i)=>`<label class="card pick rise${unpicked.has(p.id)?' is-off':''}" style="--i:${i}"><input type="checkbox" data-copy-pick="${esc(p.id)}"${unpicked.has(p.id)?'':' checked'}><img src="/media/${esc(copy.runId)}/${esc(p.id)}" alt="" loading="lazy"><div class="pick-body"><b>${n0(p.plays)} plays · ${esc(Math.round(p.xNormal))}× their normal</b><p class="quote">“${esc(p.opening)}…”</p><p class="hint">${esc(p.why)}</p><span class="hint">${esc(Math.round(p.seconds))} s · ${eng.map(e=>`${ENGINE_LABEL[e]} $${esc(priceOf(p,e).toFixed(2))}`).join(' · ')}</span></div></label>`).join('');
+function picks(copy,{busy,unpicked,engine='veo-fast'}){
+ const list=copy.picks.picks,chosen=list.filter(p=>!unpicked.has(p.id)),eng=enginesOf(engine),unavailable=chosen.some(p=>eng.some(e=>priceOf(p,e)===null)),usd=Math.round(chosen.reduce((a,p)=>a+eng.reduce((x,e)=>x+priceOf(p,e),0),0)*100)/100;
+ const choose=`<div class="engine-row"><span class="label">Video model</span><div class="seg" role="group" aria-label="Video model">${ENGINE_CHOICES.map(([id,label])=>`<button type="button" data-copy-engine="${id}" aria-pressed="${engine===id}">${label} · ${chosen.some(p=>enginesOf(id).some(e=>priceOf(p,e)===null))?'unavailable':'$'+(Math.round(chosen.reduce((a,p)=>a+enginesOf(id).reduce((x,e)=>x+priceOf(p,e),0),0)*100)/100)}</button>`).join('')}</div><span class="hint">Veo 3.1 Fast is selected by default. Gemini Omni supports reels up to 40 seconds.</span></div>`;
+ const cards=list.map((p,i)=>`<label class="card pick rise${unpicked.has(p.id)?' is-off':''}" style="--i:${i}"><input type="checkbox" data-copy-pick="${esc(p.id)}"${unpicked.has(p.id)?'':' checked'}><img src="/media/${esc(copy.runId)}/${esc(p.id)}" alt="" loading="lazy"><div class="pick-body"><b>${n0(p.plays)} plays · ${Number.isFinite(p.xNormal)?Math.round(p.xNormal):'–'}× their normal</b><p class="quote">“${esc(p.opening)}…”</p><p class="hint">${esc(p.why)}</p><span class="hint">${Number.isFinite(p.seconds)?`${Math.round(p.seconds)} s`:'Length unavailable'} · ${['veo-fast','omni'].map(e=>`${ENGINE_LABEL[e]} ${esc(priceText(p,e))}`).join(' · ')}</span></div></label>`).join('');
  return `<section class="block"><div class="row-between"><h2 class="sub-title">The ${list.length} winners to copy</h2><button type="button" class="btn btn-ghost" data-act="copy-pick"${busy?' disabled':''}>Pick again</button></div>
 <div class="pick-grid">${cards}</div>${copy.picks.skipped?`<p class="hint">${esc(copy.picks.skipped)} other winner${copy.picks.skipped>1?'s':''} skipped: Jev judged they would not copy well, or they need people we do not have.</p>`:''}
-${choose}<div class="hero-cta"><button type="button" class="btn btn-primary btn-big" data-act="copy-start" data-usd="${usd}" data-engines="${esc(eng.join(','))}" data-ids="${esc(chosen.map(p=>p.id).join(','))}"${busy||!chosen.length?' disabled':''}>Copy ${chosen.length===1?'this one':`these ${chosen.length}`}${eng.length>1?' with both models':''} · $${usd.toFixed(2)}</button><span class="hint">All at once, about ${esc(Math.round(Math.max(...chosen.map(p=>p.parts),1)*1.4+3))} minutes. Each part is checked against the original before the next is paid for.</span></div></section>`;
+${choose}<div class="hero-cta"><button type="button" class="btn btn-primary btn-big" data-act="copy-start" data-usd="${usd}" data-engines="${esc(eng.join(','))}" data-ids="${esc(chosen.map(p=>p.id).join(','))}"${busy||!chosen.length||unavailable?' disabled':''}>Copy ${chosen.length===1?'this one':`these ${chosen.length}`}${eng.length>1?' with both models':''} · ${unavailable?'choose available reels':`$${usd.toFixed(2)}`}</button><span class="hint">All at once, about ${esc(Math.round(Math.max(...chosen.map(p=>engine==='veo-fast'?(p.veo?.parts||p.parts||1):(p.parts||1)),1)*1.4+3))} minutes. Each part is checked against the original before the next is paid for.</span></div></section>`;
 }
 // One tile: a ring that fills with real progress while it is made, then the reel.
 // The badge is a match score, most of it Gemini's beat-by-beat rating, so it does not claim a measured "% same".
@@ -57,7 +58,7 @@ function compareGroups(items){
  const groups=[];for(const it of items){const g=groups.find(x=>x.postId===it.postId);g?g.items.push(it):groups.push({postId:it.postId,original:it.original,items:[it]});}
  return groups.map(g=>`<div class="cmp-col"><div class="ig-cell"><video src="${esc(g.original)}#t=1" playsinline preload="metadata" controls data-orig="${esc(g.postId)}"></video><span class="fid-label">Original</span></div>${g.items.map(fidCard).join('')}</div>`).join('');
 }
-export function renderCopyStudio({copy,kit,busy=false,unpicked=new Set(),compareOpen=false,engine='both'}){
+export function renderCopyStudio({copy,kit,busy=false,unpicked=new Set(),compareOpen=false,engine='veo-fast'}){
  if(!copy?.picks&&!copy?.batch)return intro(copy,{busy});
  // Picking again, or picks newer than the batch, come first; the last batch stays below. Once a batch existed the
  // picks never came back, so a paid re-pick showed nothing (audit, 2026-09-29).
@@ -71,7 +72,7 @@ export function renderCopyStudio({copy,kit,busy=false,unpicked=new Set(),compare
  const ready=done&&!working?'<button type="button" class="btn btn-primary" data-step="ready">Open Ready to post →</button>':'';
  return `${top}<section class="block">${top?'<h2 class="sub-title">Your last copies</h2>':''}<div class="card ig ig-wide rise">${profile(kit,done)}${bar}
 <div class="ig-grid copy-grid">${b.items.map(tile).join('')}</div></div>
-<div class="hero-cta">${ready}${done?`<button type="button" class="btn${compareOpen||ready?'':' btn-primary'}" data-act="copy-compare">${compareOpen?'Hide the originals':'Compare with the originals'}</button>`:''}${working||fresh||pick?.state==='working'?'':`<button type="button" class="btn btn-ghost" data-act="copy-new">Copy other winners</button>`}</div>
+<div class="hero-cta">${ready}${done?`<button type="button" class="btn${compareOpen||ready?'':' btn-primary'}" data-act="copy-compare">${compareOpen?'Hide the originals':'Compare with the originals'}</button>`:''}${working||fresh||pick?.state==='working'?'':`<button type="button" class="btn btn-ghost" data-act="copy-new">Find other winners · a few cents</button>`}</div>
 ${compareOpen?`<div class="cmp-grid">${compareGroups(b.items)}</div>`:''}</section>`;
 }
 // What changes second to second while copies are made, so the page can update numbers without redrawing videos.

@@ -26,13 +26,14 @@ export function mountScanMap(root,{posts,imageFor,videoFor,selected,onSelect}){
  const stage=root.querySelector('.scan-stage');if(!stage)return;
  const w=stage.clientWidth,h=stage.clientHeight,stacked=w<640,wallW=stacked?w:Math.floor(w*0.42),wallH=stacked?Math.floor(h*0.42):h;
  const L=layout(posts,{wallW,wallH,mapX:stacked?0:wallW+24,mapW:stacked?w:w-wallW-24,mapH:stacked?h-wallH-16:h});
+ const mapLabel=stage.querySelector('.scan-lab.right');if(mapLabel){mapLabel.style.top=stacked?`${wallH}px`:'0';mapLabel.style.right=stacked?'auto':'0';mapLabel.style.left=stacked?'0':'auto';}
  const offY=stacked?wallH+16:0,svg=stage.querySelector('svg');
  const a=L.axes;svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
  svg.innerHTML=`<g transform="translate(0,${offY})">${a.y.map(t=>`<line x1="${a.box.l}" x2="${a.box.r}" y1="${t.at}" y2="${t.at}" class="grid"/><text x="${a.box.l-6}" y="${t.at+4}" text-anchor="end">${t.v.toFixed(0)}</text>`).join('')}${a.x.map(t=>`<text x="${t.at}" y="${a.box.b+18}" text-anchor="middle">${compact(t.v)}</text>`).join('')}${a.median?`<line class="med" x1="${a.median.x}" x2="${a.median.x}" y1="${a.box.t}" y2="${a.box.b}"/><line class="med" x1="${a.box.l}" x2="${a.box.r}" y1="${a.median.y}" y2="${a.median.y}"/>`:''}<text class="ax" x="${a.box.l}" y="${a.box.t-4}">↑ likes per 1,000 plays</text><text class="ax" x="${a.box.r}" y="${a.box.b-6}" text-anchor="end">plays →</text></g>`;
  // Two tiles per reel, as in the lab: the wall keeps every reel (the archive), and a copy flies from its place on the
  // wall to the map once the reel is analysed (an empty wall after a finished scan looked broken, 2026-09-28).
- const tile=(cls,id)=>{const el=document.createElement('button');el.type='button';el.className=cls;el.dataset.id=id;el.innerHTML=`<img src="${imageFor(id)}" alt="" loading="lazy" onerror="this.remove()">`;el.onclick=()=>onSelect(id);stage.append(el);return el;};
- const place=(el,b)=>{el.style.width=`${b.w}px`;el.style.height=`${b.h}px`;el.style.transform=`translate(${b.x}px,${b.y}px)`;};
+ const tile=(cls,id)=>{const el=document.createElement('button');el.type='button';el.className=cls;el.dataset.id=id;const p=posts.find(p=>p.id===id);el.setAttribute('aria-label',`Play reel: ${compact(reach(p||{}))} plays`);el.innerHTML=`<img src="${imageFor(id)}" alt="" loading="lazy" onerror="this.remove()">`;el.onclick=()=>onSelect(id);stage.append(el);return el;};
+ const place=(el,b)=>{const w=Math.max(40,b.w),h=Math.max(40,b.h);el.style.width=`${w}px`;el.style.height=`${h}px`;el.style.setProperty('--tile-w',`${b.w}px`);el.style.setProperty('--tile-h',`${b.h}px`);el.style.transform=`translate(${b.x-(w-b.w)/2}px,${b.y-(h-b.h)/2}px)`;};
  const walls=new Map([...stage.querySelectorAll('.st-wall')].map(el=>[el.dataset.id,el])),maps=new Map([...stage.querySelectorAll('.st-map')].map(el=>[el.dataset.id,el]));
  for(const t of L.tiles){
   const w=walls.get(t.id)||tile('st st-wall',t.id);walls.delete(t.id);place(w,t.wall);w.classList.toggle('waiting',!t.analysed);w.classList.toggle('is-sel',t.id===selected);

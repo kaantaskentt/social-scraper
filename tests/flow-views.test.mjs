@@ -12,15 +12,15 @@ test('steps open in order: winners and look need a scored scan, copy needs a fin
  assert.match(html,/data-step="winners"[^>]*aria-current="step"/);assert.doesNotMatch(html,/data-step="secret"/);assert.match(html,/data-step="make"[^>]*disabled/);assert.match(html,/✓/);
 });
 
-test('scan: one input, the price on the button, earlier accounts to reopen, and a next step once scanned',()=>{
- const html=renderScan({runs:[{id:'a',creator:'ken.remedie',count:100,status:'complete'}],run:{id:'a',creator:'ken.remedie',count:100}});
- assert.match(html,/name="handle"/);assert.match(html,/Scan 100 reels · about \$0\.35/);assert.match(html,/data-run="a"[\s\S]*@ken\.remedie/);assert.match(html,/data-step="winners"/);
+test('scan: an open account shows its map and next step, with no inline analysis form',()=>{
+ const html=renderScan({runs:[{id:'a',creator:'ken.remedie',count:100,status:'complete'}],run:{id:'a',creator:'ken.remedie',count:100},scored:true});
+ assert.doesNotMatch(html,/name="handle"|acct-list/);assert.match(html,/@ken\.remedie is scanned/);assert.match(html,/data-step="winners"/);
  assert.match(renderScan({run:{id:'a',creator:'x'},progress:{state:'running',done:3,total:10,label:'Listening'}}),/<progress value="3" max="10">/);
 });
 
 test('winners: big reel tiles with how many times their normal, weakest for contrast',()=>{
  const html=renderWinners({account:'ken',winners:[{id:'w1',image:'/i/w1',xNormal:104.1,reach:5.8e6}],weakest:[{id:'f1',image:'/i/f1',xNormal:0.3,reach:1e4}]});
- assert.match(html,/104\.1× normal/);assert.match(html,/5\.8M views/);assert.match(html,/data-play="w1"/);assert.match(html,/weakest/);assert.match(html,/data-step="secret"/);
+ assert.match(html,/104\.1× their usual/);assert.match(html,/5\.8M <span>plays/);assert.match(html,/data-preview="w1"/);assert.match(html,/weakest/);assert.match(html,/data-step="secret"/);
 });
 
 const saved={account:'ken',secret:{headline:'Kitchen tests <b>',person:{text:'Two casual people',evidence:['r1']},setting:{text:'Bright kitchen',evidence:['r2']},format:{text:'A food test',evidence:['r3']},why:[{mechanism:'curiosity_gap',pattern:'x',evidence:['r1']}],critique:[{kind:'risk',point:'Check health claims',evidence:['r1']}]},
@@ -49,7 +49,7 @@ test('make: the ideas button first; then ideas with three meters; script with sh
 
 test('ready to post: video, download, copy caption; nothing yet says so',()=>{
  const html=renderReady({reels:[{id:'0-celery',url:'/channels/a/0-celery/reel.mp4',title:'Celery',caption:'Try it #kitchen',seconds:30.1,spent:76}]});
- assert.match(html,/<video src="\/channels\/a\/0-celery\/reel\.mp4#t=0\.5"/);assert.match(html,/download>1 · Download the reel/);assert.match(html,/data-copy="cap-0-celery"/);assert.match(html,/30 s · 76 credits/);
+ assert.match(html,/<video src="\/channels\/a\/0-celery\/reel\.mp4#t=0\.5"/);assert.match(html,/data-download="0-celery">Download reel and cover/);assert.match(html,/data-copy="cap-0-celery"/);assert.match(html,/30 s · 76 credits/);
  assert.match(renderReady({reels:[]}),/Nothing ready yet/);
 });
 
@@ -218,11 +218,11 @@ test('the script shows whether hosts talk or a voice explains, why, and a one-ta
  assert.match(renderKitScript({...plan,voice:{mode:'voiceover',why:'You chose this.'}}),/data-voice-mode="talking">Let the hosts talk instead/);
 });
 
-test('ready to post: cover, reel and caption, each with one numbered button; a free cover button for older reels',()=>{
+test('ready to post: reel and cover download together; older reels can create a cover in Details',()=>{
  const html=renderReady({reels:[{id:'0-fizz',url:'/channels/a/0-fizz/reel.mp4',cover:'/channels/a/0-fizz/cover.jpg',title:'Fizz',caption:'Try it #kitchen',seconds:22,spentUsd:2.15}]});
- assert.match(html,/<img class="ready-cover" src="\/channels\/a\/0-fizz\/cover\.jpg"/);assert.match(html,/href="\/channels\/a\/0-fizz\/reel\.mp4" download>1 · Download the reel/);
- assert.match(html,/href="\/channels\/a\/0-fizz\/cover\.jpg" download>2 · Download the cover/);assert.match(html,/data-copy="cap-0-fizz">3 · Copy the caption/);
- const old=renderReady({reels:[{id:'0-egg',url:'/e.mp4',title:'Egg',caption:'c',seconds:22}]});assert.match(old,/data-act="make-cover" data-reel="0-egg">Make the cover · free/);assert.match(old,/2 · Copy the caption/);
+ assert.match(html,/poster="\/channels\/a\/0-fizz\/cover\.jpg"/);assert.match(html,/data-download="0-fizz">Download reel and cover/);
+ assert.match(html,/href="\/channels\/a\/0-fizz\/cover\.jpg" download/);assert.match(html,/data-copy="cap-0-fizz">Copy caption/);
+ const old=renderReady({reels:[{id:'0-egg',url:'/e.mp4',title:'Egg',caption:'c',seconds:22}]});assert.match(old,/data-act="make-cover" data-reel="0-egg">Make the cover · free/);assert.match(old,/Copy caption/);
 });
 
 test('when nothing passes: one clear next step (new ideas), the reasons folded under Why',()=>{
@@ -241,7 +241,7 @@ test('the Ready step leads straight to the next reel',()=>{
 
 test('a reel with a line cut off says so on its card',()=>{
  const base={id:'a',url:'/r.mp4',title:'T',caption:'c',seconds:20,spentUsd:2};
- assert.match(renderReady({reels:[{...base,heard:{all:false,missing:['Follow for the next test.']}}]}),/Not ready: this line is cut off or never heard: “Follow for the next test.”/);
+ assert.match(renderReady({reels:[{...base,heard:{all:false,missing:['Follow for the next test.']}}]}),/Not ready: review the issues in Details[\s\S]*Missing speech: Follow for the next test/);
  assert.doesNotMatch(renderReady({reels:[{...base,heard:{all:true,missing:[]}}]}),/Not ready/);
 });
 
@@ -252,7 +252,7 @@ test('ideas Jev stopped go last and say so; fresh ideas come first',()=>{
 });
 
 test('a reel reviewed as not postable says why on its card',()=>{
- assert.match(renderReady({reels:[{id:'s',url:'/r.mp4',title:'Silver',caption:'c',seconds:20,spentUsd:2,review:{postable:false,why:'The spoon never turns shiny.'}}]}),/Not ready: The spoon never turns shiny\./);
+ assert.match(renderReady({reels:[{id:'s',url:'/r.mp4',title:'Silver',caption:'c',seconds:20,spentUsd:2,review:{postable:false,why:'The spoon never turns shiny.'}}]}),/Not ready: review the issues in Details[\s\S]*The spoon never turns shiny\./);
 });
 
 test('real results: ask for the handle once, then one check button; each posted reel shows its real numbers',async()=>{
@@ -270,4 +270,59 @@ test('the gate and the rank show on the reel card',()=>{
  assert.match(opinion,/Second opinion: 16s missing_result: spoon still black/);assert.doesNotMatch(opinion,/Not ready/); // advice, not a gate: it flips between runs
  const weak=renderReady({reels:[{...base,check:{level:'weak',problems:[],weaknesses:['6s missing_result: no floating egg']},rank:{sentence:'Beat 3 of 5 of their typical reels in a side-by-side watch.'}}]});
  assert.match(weak,/Second opinion: 6s missing_result: no floating egg/);assert.match(weak,/Beat 3 of 5 of their typical reels/);assert.doesNotMatch(weak,/Not ready/);
+});
+
+import {REEL_COUNTS,renderAnalysisSheet,renderAccounts,winnersFinished,scanSummary,dockActions} from '../public/flow-views.mjs';
+test('new analysis offers the three measured sizes and a fresh start by default',()=>{
+ const html=renderAnalysisSheet();
+ assert.deepEqual(REEL_COUNTS,[{limit:30,time:3,usd:0.12},{limit:60,time:4,usd:0.22},{limit:100,time:6,usd:0.35}]);
+ for(const {limit,time,usd} of REEL_COUNTS){assert.match(html,new RegExp(`name="limit" value="${limit}"`));assert.ok(html.includes(`About ${time} min`));assert.ok(html.includes(`About $${usd.toFixed(2)}`));}
+ assert.match(html,/name="fresh" checked/);assert.match(html,/type="submit">Start/);assert.match(html,/instagram.com/);
+ assert.match(renderAccounts([{id:'a',creator:'alpha',count:30}],{id:'a',creator:'alpha'}),/new-analysis[\s\S]*data-run="a"[\s\S]*30 reels/);
+});
+test('scored reels unlock Winners immediately; Secret waits; Look and Copy wait for the top winners',()=>{
+ const results=Object.fromEntries(Array.from({length:7},(_,i)=>[String(i),{label:'winner',xNormal:10-i,reach:1000}]));
+ const posts=Object.keys(results).map((id,i)=>({id,status:i===6?'queued':['complete','no_speech','music','no_audio','failed','complete'][i]}));
+ assert.equal(winnersFinished(posts,results),true,'the seventh winner does not hold up the first six');
+ assert.equal(winnersFinished([{...posts[0],status:'transcribed'},...posts.slice(1)],results),false);
+ assert.equal(winnersFinished([],{}),false);
+ const early=reachable({scored:true,kit:true});assert.equal(early.winners,true);assert.equal(early.secret,false);assert.equal(early.kit,false);assert.equal(early.make,false);
+ const ready=reachable({scored:true,winnersReady:true,kit:true});assert.equal(ready.kit,true);assert.equal(ready.make,true);assert.equal(ready.secret,false);
+ assert.equal(reachable({scanned:true,scored:true}).kit,true);
+});
+test('scan summary distinguishes the median, best reel and scoring baseline',()=>{
+ assert.deepEqual(scanSummary([{plays:100},{plays:200},{plays:900}],{a:{reach:900,xNormal:3}}),[['Reels',3],['Median plays',200],['Best reel',900],['Usual plays',300]]);
+ assert.equal(scanSummary([])[1][1],null);
+});
+test('winner metrics put plays before relative reach and engagement, with inline muted preview',()=>{
+ const html=renderWinners({account:'a',winners:[{id:'w',image:'/w.jpg',video:'/w.mp4',reach:14.3e6,xNormal:397,engagement:22}],secretOpen:false,lookOpen:false});
+ assert.match(html,/14.3M <span>plays[\s\S]*397× their usual[\s\S]*22 likes and comments per 1,000 plays/);
+ assert.match(html,/data-src="\/w.mp4" muted playsinline loop/);assert.match(html,/data-step="secret" disabled/);assert.match(html,/data-step="kit" disabled/);
+});
+test('one primary action is docked with its hooks, cost, disabled state and optional secondary',()=>{
+ const html=renderWinners({account:'a',winners:[{id:'w',reach:10,xNormal:3}]});
+ const dock=dockActions(html,{step:'winners',open:{kit:true}});
+ assert.equal((dock.bar.match(/btn-primary/g)||[]).length,1);assert.doesNotMatch(dock.html,/btn-primary|data-step="kit"/);assert.match(dock.bar,/data-step="secret"[\s\S]*data-step="kit"/);
+ const build=dockActions(renderKit({account:'a',status:{estimate:{usd:1.01}}}),{step:'kit',open:{}});
+ assert.match(build.bar,/data-act="kit-build"[^>]*>Build my look · about \$1.01/);
+ const live=dockActions(renderScan({run:{id:'a',creator:'a'},progress:{state:'running',done:2,total:30,label:'Listening'},scored:true}),{step:'scan',open:{winners:true}});
+ assert.match(live.bar,/See the winners/);assert.match(live.html,/Still listening: 2 of 30/);
+ const waiting=dockActions('',{step:'make',open:{}});assert.match(waiting.bar,/disabled>Making your copies/);
+});
+test('Ready keeps the two actions outside Details and all diagnostics inside',()=>{
+ const html=renderReady({reels:[{id:'r',url:'/r.mp4',cover:'/r.jpg',caption:'line one\nline two\nline three',check:{level:'weak',problems:['Opinion']},review:{postable:false,why:'Issue'},rank:{sentence:'Score'},spentUsd:3,seconds:20}]});
+ const card=html.split('<article')[1].split('</article>')[0],before=card.split('<details')[0],details=card.split('<details')[1];
+ assert.match(before,/data-download="r"/);assert.match(before,/data-copy="cap-r"/);assert.match(before,/aria-expanded="false"/);assert.match(before,/Not ready:/);
+ assert.doesNotMatch(before,/Opinion|Score|\$3.00/);assert.match(details,/Details[\s\S]*Opinion[\s\S]*Score[\s\S]*Issue[\s\S]*\$3.00/);
+});
+
+import {reelDownloadBundle} from '../public/flow-views.mjs';
+test('download bundle contains both intact files and standard ZIP checksums',async()=>{
+ const encoder=new TextEncoder(),blob=reelDownloadBundle([{name:'reel.mp4',bytes:encoder.encode('123456789')},{name:'cover.jpg',bytes:new Uint8Array([0,255,12])}]);
+ assert.equal(blob.type,'application/zip');const bytes=new Uint8Array(await blob.arrayBuffer()),v=new DataView(bytes.buffer);
+ assert.equal(v.getUint32(0,true),0x04034b50);assert.equal(v.getUint32(14,true),0xcbf43926,'standard CRC32 test vector');
+ assert.equal(new TextDecoder().decode(bytes.slice(30,38)),'reel.mp4');assert.equal(new TextDecoder().decode(bytes.slice(38,47)),'123456789');
+ assert.equal(v.getUint32(47,true),0x04034b50);assert.deepEqual([...bytes.slice(47+30+9,47+30+9+3)],[0,255,12]);
+ assert.equal(v.getUint32(bytes.length-22,true),0x06054b50);assert.equal(v.getUint16(bytes.length-12,true),2);
+ assert.equal(v.getUint32(v.getUint32(bytes.length-6,true),true),0x02014b50,'central directory points to the entries');
 });
