@@ -466,7 +466,7 @@ test('visual copy prompt: only the garment\'s printed line may show, no speech, 
  const {veoPrompt,partVerdict}=await import('../lib/kit-reel.mjs');
  const sc={visual:true,print:"DON'T TALK TO ME",parts:[{seconds:8,beats:[{from:0,to:8,shot:'Medium shot from behind',who:'Leo',does:'Leo walks down a store aisle, back to the camera',says:'',sound:''}]}]};
  const p=veoPrompt(sc,0,kitSaved);
- assert.match(p,/printed large on the back of Leo's top: "DON'T TALK TO ME"/);assert.match(p,/No one speaks/);assert.match(p,/no music/i);assert.doesNotMatch(p,/No text, captions, logos or labels on screen;/);
+ assert.match(p,/printed large on the back of Leo's top: "DON'T TALK TO ME"/);assert.doesNotMatch(p,/no walking/);assert.match(veoPrompt({...sc,still:true},0,kitSaved),/stays in place, no walking/);assert.match(p,/No one speaks/);assert.match(p,/no music/i);assert.doesNotMatch(p,/No text, captions, logos or labels on screen;/);
  const seen={match:3,same_people:'yes',text_or_logos:true,gear_visible:false,broken:false,lips_match:'no_speech_on_camera',result_as_written:'yes'};
  assert.equal(partVerdict(seen,{talking:false,allowText:true}).pass,true);assert.equal(partVerdict(seen,{talking:false}).pass,false);
 });
@@ -488,7 +488,7 @@ test('Veo visual copy: the first frame is drawn with the exact line, read back, 
  const posts=[];const veoFetch=async(url,o={})=>{if(o.method==='POST'){posts.push(JSON.parse(o.body));return Response.json({name:'models/x/operations/op1'});}
   if(url.includes(':download'))return new Response('VEO');return Response.json({done:true,response:{generateVideoResponse:{generatedSamples:[{video:{uri:'https://generativelanguage.googleapis.com/v1beta/files/v:download?alt=media'}}]}}});};
  const {videoPath}=await import('../lib/videos.mjs');await mkdir(join(root,'videos','r1'),{recursive:true});await writeFile(videoPath(root,'r1','o1'),'ORIG');
- let drawn=0;const image=async({prompt,refs})=>{drawn++;assert.match(prompt,/"DON'T TALK TO ME"/);assert.equal(String(refs[0].data),'JPG place');assert.equal(String(refs[1].data),'ORIGFRAME@0.5');assert.match(prompt,/Match the second picture's camera distance and framing/);return {data:Buffer.from(`FRAME${drawn}`),mime:'image/jpeg',costUsd:0.04};};
+ let drawn=0;const image=async({prompt,refs})=>{drawn++;assert.match(prompt,/"DON'T TALK TO ME"/);assert.equal(String(refs[0].data),'ORIGFRAME@0.5');assert.equal(String(refs[1].data),'JPG place');assert.match(prompt,/Frame it exactly like the first picture[\s\S]*the place from the second picture/);return {data:Buffer.from(`FRAME${drawn}`),mime:'image/jpeg',costUsd:0.04};};
  const gemini=async({schema,parts})=>{if(schema.required?.includes('printed_text')&&!schema.required.includes('match'))return {json:{printed_text:drawn===1?'DONT TALK T0 NE':"DON'T TALK TO ME"},costUsd:0.001};
   return {json:{shows:'x',match:3,same_people:'no_people',text_or_logos:true,gear_visible:false,broken:false,missing:'nothing',printed_text:"DON'T TALK TO ME"},costUsd:0};};
  let rendered=null,trimmed=null;const maker=new ReelMaker(root,keys,{cover:fakeCover,gemini,image,frame:async(v,o,at)=>Buffer.from(`${await readFile(v,'utf8')}FRAME@${at}`),trim:async(f,o,sec)=>{trimmed=sec;await writeFile(o,'TRIM');return o;},jev:async()=>good,veoFetch,pollMs:0,seconds:async()=>8,cut:async(i,o)=>o,render:async a=>{rendered=a;await writeFile(a.out,'R');return {seconds:8,spoken:[]};}});
