@@ -148,7 +148,7 @@ test('visual copy: a winner whose sound is a song (or that has no speech) is cop
  assert.equal(copyMode({post:{status:'complete'},breakdown:{voice:{delivery:'Warm, fast narration to camera'},beats:[]}}),'spoken');
  const s=visualScript({breakdown:sung,seconds:6,lengths:[8],cast:[{who:'Leo',does:'Leo stands in a store aisle, back to the camera'}],caption:'c'});
  assert.equal(s.visual,true);assert.equal(s.print,"DON'T TALK TO ME I HAVE A CRAZY GIRLFRIEND");assert.equal(s.hook_title,'');
- assert.deepEqual(s.parts.flatMap(p=>p.beats.map(b=>b.says)),['']);assert.equal(s.parts[0].beats[0].who,'Leo');assert.equal(s.parts[0].seconds,8);
+ assert.deepEqual(s.parts.flatMap(p=>p.beats.map(b=>b.says)),['']);assert.deepEqual(s.parts.flatMap(p=>p.beats.map(b=>[b.shot,b.sound])),[['','']]); // the original's place and song stay outassert.equal(s.parts[0].beats[0].who,'Leo');assert.equal(s.parts[0].seconds,8);
 });
 test('candidates: a silent or song-only winner is offered too, most played first',()=>{
  const c=copyCandidates([{id:'song',xNormal:113,seconds:6,text:'',timed:false,silent:true,plays:750412,engagement:57},{id:'talk',xNormal:5,seconds:30,text:'Here is why your bananas go brown so fast and what stops it',timed:true,plays:40000,engagement:20}]);
