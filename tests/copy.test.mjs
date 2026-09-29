@@ -57,8 +57,8 @@ test('the comparison: Gemini is told other people are expected; code decides fai
  const beats=[{from:0,to:3,shot:'close-up',happens:'pours water',says:'Pour boiling water',sound:'pour'},{from:3,to:12,shot:'foam',happens:'foam rises',says:'',sound:''},{from:12,to:25,shot:'medium',happens:'react',says:'',sound:''}];
  assert.match(fidelityPrompt(beats),/Different people, clothes and room are expected/);assert.match(fidelityPrompt(beats),/1\. 0-3 s: close-up; pours water; says "Pour boiling water"; sound: pour/);
  const seen=m=>({beats:m.map((match,i)=>({beat:i+1,match})),same_feel:2});
- assert.deepEqual(fidelityVerdict(90,seen([3,3,3]),beats),{faithful:true,redo:null});
- assert.deepEqual(fidelityVerdict(60,seen([3,3,1]),beats),{faithful:false,redo:'part_2'}); // beat 3 starts at 12 s: part 2
+ assert.deepEqual(fidelityVerdict(90,seen([3,3,3]),beats),{faithful:true,redo:null,resultMissing:[]});
+ assert.deepEqual(fidelityVerdict(60,seen([3,3,1]),beats),{faithful:false,redo:'part_2',resultMissing:[]}); // beat 3 starts at 12 s: part 2
  assert.equal(fidelityVerdict(90,{...seen([3,3,3]),same_feel:1},beats).faithful,false);
 });
 
@@ -95,7 +95,7 @@ test('fidelity counts every beat of the original once; a beat the watch left out
  const beats=[0,5,12,15,22].map(from=>({from,to:from+3}));
  // Beats 3 to 5 (parts 2 and 3) were never judged: not faithful, and a part with missing beats is filmed again.
  const seen={beats:[{beat:1,match:3},{beat:2,match:3}],same_feel:3},f=fidelityScore({wordsKept:1,lengthRatio:1,beats:seen.beats,count:5});
- assert.ok(f.score<75,`score ${f.score}`);assert.deepEqual(fidelityVerdict(f.score,seen,beats),{faithful:false,redo:'part_2'});
+ assert.ok(f.score<75,`score ${f.score}`);assert.deepEqual(fidelityVerdict(f.score,seen,beats),{faithful:false,redo:'part_2',resultMissing:[]});
 });
 
 test('Veo lengths: the same words cut into an 8 s clip and 7 s extensions, every part ending at its own length',()=>{
@@ -104,4 +104,14 @@ test('Veo lengths: the same words cut into an 8 s clip and 7 s extensions, every
  const s=copyScript({breakdown,segments,seconds:22,cast:[{who:'Felix',does:'pours'},{who:'Felix',does:'foam'}],hook:'h',caption:'c',lengths:[8,7,7]});
  assert.deepEqual(s.parts.map(p=>p.seconds),[8,7,7]);assert.deepEqual(s.parts.map(p=>p.beats.at(-1).to),[8,7,7]);
  assert.equal(wordsKept(segments.map(x=>x.text).join(' '),s.parts.flatMap(p=>p.beats.map(b=>b.says)).join(' ')),1);
+});
+
+test('stricter comparison: a wide shot of the right action scores its framing; a result not visible is never faithful',async()=>{
+ const {fidelityScore,fidelityVerdict,matchByBeat}=await import('../lib/copy.mjs');
+ const beats=[{from:0,to:4,happens:'pour'},{from:4,to:8,happens:'foam'},{from:12,to:20,happens:'react'}];
+ const seen={beats:[{beat:1,match:3,framing:1,result_visible:'no_result'},{beat:2,match:3,framing:3,result_visible:'no'},{beat:3,match:3,framing:3,result_visible:'no_result'}],same_feel:3};
+ assert.deepEqual(matchByBeat(seen.beats,3),[1,3,3]);
+ const f=fidelityScore({wordsKept:1,lengthRatio:1,beats:seen.beats,count:3});assert.equal(f.shots,78);
+ const v=fidelityVerdict(95,seen,beats);assert.equal(v.faithful,false);assert.deepEqual(v.resultMissing,[2]);assert.equal(v.redo,'part_1');
+ assert.equal(fidelityVerdict(95,{...seen,beats:seen.beats.map(b=>({...b,result_visible:'yes'}))},beats).faithful,true);
 });

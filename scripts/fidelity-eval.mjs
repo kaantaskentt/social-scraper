@@ -27,11 +27,16 @@ const orig=id=>({src:videoPath(ROOT,RUN,id),as:`${id}.mp4`}),ours=id=>({src:join
 const CASES=[
  {name:'chicken vs itself',orig:'DdFcvvDpmIy',copy:orig('DdFcvvDpmIy'),copyId:'DdFcvvDpmIy',want:true},
  {name:'sweet potato vs itself',orig:'DdRgLdABwbq',copy:orig('DdRgLdABwbq'),copyId:'DdRgLdABwbq',want:true},
- {name:'chicken vs salmon (same format, other object)',orig:'DdFcvvDpmIy',copy:orig('Dc4QBNbB54H'),copyId:'Dc4QBNbB54H',want:false},
- {name:'salmon vs chicken (same format, other object, turned around)',orig:'Dc4QBNbB54H',copy:orig('DdFcvvDpmIy'),copyId:'DdFcvvDpmIy',want:false},
+ // The same format with another object counts as a faithful copy: that is the goal (Kaan, 2026-09-29: "another
+ // chicken in a different background", "just use a different object"). Relabelled from false after a run scored them 75,
+ // on his definition, not on the score.
+ {name:'chicken vs salmon (same format, other object)',orig:'DdFcvvDpmIy',copy:orig('Dc4QBNbB54H'),copyId:'Dc4QBNbB54H',want:true},
+ {name:'salmon vs chicken (same format, other object, turned around)',orig:'Dc4QBNbB54H',copy:orig('DdFcvvDpmIy'),copyId:'DdFcvvDpmIy',want:true},
  {name:'chicken vs lime on blueberries (another reel)',orig:'DdFcvvDpmIy',copy:orig('DdZzWC1BYL7'),copyId:'DdZzWC1BYL7',want:false},
  {name:'sweet potato vs chicken (another reel)',orig:'DdRgLdABwbq',copy:orig('DdFcvvDpmIy'),copyId:'DdFcvvDpmIy',want:false},
  {name:'sweet potato vs our drifted egg reel',orig:'DdRgLdABwbq',copy:ours('0-sink-or-float-egg-test-3a6ced'),copyId:null,want:false},
+ // Checked by eye on 2026-09-29: the camera stands back and the foam is never visible, yet it once scored 78 "faithful".
+ {name:'our Omni chicken copy (wide, no foam)',orig:'DdFcvvDpmIy',copy:{...ours('copy-DdFcvvDpmIy-a85efa'),labeledAt:'2026-09-29T00:10:00Z'},copyId:null,want:false},
 ];
 const ids=[...new Set(CASES.flatMap(c=>[c.orig,c.copyId]).filter(Boolean))];
 // The transcripts once, from the run file; after that from the frozen copy. A breakdown the run has not cached yet is

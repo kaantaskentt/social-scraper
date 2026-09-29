@@ -47,7 +47,7 @@ function tile(it,i){
 // Under each winner: the original once, then each model's copy with how close it is, beat by beat.
 function fidCard(it){
  const f=it.fidelity,name=ENGINE_LABEL[it.engine]||'Gemini Omni';
- const beats=f?.beats?.length?`<ol class="fid-beats">${f.beats.map(b=>`<li class="m${b.match}"><span class="shot-s">${esc(b.from)}–${esc(b.to)} s</span><span>${esc(b.happens||'')}</span><b>${['missing','different','close','same'][b.match]||''}</b>${b.differs&&!/^nothing/i.test(b.differs)?`<em>${esc(b.differs)}</em>`:''}</li>`).join('')}</ol>`:'';
+ const beats=f?.beats?.length?`<ol class="fid-beats">${f.beats.map(b=>`<li class="m${b.match}"><span class="shot-s">${esc(b.from)}–${esc(b.to)} s</span><span>${esc(b.happens||'')}</span><b>${['missing','different','close','same'][Math.min(b.match??0,b.framing??b.match??0)]||''}${Number.isFinite(b.framing)&&b.framing<b.match?' (framing)':''}${b.result_visible==='no'?' · result not visible':''}</b>${b.differs&&!/^nothing/i.test(b.differs)?`<em>${esc(b.differs)}</em>`:''}</li>`).join('')}</ol>`:'';
  if(f?.error)return `<p class="hint"><b>${esc(name)}:</b> not compared: ${esc(f.error)}</p>`;
  if(!f)return `<p class="hint"><b>${esc(name)}:</b> ${it.state==='done'?'not compared.':'compared when the copy is made.'}</p>`;
  return `<div class="fid-card"><b>${esc(name)} · match score ${esc(f.score)} of 100</b> <span class="hint">shots ${esc(f.shots??'?')}% (Gemini watched both) · words ${esc(f.words??'?')}% · length ${esc(f.length??'?')}%</span>
