@@ -3,7 +3,9 @@
 Fork of github.com/artemnovitckii/creator-lab (MIT), remote `upstream`. Being extended into "Money Radar": see
 `docs/superpowers/specs/2026-09-25-money-radar-design.md`. Read `lessons.md` too.
 
-- Start: `~/Dev/active/office/bin/creator-lab.sh` (loads APIFY_TOKEN from the office .env.local and TYPESAFE_API_KEY from
+- Folder: `~/Dev/active/social-scraper` (renamed from creator-lab on 2026-09-30); GitHub: private `kaantaskentt/social-scraper`,
+  push with `git push private money-radar-build-1:main` (never to `origin`, the public fork).
+- Start: `~/Dev/active/office/bin/social-scraper.sh` (loads APIFY_TOKEN from the office .env.local and TYPESAFE_API_KEY from
   JEV's .env.local; picks Fireworks or Groq by which key exists). Or `npm start` with a local `.env`. Serves 127.0.0.1:5190.
 - Test: `npm test` (mocked providers, no paid calls). Syntax check: `npm run check`. Setup check: `npm run doctor`.
 - No build step, no dependencies. Deploy: none (local only).
