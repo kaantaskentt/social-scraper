@@ -124,6 +124,8 @@ test('#46 the reel price is labelled as the video only; the checks and voices ar
 test('#47 #60 the ideas card promises what the engine makes: up to 12 ideas for a look, up to 8 without',()=>{
  assert.match(renderMake({account:'k',plan:{state:'none'},kit:{approved:true,createdAt:'K',kit:{cast:[]}}}),/Up to 12 ideas for your look/);
  const hands=renderMake({account:'k',plan:{state:'none'}});assert.match(hands,/Up to 8 ideas in the winners&#39;|Up to 8 ideas in the winners' style/);assert.doesNotMatch(hands,/4 ideas/);
+ // Claims are no longer filtered (Kaan, 2026-09-29), so the card must not promise it; it promises the script check.
+ assert.doesNotMatch(hands,/Health claims/);assert.match(hands,/Jev checks the script before any money is spent/);
 });
 
 test('#54 a finished scan with nothing scored says why instead of a "See the winners" button that does nothing',()=>{

@@ -305,7 +305,7 @@ export function renderMake({account,plan,make,balance,mode='fast',busy=false,err
  if(make?.state==='working')return `${top}${renderProgress(make)}`;
  if(plan?.state==='working')return `${top}${renderWriting(plan)}`;
  const p0=plan?.plan,stale=useKit&&p0&&(p0.mode!=='kit'||p0.kitAt!==kit.createdAt),p=stale?null:p0;
- if(!p)return `${top}${err}<div class="card cta-card"><ul class="ticks"><li>${useKit?'Up to 12 ideas for your look':'Up to 8 ideas in the winners\' style'}</li><li>Health claims and fake tests removed</li><li>You pick one and see the exact price</li></ul><button type="button" class="btn btn-primary" data-act="ideas"${busy?' disabled':''}>Get ideas · a few cents</button></div>`;
+ if(!p)return `${top}${err}<div class="card cta-card"><ul class="ticks"><li>${useKit?'Up to 12 ideas for your look':'Up to 8 ideas in the winners\' style'}</li><li>Jev checks the script before any money is spent</li><li>You pick one and see the exact price</li></ul><button type="button" class="btn btn-primary" data-act="ideas"${busy?' disabled':''}>Get ideas · a few cents</button></div>`;
  const made=madeIdeas(make?.reels,p),doneReel=(make?.reels||[]).find(r=>r.url&&ofPlan(r,p)&&ideaOf(r)===p.chosen);
  const finished=doneReel?`<div class="card done"><video src="${esc(doneReel.url)}#t=0.5" controls playsinline preload="metadata"></video><div><span class="pill pill-ok">Made ✓</span><h3>${esc(doneReel.title||'Your reel')}</h3>${renderReelScore(doneReel,{open:fbOpen===doneReel.id,judge:make?.judge})}<p class="hint">Pick another idea below to make a new reel.</p>${next('ready','Open Ready to post')}</div></div>`:'';
  if(p.mode==='kit'){
