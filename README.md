@@ -7,12 +7,12 @@ It runs on your own computer, shows the price before every paid step, and never 
 
 ```mermaid
 flowchart LR
-  A["1 · Scan<br/>type an @account<br/>30 to 100 reels"] --> B["2 · Winners<br/>reels at 2x or more<br/>of their usual plays"]
-  B --> C["3 · Look<br/>your AI hosts,<br/>place and voice"]
-  C --> D["4 · Copy<br/>their winners, shot by shot,<br/>with your hosts"]
-  D --> E["5 · Ready to post<br/>video, cover, caption,<br/>download"]
-  B -.-> S["Why do these win?<br/>best vs weakest reels,<br/>with proof you can play"]
-  E -.-> R["Track real results<br/>your public numbers<br/>after you post"]
+  A["1 · Scan<br/>any @account"] --> B["2 · Winners<br/>2x+ their usual"]
+  B --> C["3 · Look<br/>your AI hosts"]
+  C --> D["4 · Copy<br/>shot by shot"]
+  D --> E["5 · Ready<br/>to post"]
+  B -.-> S["Why do<br/>they win?"]
+  E -.-> R["Real results<br/>after posting"]
 ```
 
 ## The idea in one paragraph
@@ -63,7 +63,7 @@ flowchart LR
   J --> AP["Apify<br/>collect reels"]
   J --> TR["Groq or Fireworks<br/>Whisper transcripts"]
   J --> JV["TypeSafe Jev<br/>typed judgments"]
-  J --> G["Gemini API<br/>watch videos, Nano Banana,<br/>Veo 3.1, Gemini Omni"]
+  J --> G["Gemini API<br/>Veo, Omni,<br/>Nano Banana"]
   J --> RM["Remotion in render/<br/>captions and final edit"]
 ```
 
