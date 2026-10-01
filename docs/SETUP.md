@@ -1,37 +1,20 @@
-# Set up your own creator research dashboard
+# Set up Social Scraper
 
-You need a computer, Node.js, FFmpeg, and three API keys: Apify, TypeSafe Jev, and either Fireworks or Groq. You do not need both speech providers. No Instagram password is requested.
+You need a computer, Node.js, FFmpeg and a few API keys. No Instagram password is ever asked for. It is built and
+tested on macOS.
 
 ## 1. Install the tools
 
-Install Node.js 24 from [nodejs.org](https://nodejs.org/en/download). Node 22.9 or newer also works. Open a new terminal after installing it.
-
-Install FFmpeg using the option for your computer:
-
-**macOS with Homebrew**
+Install Node.js 24 from [nodejs.org](https://nodejs.org/en/download) (22.9 or newer also works) and FFmpeg. On macOS
+with Homebrew:
 
 ```sh
-brew install ffmpeg
+brew install node ffmpeg
 ```
 
-If you do not have Homebrew, use the macOS build links on [FFmpeg's download page](https://ffmpeg.org/download.html), or install Homebrew from its official site first.
+On Ubuntu or Debian, `sudo apt install ffmpeg`, and Node from nodejs.org (the system package is often too old).
 
-**Windows with WinGet, in PowerShell**
-
-```powershell
-winget install --id Gyan.FFmpeg --exact
-```
-
-Close and reopen PowerShell after installation. If WinGet is unavailable, use the Windows build links on FFmpeg's download page and add its `bin` folder to PATH.
-
-**Ubuntu / Debian**
-
-```sh
-sudo apt update
-sudo apt install ffmpeg
-```
-
-Verify installation:
+Check that all four work:
 
 ```sh
 node --version
@@ -40,142 +23,97 @@ ffmpeg -version
 ffprobe -version
 ```
 
-## 2. Download Creator Lab
-
-On the [repository page](https://github.com/artemnovitckii/creator-lab), click **Code → Download ZIP**, then extract the ZIP. Open a terminal inside the extracted folder, where `package.json` is located.
-
-If you use Git:
+## 2. Get the code
 
 ```sh
-git clone https://github.com/artemnovitckii/creator-lab.git
-cd creator-lab
-```
-
-Run:
-
-```sh
+git clone https://github.com/kaantaskentt/social-scraper.git
+cd social-scraper
+(cd render && npm ci)
 npm run setup
 ```
 
-This copies `.env.example` to `.env`. It never overwrites an existing `.env`. Open `.env` with a text editor. Dotfiles may be hidden in Finder; an editor such as VS Code can open the folder and show them.
+`render/` is the video editor (Remotion). It downloads its own headless Chrome the first time it renders a reel.
+`npm run setup` copies `.env.example` to `.env` and never overwrites an existing `.env`.
 
 ## 3. Get your keys
 
 | Key | Where to get it | What it does |
-| --- | --- | --- |
-| Apify | [Apify Console](https://console.apify.com/), account settings / API integrations | Collects Reel URLs, thumbnails and public metrics |
-| Jev | [TypeSafe](https://typesafe.ai/), your account's API key settings; [API documentation](https://docs.typesafe.ai/api) | Labels transcripts and script passages |
-| Fireworks, one option | [Fireworks account](https://app.fireworks.ai/), API keys | Transcribes audio with Whisper V3 Turbo |
-| Groq, alternative | [Groq API keys](https://console.groq.com/keys) | Transcribes audio with Whisper Large V3 Turbo |
+|---|---|---|
+| `APIFY_TOKEN` | [Apify Console](https://console.apify.com/), Settings, API and integrations | Collects reels, thumbnails and public numbers with the [Instagram Reel Scraper](https://apify.com/apify/instagram-reel-scraper) |
+| `GROQ_API_KEY` | [Groq API keys](https://console.groq.com/keys) | Transcribes speech (Whisper Large V3 Turbo) and times the captions |
+| `FIREWORKS_API_KEY` (instead of Groq) | [Fireworks](https://app.fireworks.ai/), API keys | Transcribes speech (Whisper V3 Turbo) |
+| `TYPESAFE_API_KEY` | [TypeSafe](https://typesafe.ai/), API key settings ([docs](https://docs.typesafe.ai/)) | Jev: labels scripts, picks winners to copy, checks scripts and videos |
+| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) (Veo video and pictures are billed per use) | Watches reels, draws pictures (Nano Banana), films video (Veo 3.1 Fast, Gemini Omni) |
+| `ANTHROPIC_API_KEY` (optional) | [Anthropic Console](https://console.anthropic.com/) | A second opinion on finished reels |
 
-Enable the necessary API access and billing in each account. Available plans, credits, quotas, and upgrade availability can change. You are billed by these services, not Creator Lab. The app uses Apify's [Instagram Reel Scraper](https://apify.com/apify/instagram-reel-scraper), Actor ID `xMc5Ga1oCONPmWJIa`.
+Put them in `.env`, one value per line, and set `TRANSCRIPTION_PROVIDER` to `groq` or `fireworks`. You only need the
+key of the provider you chose. You are billed by these services directly; plans, prices and quotas can change.
 
-## 4. Configure one transcription provider
+Groq's free plan allows 20 transcriptions a minute and 2,000 a day. The app reads Groq's limit headers and paces itself,
+so a free plan works but a 100-reel scan takes about 7 minutes.
 
-For **Fireworks**, fill these entries in `.env`:
-
-```dotenv
-APIFY_TOKEN=your_apify_token
-TYPESAFE_API_KEY=your_typesafe_key
-TRANSCRIPTION_PROVIDER=fireworks
-FIREWORKS_API_KEY=your_fireworks_key
-PORT=5190
-```
-
-For **Groq**, use:
-
-```dotenv
-APIFY_TOKEN=your_apify_token
-TYPESAFE_API_KEY=your_typesafe_key
-TRANSCRIPTION_PROVIDER=groq
-GROQ_API_KEY=your_groq_key
-PORT=5190
-```
-
-Replace the example values with your own keys. Keep just one value per setting. Leave the unused speech provider key empty. You do not need to edit any JavaScript.
-
-The default local pacing settings are `FIREWORKS_REQUESTS_PER_MINUTE=60` and `GROQ_REQUESTS_PER_MINUTE=20`. These are local ceilings, not a statement of your account quota. Lower them if your account has a lower limit. Audio-duration quotas can also apply.
-
-Keys can alternatively be supplied through environment variables or the app's **Connections** dialog. Dialog keys last until the server stops. `.env` keys persist locally. This distribution does not read a parent folder's `.env`.
-
-## 5. Launch and verify
+## 4. Check and start
 
 ```sh
 npm run doctor
 npm start
 ```
 
-Doctor checks installed tools and key presence without printing keys or calling provider APIs. Open **http://127.0.0.1:5190** in your browser. Keep the terminal open while processing.
+`doctor` checks the tools and that each key is present, without printing keys or making paid calls. Then open
+**http://127.0.0.1:5190**. Keep the terminal open while the app works. Press **Ctrl+C** to stop it; restart it after
+editing `.env`.
 
-Open **Connections** and use **Save & verify connections**. Only Apify, Jev, and the selected speech provider are needed. A missing unused speech key is fine. Verification confirms API access; your first audio request still needs to succeed.
+## 5. Your first analysis
 
-To stop the server, press **Ctrl+C** in its terminal. After editing `.env`, stop and start it again.
+1. Click **New analysis**, type an account name (without `@`) and choose 30, 60 or 100 reels. The button shows the
+   estimated price.
+2. Watch the scan. Winners appear in about a minute, before the scan finishes.
+3. Open **Winners**, then optionally **Why do these win?**
+4. **Make your look**: the app proposes a format, hosts and a place, and shows every picture. Approve it once.
+5. **Copy**: pick the winners to copy and the video model, see the price, confirm. Each part plays as soon as it is
+   filmed. Every copy gets a faithfulness score against the original.
+6. **Ready to post**: download the video, cover and caption. After you post, add your account under
+   **Track real results** to see real numbers on each reel.
 
-## 6. Run a small pilot
+Every paid step shows its price and asks before spending. Start with a small account to check your setup.
 
-1. Choose **New analysis**.
-2. Enter the creator's username without `@` or a profile URL. Use your own account or another public creator.
-3. Start with **20 Reels**, concurrency **2**, and a small Apify cap such as **$1**. This cap may stop collection before the requested count, and only covers Apify charges.
-4. Optionally provide a two-letter speech language code such as `en`; otherwise leave it blank.
-5. Start the run. Watch Run activity for collection, transcription, and classification.
-6. Inspect a few transcripts and original Reels before collecting a larger batch.
+## 6. The research view and recording studio
 
-The pipeline downloads media, extracts 16 kHz mono audio with FFmpeg, sends it to your chosen transcription service, and asks Jev to label the resulting speech. Each stage takes real time. The animated replay runs only after results exist.
+- **http://127.0.0.1:5190/lab** is the dense research view: choose a topic and a hook, and the thumbnail wall, the
+  performance map and the examples narrow together. **Compare engagement** compares patterns with sample sizes. It also
+  has the **Connections** dialog to enter and verify keys, pause and resume, and JSON export.
+- **http://127.0.0.1:5190/record** replays a saved scan as an animation for screen recording (scanner, wall and map, or
+  script breakdown layouts). Press **C** for controls, **Space** to pause, **R** to restart. It makes no paid calls.
 
-A run supports up to 1,000 requested Reels. Instagram availability and the scraper determine what is actually returned. Pinned and trial Reels are skipped. This is not a guarantee of analyzing every Reel on any account.
+## 7. Pause, resume and restarts
 
-## 7. Use the findings for your next post
-
-Choose a **Topic**, then a **Hook**. The wall, graph and examples narrow together. Select **Compare engagement** to compare patterns using median plays or views, likes per 1,000, and comments per 1,000. Check the sample sizes and keep post age and length comparable.
-
-Open **Read script** or click a thumbnail to inspect its opening, script roles, and transcript. Use **Original Reel** to check how it was delivered. Save an opening structure you can adapt to your own topic and experience. Engagement is a clue to investigate, not proof that copying a hook will reproduce the result.
-
-You can repeat this for your own account to find topics worth revisiting. Each new analysis takes a separate handle; the app does not combine multiple creators into one run.
-
-Use **Replay analysis** for a saved-result animation. Filtering and replay do not trigger new paid analyses. Export JSON when you want a local backup; exports contain creator content and source URLs, so review them before sharing.
-
-## 8. Pause, resume, and change providers
-
-**Pause run** lets in-flight requests finish. **Start / resume** retries unfinished work and preserves completed results. Closing the browser does not stop the server. After a server restart, select the saved run and resume it.
-
-To switch transcription provider: pause, stop the server, change `TRANSCRIPTION_PROVIDER` and the corresponding key in `.env`, restart, and resume. Existing transcripts are reused. Changing provider does not automatically replace transcripts you already paid for.
-
-If an Apify launch response is lost, the app blocks a duplicate launch. Find the existing Actor run ID in Apify, attach it in **Run activity**, then resume. Do not launch another scrape merely because the first response was lost.
+- A scan that was cut off by a restart resumes on its own when the server starts again. Finished transcripts and labels
+  are reused, never paid for twice.
+- If an Apify launch reply is lost, the app blocks a second launch. Find the existing run in Apify, attach it in the
+  research view, then resume.
+- To switch transcription provider: stop the server, change `TRANSCRIPTION_PROVIDER` and the key, start again. Existing
+  transcripts are kept.
 
 ## Troubleshooting
 
 | Symptom | What to do |
-| --- | --- |
-| `node` or `npm` not found | Install Node.js, then reopen the terminal. |
-| `--env-file-if-exists` unsupported | Upgrade to Node 22.9 or newer. |
-| FFmpeg or ffprobe missing | Install FFmpeg and ensure both commands are on PATH. |
-| Missing key after editing `.env` | Confirm it is named `.env`, not `.env.txt`, in the same folder as `server.mjs`. Restart. |
-| HTTP 401 or 403 | Check the selected provider key, account permissions and billing. |
-| HTTP 429 / paused run | Check provider quotas. Wait for reset or lower pacing; then resume. Short rate limits retry automatically. |
-| Groq upgrade unavailable | Configure Fireworks instead. Existing transcripts remain cached. |
-| No audio / too little speech | These Reels are excluded from spoken-script comparisons. They are not pending labels. |
-| Failed download or expired media | Inspect the original Reel. Resume can retry, but an expired source URL may require a fresh collection. |
-| Graph has fewer points than Reels | Missing/nonpositive plays or views, unknown likes, age filters, duplicates and exclusions can remove points. |
-| No Reels returned | Check the username, whether the account is public, Actor access, budget and the Apify run log. |
-| Port already in use | Stop the previous server, or set `PORT=5191` and open that port. |
-| Page stops responding after restart | Refresh the browser to obtain a new local request token. |
+|---|---|
+| `node` or `npm` not found | Install Node.js, then open a new terminal |
+| `--env-file-if-exists` unsupported | Upgrade to Node 22.9 or newer |
+| FFmpeg or ffprobe missing | Install FFmpeg and make sure both are on PATH |
+| Doctor says "Video editor" is missing | Run `cd render && npm ci` |
+| A key is missing after editing `.env` | Check the file is named `.env` (not `.env.txt`) next to `server.mjs`, then restart |
+| HTTP 401 or 403 | Check the key, the account's permissions and billing |
+| HTTP 429 or a paused scan | A provider's quota was hit. Wait, then resume. Short limits retry on their own |
+| A reel shows "no speech" | It is music or too little speech. It can still be copied as a visual copy |
+| A video failed to download | Instagram links expire. A new scan fetches fresh links |
+| No reels returned | Check the account name, that it is public, and the Apify run log |
+| Port already in use | Stop the other server, or set `PORT=5191` in `.env` |
+| The page stops responding after a restart | Refresh the page to get a new local request token |
+| Something else went wrong | Run `node scripts/errors.mjs open`: every error is logged there with where it happened |
 
-## Costs, privacy and sharing
+## Costs and sharing
 
-The app's estimated costs are separate for collection, speech and Jev. Account minimums, retries and rate changes can affect the actual bill. Provider billing is authoritative. [Groq speech documentation](https://console.groq.com/docs/speech-to-text), [Apify Actor pricing](https://apify.com/apify/instagram-reel-scraper/pricing), and [TypeSafe documentation](https://docs.typesafe.ai/) are the starting points for current terms. The Fireworks implementation uses its Whisper Turbo audio endpoint; confirm availability in your account.
-
-Do not publish `.env`, `data/`, screenshots of keys, or your exported archive by accident. These files are excluded from Git by default. [Read the data flow](PRIVACY.md). The server is intended for your own computer, not public hosting.
-
-## Record the demo
-
-Open **Recording studio** from the dashboard, or visit **http://127.0.0.1:5190/record**. Choose your saved archive and a layout:
-
-- **Scanner:** a paged thumbnail grid, large current-Reel analysis, counters and hook-frequency bars.
-- **Wall + map:** larger thumbnails fill the wall while corresponding points appear on the engagement map. The axis explicitly names plays or views, whichever the archive supports; they are never combined.
-- **Script breakdown:** a large Reel image and readable excerpts with Jev's script-role labels.
-
-Choose 12, 20 or 40 seconds, press Play, then **Clean view** to hide the controls. Press **C** to bring controls back, **Space** to pause, and **R** to restart. The timeline slider lets you inspect any frame. Loop adds a short hold at the end.
-
-The canvas is 1080 × 1000 and scales to your window. Crop your screen recording around it and place it over your portrait footage. It is intentionally taller than the full research dashboard so the text stays larger on a phone. Script excerpts can be visually truncated; use the main dashboard to read the full transcript.
-
-The recording cost counter sums stored Jev estimates for the revealed scripts, including reused results; it is not a new charge or a complete pipeline invoice. Missing costs display as unknown. The synthetic rehearsal has no real cost. All these layouts replay saved results and make no new paid analysis calls.
+The prices shown in the app are estimates from each provider's published rates; your provider bills are the final word.
+Never share `.env`, `data/` or screenshots of keys. The server is meant for your own computer, not public hosting.
+Read the full [data flow](PRIVACY.md).

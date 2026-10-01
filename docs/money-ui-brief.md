@@ -1,6 +1,6 @@
 # Money view: UI brief (for Codex / GPT-6 Astra)
 
-Kaan uses Creator Lab to decode Instagram accounts that make money with short videos (for example an account whose captions say "Comment LIME and I'll send you the recipe"). The numbers are already computed; you build how they look. Read `docs/superpowers/specs/2026-09-25-money-radar-design.md` section 4 for what each number means. Kaan is a visual thinker: one glance should tell him which reels to copy.
+Kaan uses the app to decode Instagram accounts that make money with short videos (for example an account whose captions say "Comment LIME and I'll send you the recipe"). The numbers are already computed; you build how they look. Read `docs/superpowers/specs/2026-09-25-money-radar-design.md` section 4 for what each number means. Kaan is a visual thinker: one glance should tell him which reels to copy.
 
 ## Files you may create or change
 - `public/app.js`, `public/index.html`, `public/styles.css`
@@ -57,7 +57,7 @@ Add it next to the existing explorer (a tab or a section switch; follow the page
 5. Version picker only if `versions.length > 1` (today it is hidden).
 
 ## Design
-Match the existing Creator Lab look (fonts, colors, spacing, tiles, thumbnail style) exactly; the Money view must feel native, not bolted on. Use the four box names with subtle color accents consistent with the palette. Numbers use tabular figures. No external requests. Keyboard: every thumbnail is focusable and selectable with Enter; focus visible. Respect `prefers-reduced-motion`. Must look right at 1440x900 and 1024x768 with no horizontal overflow.
+Match the app's existing look (fonts, colors, spacing, tiles, thumbnail style) exactly; the Money view must feel native, not bolted on. Use the four box names with subtle color accents consistent with the palette. Numbers use tabular figures. No external requests. Keyboard: every thumbnail is focusable and selectable with Enter; focus visible. Respect `prefers-reduced-motion`. Must look right at 1440x900 and 1024x768 with no horizontal overflow.
 
 ## Behavior
 - Fetch the money report when a real run is loaded or finishes updating (debounce: at most once every 2 seconds while a run is live). Failure shows a small error line with the message, never a blank area.

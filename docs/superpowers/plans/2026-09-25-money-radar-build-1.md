@@ -2,17 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Every reel in a Creator Lab run gets x normal, a label, a comment rate, a keyword CTA and a quadrant (or a named reason it has none), shown in a Money view; plus crash-safe saving and a language-aware transcript cache.
+**Goal:** Every reel in a scan gets x normal, a label, a comment rate, a keyword CTA and a quadrant (or a named reason it has none), shown in a Money view; plus crash-safe saving and a language-aware transcript cache.
 
 **Architecture:** Metrics are pure functions in an immutable, versioned module (`public/money/1.0.mjs`) behind a registry (`public/money/index.mjs`); the server computes a report per run on request and records which version was shown. Pipeline changes are limited to durable-vs-progress saves, observation time, and a transcript cache policy in a new small module. The UI is built by Codex GPT-6 Astra from a brief and inspected by Claude.
 
-**Tech Stack:** Node 22+ ESM, `node:test`, no dependencies (matches upstream).
+**Tech Stack:** Node 22+ ESM, `node:test`, no dependencies (matches the base app).
 
 **Spec:** `docs/superpowers/specs/2026-09-25-money-radar-design.md` (v3), sections 3, 4, 5, 8, 9.
 
 ## Global Constraints
 - Node >= 22.9, no npm dependencies, no build step.
-- Dense one-line style of upstream files is kept in edited upstream files; new files use normal formatting with short comments.
+- Dense one-line style of the original files is kept when editing them; new files use normal formatting with short comments.
 - Formula id `money-1.0`; `public/money/1.0.mjs` is immutable after Task 5's golden test lands.
 - Params (verbatim from spec): minAgeDays 7, window 30 reels within 90 days, minWindow 10, winner x >= 2, big winner x >= 5, flop x <= 0.5, z gate 1, z constant 0.6745, rate floor 1,000 reach, reach disagreement 5%, growth +50% / -33% per 30 days, growth needs 5 distinct timestamps, tolerance 1e-9.
 - Paid calls: none in tests (mock `fetch`). No real run is started by Claude without Kaan's yes.
@@ -545,13 +545,13 @@ test('observedAt comes from Apify finishedAt, retrievedAt from the download',asy
   - Replace `save(job)` with:
 ```js
  // Durable saves (launch markers, run ids, status changes) are written now and awaited; progress saves are coalesced.
- save(job,{durable=false}={}){this.emit(job);if(durable)return this.persist(job);if(!this.saveTimers.has(job.id))this.saveTimers.set(job.id,setTimeout(()=>{this.persist(job).catch(e=>console.error(`Creator Lab: progress save failed for ${job.id}: ${e.message}`));},this.saveDelayMs));return Promise.resolve();}
+ save(job,{durable=false}={}){this.emit(job);if(durable)return this.persist(job);if(!this.saveTimers.has(job.id))this.saveTimers.set(job.id,setTimeout(()=>{this.persist(job).catch(e=>console.error(`Social Scraper: progress save failed for ${job.id}: ${e.message}`));},this.saveDelayMs));return Promise.resolve();}
  // One serialized chain per run; the snapshot is taken when the write starts, so a later write never holds older state.
  persist(job){clearTimeout(this.saveTimers.get(job.id));this.saveTimers.delete(job.id);const prev=this.writes.get(job.id)||Promise.resolve();const next=prev.catch(()=>{}).then(()=>this.writer(join(this.root,'runs',job.id+'.json'),structuredClone(job)));this.writes.set(job.id,next);return next;}
 ```
   - Durable call sites (change `await this.save(j)` to `await this.save(j,{durable:true})`): `create()` final save; `pause()` return; `run()` first save after setting status; before `startScrape` (`j.scrapeUncertain=true`); after `startScrape` returns; after the dataset is collected (`j.status='running'`); the `finally` save; `attachScrape()` save. All other saves stay progress saves.
   - After `const raw=await providers.dataset(...)`: `j.observedAt=j.scrape.finishedAt||null;j.retrievedAt=new Date().toISOString();`.
-  - `finally` becomes: `finally{j.elapsedMs+=Date.now()-start;this.active.delete(id);try{await this.save(j,{durable:true});}catch(e){j.error=`Could not save this run: ${e.message}`;this.emit(j);console.error(`Creator Lab: ${j.error}`);}}`.
+  - `finally` becomes: `finally{j.elapsedMs+=Date.now()-start;this.active.delete(id);try{await this.save(j,{durable:true});}catch(e){j.error=`Could not save this run: ${e.message}`;this.emit(j);console.error(`Social Scraper: ${j.error}`);}}`.
 - [ ] **Step 4:** `npm test` — all PASS, including the original pipeline tests.
 - [ ] **Step 5: Commit** `fix(pipeline): durable checkpoints around paid launches, coalesced progress saves, observation time`
 
@@ -596,7 +596,7 @@ test('a new run never reads a legacy transcript; a legacy run still does',async(
 - [ ] **Step 2:** FAIL (module missing).
 - [ ] **Step 3: Implement** `lib/transcript-policy.mjs`:
 ```js
-// Transcript cache keys. Policy 1 (upstream): one transcript per reel id, whatever language was requested, so a run
+// Transcript cache keys. Policy 1 (the original): one transcript per reel id, whatever language was requested, so a run
 // set to English kept reusing wrong transcripts of Turkish speech. Policy 2 keys also carry the requested language
 // (or auto), provider and model. Policy-2 runs never read policy-1 keys; no cache file is deleted.
 export const TRANSCRIPT_POLICY=2;
@@ -704,7 +704,7 @@ for(const name of (await readdir(dir)).filter(n=>n.endsWith('.json')&&!n.endsWit
 
 **Files (Astra may touch only):** `public/app.js`, `public/index.html`, `public/styles.css`, new `public/money-view.mjs`, new `tests/money-view.test.mjs`, and one static-map line in `server.mjs` for `/money-view.mjs`. Everything else is read-only for Astra.
 
-- [ ] **Step 1:** Write `docs/money-ui-brief.md` with: data source (`GET /api/runs/:id/money`, fields from Task 5), the reel-panel additions (x its previous posts with age, label, comment rate wording rules, keyword with evidence, quadrant or reason in plain words), the Money view (2x2 of thumbnails using `/media/<runId>/<postId>`, account summary, Stars/Billboards/Closers lists, version shown, a "How this is measured" panel with the spec's plain-language rules), demo mode shows "Run a real analysis to see money metrics", bucket reasons in plain words (too new: "under 7 days old, still collecting plays"; short history: "needs 10 earlier reels"; too few plays: "under 1,000 plays"; pooled: "not enough variation in earlier reels"), design matches the existing Creator Lab look, keyboard focus visible, reduced motion respected, 1440x900 and 1024x768 without overflow, and the list of files it must not touch.
+- [ ] **Step 1:** Write `docs/money-ui-brief.md` with: data source (`GET /api/runs/:id/money`, fields from Task 5), the reel-panel additions (x its previous posts with age, label, comment rate wording rules, keyword with evidence, quadrant or reason in plain words), the Money view (2x2 of thumbnails using `/media/<runId>/<postId>`, account summary, Stars/Billboards/Closers lists, version shown, a "How this is measured" panel with the spec's plain-language rules), demo mode shows "Run a real analysis to see money metrics", bucket reasons in plain words (too new: "under 7 days old, still collecting plays"; short history: "needs 10 earlier reels"; too few plays: "under 1,000 plays"; pooled: "not enough variation in earlier reels"), design matches the existing look, keyboard focus visible, reduced motion respected, 1440x900 and 1024x768 without overflow, and the list of files it must not touch.
 - [ ] **Step 2:** Launch `codex exec -m gpt-6-astra -s workspace-write -C ~/Dev/active/creator-lab -o <scratchpad>/codex-money-ui.md "<brief pointer + rules>" < /dev/null > <scratchpad>/codex-money-ui.log 2>&1` in the background.
 - [ ] **Step 3:** When done: `git status` shows only allowed files changed; `npm test` PASS; start the app (preview config `creator-lab`), open ken.remedie's run, screenshot the Money view and a reel panel at both sizes, check console errors, check the numbers on screen equal `scripts/validate-money.mjs` output for 3 reels.
 - [ ] **Step 4:** Fix issues (small fixes by Claude; big ones back to Astra with the list). 
@@ -713,7 +713,7 @@ for(const name of (await readdir(dir)).filter(n=>n.endsWith('.json')&&!n.endsWit
 ### Task 11: final audit and hand-off
 
 - [ ] **Step 1:** `npm test` and `npm run check` — all PASS; paste the counts.
-- [ ] **Step 2:** Codex GPT-6 Astra read-only review of the full diff (`git diff upstream/main...HEAD -- . ':!docs'`) against the spec, same format as the design reviews. Fix every real finding with a test first.
+- [ ] **Step 2:** Codex GPT-6 Astra read-only review of the full diff (`git diff <base commit>...HEAD -- . ':!docs'`) against the spec, same format as the design reviews. Fix every real finding with a test first.
 - [ ] **Step 3:** Update `CLAUDE.md` (Money view, validation script), `lessons.md` (anything learned), `~/Dev/active/office/NEEDS.md` (Kaan: spot-check 10 reels in the Money view; re-run Slush'D with auto-detect when he wants, about $0.05).
 - [ ] **Step 4:** Commit named files; do not push.
 - [ ] **Step 5:** Open the app in Kaan's Chrome on the ken.remedie Money view; report with screenshots, test counts, what was not verified.

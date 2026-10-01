@@ -1,6 +1,6 @@
 # UI brief 2: clickable script parts, saved videos, cleaner page (for Codex / GPT-6 Astra)
 
-Kaan tested the Money view and wants: fewer useless buttons, clearer clickable things, "+N more" that opens, and script parts he can click to jump to that moment in the reel. Match the existing Creator Lab look exactly. Read `public/app.js`, `public/index.html`, `public/styles.css`, `public/money-view.mjs` first and follow their patterns.
+Kaan tested the Money view and wants: fewer useless buttons, clearer clickable things, "+N more" that opens, and script parts he can click to jump to that moment in the reel. Match the app's existing look exactly. Read `public/app.js`, `public/index.html`, `public/styles.css`, `public/money-view.mjs` first and follow their patterns.
 
 ## Files you may create or change
 `public/app.js`, `public/index.html`, `public/styles.css`, `public/money-view.mjs`, `tests/money-view.test.mjs`, new `public/anatomy-view.mjs` (pure helpers, importable by Node tests), new `tests/anatomy-view.test.mjs`, and exactly one entry in the static `files` map in `server.mjs` for `/anatomy-view.mjs`.

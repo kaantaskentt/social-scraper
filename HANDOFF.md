@@ -39,10 +39,8 @@ Stack: plain Node (22.9 or newer), ES modules, **no npm dependencies at the root
 
 1. **Tools:** Node 22.9+ (24 LTS is fine), git, `gh`, ffmpeg (Homebrew: `brew install node ffmpeg gh`).
 2. **Code:** `gh auth login` with Kaan's GitHub, then
-   `gh repo clone kaantaskentt/social-scraper ~/Dev/active/social-scraper` (private repo, default branch `main`).
-   Work on branch `money-radar-build-1` and push with `git push private money-radar-build-1:main`
-   (on a fresh clone the remote is `origin` = kaantaskentt/social-scraper; that is the private one there).
-   Never push to `kaantaskentt/creator-lab`: that is an old **public** fork.
+   `gh repo clone kaantaskentt/social-scraper ~/Dev/active/social-scraper` (default branch `main`).
+   On a fresh clone the remote is `origin` = kaantaskentt/social-scraper; push your work there and nowhere else.
 3. **Video editor:** `cd render && npm ci` (Remotion downloads its headless Chrome on the first render).
 4. **Keys:** create `.env` in the project folder (it is gitignored). Names only here; Kaan gives you the values through
    a secure channel, never in chat, never in a file that is committed, never printed. Check a key by its length.

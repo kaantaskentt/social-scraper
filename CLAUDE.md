@@ -1,10 +1,10 @@
-# Social Scraper (Kaan's fork of Creator Lab, MIT)
+# Social Scraper
 
-Fork of github.com/artemnovitckii/creator-lab (MIT), remote `upstream`. Being extended into "Money Radar": see
-`docs/superpowers/specs/2026-09-25-money-radar-design.md`. Read `lessons.md` too.
+Finds the reels that win on an Instagram account and remakes them with our own AI hosts. Read `README.md` (what it
+does), `HANDOFF.md` (state and priorities) and `lessons.md` first. Design history: `docs/superpowers/specs/`.
 
-- Folder: `~/Dev/active/social-scraper` (renamed from creator-lab on 2026-09-30); GitHub: private `kaantaskentt/social-scraper`,
-  push with `git push private money-radar-build-1:main` (never to `origin`, the public fork).
+- Folder: `~/Dev/active/social-scraper`; GitHub: `kaantaskentt/social-scraper` (public). On Kaan's first Mac push with `git push private money-radar-build-1:main`; never push to any other
+  remote there. On a fresh clone, `origin` is this repo.
 - Start: `~/Dev/active/office/bin/social-scraper.sh` (loads APIFY_TOKEN from the office .env.local and TYPESAFE_API_KEY from
   JEV's .env.local; picks Fireworks or Groq by which key exists). Or `npm start` with a local `.env`. Serves 127.0.0.1:5190.
 - Test: `npm test` (mocked providers, no paid calls). Syntax check: `npm run check`. Setup check: `npm run doctor`.
@@ -21,5 +21,4 @@ Fork of github.com/artemnovitckii/creator-lab (MIT), remote `upstream`. Being ex
   `node scripts/errors.mjs fixed <id> "<commit>: <what>"` (or `notbug <id> "<why>"`, and add Kaan's part to
   ~/Dev/active/office/NEEDS.md). The scheduled task `fix-social-scraper-errors` does this every hour.
 - Free re-edit of a made reel: `node scripts/re-edit.mjs <runId> <reelId> <source.mp4> <keep ranges> [--captions] [--no-hook]` (keeps the old reel as reel-before-*.mp4).
-- Status: build 1 done (metrics, Money view, crash-safe saves, transcript policy). Next: build 2 spec (discovery, queue,
-  spending guard, storage) with its own Codex review before code. See the spec, section 6.
+- Status, what is verified and what is not, and the next priorities: `HANDOFF.md`.

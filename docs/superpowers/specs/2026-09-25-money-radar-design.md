@@ -1,4 +1,4 @@
-# Money Radar on Creator Lab: design (v3)
+# Money Radar: design (v3)
 
 Date: 2026-09-25. Owner: Kaan. Status: v3 after two Codex (GPT-6 Astra) reviews. Build 1 (sections 3 to 5) is ready for Kaan's decision. Build 2 (section 6) is an outline with hard requirements; it gets its own spec and review before any code.
 Research (all in `~/Dev/reference/research-library/raw/`): `2026-09-25-winner-score-lead-rate-methods.md`, `2026-09-25-templates-patterns-backtest.md`, `2026-09-25-account-discovery.md`, `2026-09-25-buzzabout.md`, `2026-09-25-what-social-researchers-want.md`, `2026-09-25-reel-collection-options.md`, `2026-09-25-content-intelligence-market.md`.
@@ -26,7 +26,7 @@ Research (all in `~/Dev/reference/research-library/raw/`): `2026-09-25-winner-sc
 | M18 tests missed failure cases | Failure-case acceptance tests added (9). |
 
 ## 1. Goal
-Turn this fork of Creator Lab (MIT, upstream `artemnovitckii/creator-lab`) into Kaan's research operating system for short-form money machines: find accounts, measure which reels win reach and which win comments (leads, when a keyword CTA exists), explain why, and hand over what to make next. First for Kaan's own AI-made channel; later possibly sold (competitor decode reports, or a tool).
+Turn the reel research app into Kaan's research operating system for short-form money machines: find accounts, measure which reels win reach and which win comments (leads, when a keyword CTA exists), explain why, and hand over what to make next. First for Kaan's own AI-made channel; later possibly sold (competitor decode reports, or a tool).
 
 Success for this spec (builds 1 and 2):
 - Every reel in a run shows x normal, a label, comment rate, keyword CTA and quadrant, or a named reason it has none.
@@ -41,7 +41,7 @@ Build 3 (template families, patterns, validation, Make-this card) and build 4 (A
 3. Derived and versioned. Metrics are pure functions of saved data, computed under a named formula version with its parameters. Old versions stay in the code and selectable, so history can be reproduced.
 4. Named gaps. Missing counts, too new, short history, too few plays, pooled prior: each is a bucket with a reason, never a fake number.
 5. Money is guarded. Every paid launch passes one guard that reserves the permitted maximum before launching.
-6. Small upstream surface, stated honestly. New logic in new files; the unavoidable core changes (checkpoints, cache policy, scheduler, storage) are listed in section 8 and treated as a deliberate divergence from upstream.
+6. Small changes to the original core, stated honestly. New logic in new files; the unavoidable core changes (checkpoints, cache policy, scheduler, storage) are listed in section 8 and treated as a deliberate divergence from the original.
 
 ## 3. Data concepts
 ### 3.1 Snapshot
@@ -156,7 +156,7 @@ Optional weekly re-scrape of up to 5 watched accounts (about $0.26 per 100 reels
 
 ## 8. Integration contracts and touched files
 New: `public/money/1.0.mjs`, `public/money/index.mjs`, `lib/guard.mjs`, `lib/scheduler.mjs`, `lib/storage.mjs`, `lib/discover.mjs`, `lib/signals.mjs`, `lib/projects.mjs`, tests and fixtures (real raw rows, no keys).
-Changed upstream files and why:
+Changed core files and why:
 - `server.mjs`: static allowlist entries for `/money/*.mjs`; project, discovery, queue and ledger routes; run button routed through the scheduler.
 - `lib/pipeline.mjs`: durable vs progress saves; transcript policy; observedAt; guard call before `startScrape`; scheduler hooks; sidecar raw writes; lazy loading.
 - `lib/providers.mjs`: Apify run abort; usage read for the guard.
@@ -178,7 +178,7 @@ Real data: ken.remedie 100 reels matches the hand analysis (top reels, keyword c
 ## 10. Case against
 - Paid tools already rank outliers. None measure comments against keyword CTAs, read funnels or validate their patterns; that is the gap.
 - The statistics add complexity. The screen shows one plain number per reel; the rest lives behind "how this is measured" and in tests.
-- Build 1b and 6.3 change upstream core files, so merging upstream fixes gets harder. Accepted: the scale and safety problems are real; upstream is two days old with no merged external PRs yet.
+- Build 1b and 6.3 change core files. Accepted: the scale and safety problems are real.
 - Free plan limits discovery to small searches; the real value needs Apify Starter ($19/month). Kaan's decision; the code is the same.
 - This serves an experiment, not 1% Session (priority 1). Kaan chose it; a competitor-decode report is the bridge back to paying clients.
 
